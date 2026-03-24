@@ -1,0 +1,49 @@
+// src/hooks/useClients.js
+import { useMemo, useCallback } from "react";
+import { useData } from "../contexts/DataContext";
+import { calcRevenue, calcRemainingAmount, derivePaymentStatus } from "../utils/calculations";
+
+export const useClients = () => {
+  const { jobs, settings, loading } = useData();
+
+  const clients = useMemo(() => {
+    const map = {};
+    jobs.forEach((job) => {
+      const name = job.client;
+      if (!name) return;
+      if (!map[name]) map[name] = { client:name, ops:0, totalRevenue:0, totalAcres:0, totalPaid:0, totalRemaining:0 };
+      const revenue   = calcRevenue(job.acres, job.pricePerAcre);
+      const paid      = Number(job.amountPaid) || 0;
+      const remaining = calcRemainingAmount(revenue, paid);
+      map[name].ops            += 1;
+      map[name].totalRevenue   += revenue;
+      map[name].totalAcres     += Number(job.acres) || 0;
+      map[name].totalPaid      += paid;
+      map[name].totalRemaining += remaining;
+    });
+    return Object.values(map).sort((a, b) => b.totalRemaining - a.totalRemaining);
+  }, [jobs]);
+
+  const totalDebt = useMemo(
+    () => clients.reduce((s, c) => s + c.totalRemaining, 0),
+    [clients]
+  );
+
+  const getClientSummary = useCallback((clientName) => {
+    const clientJobs = jobs.filter((j) => j.client === clientName);
+    const summary = { client:clientName, ops:clientJobs.length, jobs:[], totalRevenue:0, totalPaid:0, totalRemaining:0 };
+    clientJobs.forEach((job) => {
+      const revenue   = calcRevenue(job.acres, job.pricePerAcre);
+      const paid      = Number(job.amountPaid) || 0;
+      const remaining = calcRemainingAmount(revenue, paid);
+      const status    = derivePaymentStatus(revenue, paid);
+      summary.totalRevenue   += revenue;
+      summary.totalPaid      += paid;
+      summary.totalRemaining += remaining;
+      summary.jobs.push({ ...job, revenue, amountPaid:paid, remainingAmount:remaining, paymentStatus:status });
+    });
+    return summary;
+  }, [jobs]);
+
+  return { clients, totalDebt, loading, getClientSummary };
+};

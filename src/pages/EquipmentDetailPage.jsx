@@ -1,0 +1,184 @@
+// src/pages/EquipmentDetailPage.jsx
+import React from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useEquipmentDetail } from "../hooks/useEquipmentDetail";
+import { useData }            from "../contexts/DataContext";
+import PaymentBadge           from "../features/clients/PaymentBadge";
+import { Card, CardHeader, CardBody, StatCard, SummaryRow, EmptyState, ProgressBar } from "../components/ui/Card";
+import Button                 from "../components/ui/Button";
+import LoadingScreen          from "../components/ui/LoadingScreen";
+import { formatCurrency, formatNumber, formatDateShort, formatPercent } from "../utils/formatters";
+import { TractorIcon, FuelIcon, AcreIcon, WrenchIcon, RevenueIcon, ProfitIcon, CalendarIcon, DriverIcon } from "../components/ui/Icons";
+import { printEquipmentReport } from "../utils/pdfGenerator";
+
+// Inline print SVG
+const PrintSVG = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M6 9V2h12v7"/>
+    <path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/>
+    <rect x="6" y="14" width="12" height="8" rx="1"/>
+  </svg>
+);
+
+const EquipmentDetailPage = () => {
+  const { equipmentId } = useParams();
+  const navigate        = useNavigate();
+  const { drivers }     = useData();
+  const {
+    equipment, jobs, maintenance,
+    stats, maintCost, netProfit, margin,
+    loading, fuelPrice,
+  } = useEquipmentDetail(equipmentId);
+
+  if (loading) return <LoadingScreen />;
+  if (!equipment) return (
+    <div className="p-6 text-center text-gray-400">المعدة غير موجودة</div>
+  );
+
+  const driver = drivers.find((d) => d.id === equipment.driverId);
+
+  const handlePrint = () => {
+    printEquipmentReport({
+      equipment,
+      jobs,
+      maintenance,
+      fuelPrice,
+      driverName: driver?.name,
+    });
+  };
+
+  return (
+    <div className="p-4 lg:p-6 max-w-4xl mx-auto" dir="rtl">
+
+      {/* Back */}
+      <button onClick={() => navigate("/equipment")}
+        className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-200 mb-5 transition-colors">
+        ← المعدات
+      </button>
+
+      {/* Header */}
+      <div className="flex items-center gap-4 mb-6">
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-900/60 to-surface-3 border border-brand-800/30 flex items-center justify-center">
+          <TractorIcon size={28} className="text-brand-400"/>
+        </div>
+        <div className="flex-1">
+          <h1 className="text-xl font-extrabold text-gray-100">{equipment.name}</h1>
+          <p className="text-sm text-gray-500">
+            {equipment.type}
+            {driver && ` · ${driver.name}`}
+            {equipment.fuelRate > 0 && ` · ${equipment.fuelRate} لتر/ساعة`}
+          </p>
+        </div>
+        {/* Print button */}
+        <Button variant="secondary" size="sm" onClick={handlePrint}>
+          <PrintSVG/>
+          <span className="mr-1.5">طباعة تقرير</span>
+        </Button>
+      </div>
+
+      {/* KPIs */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        <StatCard icon={<AcreIcon size={24}/>}    label="إجمالي الأفدنة" value={formatNumber(stats.totalAcres)}    color="blue"/>
+        <StatCard icon={<RevenueIcon size={24}/>} label="إجمالي الإيراد" value={formatCurrency(stats.totalRevenue)} color="amber"/>
+        <StatCard icon={<FuelIcon size={24}/>}    label="إجمالي الوقود"  value={`${formatNumber(stats.totalFuel)} ل`} color="orange"/>
+        <StatCard icon={<ProfitIcon size={24}/>}  label="صافي الربح"     value={formatCurrency(netProfit)} color={netProfit>=0?"green":"red"}/>
+      </div>
+
+      {/* P&L */}
+      <Card className="mb-5">
+        <CardHeader title="تفصيل الأرباح والخسائر"/>
+        <CardBody>
+          <SummaryRow label="إجمالي الإيراد"  value={formatCurrency(stats.totalRevenue)}   valueColor="text-amber-400"/>
+          <SummaryRow label="تكلفة الوقود"    value={formatCurrency(stats.totalFuelCost)}  valueColor="text-red-400"/>
+          <SummaryRow label="تكاليف الصيانة"  value={formatCurrency(maintCost)}            valueColor="text-red-400"/>
+          <SummaryRow label="صافي الربح"      value={formatCurrency(netProfit)}            valueColor={netProfit>=0?"text-green-400":"text-red-400"} bold/>
+          {stats.totalRevenue > 0 && (
+            <div className="mt-4">
+              <div className="flex justify-between text-xs text-gray-500 mb-1.5">
+                <span>هامش الربح</span>
+                <span className="font-bold text-brand-400">{formatPercent(margin)}</span>
+              </div>
+              <ProgressBar value={Math.max(0,margin)} max={100}/>
+            </div>
+          )}
+        </CardBody>
+      </Card>
+
+      {/* Payment summary */}
+      {stats.totalRevenue > 0 && (
+        <Card className="mb-5">
+          <CardHeader title="حالة المدفوعات"/>
+          <CardBody>
+            <SummaryRow label="إجمالي الإيراد"  value={formatCurrency(stats.totalRevenue)}   valueColor="text-amber-400"/>
+            <SummaryRow label="تم تحصيله"       value={formatCurrency(stats.totalPaid||0)}   valueColor="text-green-400"/>
+            <SummaryRow label="متبقي للتحصيل"  value={formatCurrency(stats.totalRemaining||0)} valueColor={(stats.totalRemaining||0)>0?"text-red-400":"text-gray-400"} bold/>
+          </CardBody>
+        </Card>
+      )}
+
+      {/* Jobs */}
+      <h2 className="text-sm font-bold text-gray-300 mb-3">العمليات ({jobs.length})</h2>
+      {jobs.length === 0 ? (
+        <EmptyState icon={<AcreIcon size={40} className="text-gray-600 mx-auto mb-2"/>} title="لا توجد عمليات بعد"/>
+      ) : (
+        <div className="space-y-3 mb-6">
+          {jobs.map((job) => (
+            <div key={job.id} className={`bg-surface border rounded-2xl p-4 ${
+              job.paymentStatus==="unpaid" && job.revenue>0 ? "border-amber-800/40" : "border-white/8"
+            }`}>
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="text-sm font-bold text-gray-100">{job.client}</p>
+                  <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
+                    <CalendarIcon size={11}/> {formatDateShort(job.date)}
+                    <span>·</span><span>{job.workType}</span>
+                  </div>
+                </div>
+                {job.revenue>0 && <PaymentBadge status={job.paymentStatus}/>}
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { label:"أفدنة", value:`${formatNumber(job.acres)} ف`,  color:"text-blue-400"  },
+                  { label:"إيراد", value:formatCurrency(job.revenue),      color:"text-amber-400" },
+                  { label:"ربح",   value:formatCurrency(job.profit),       color:job.profit>=0?"text-green-400":"text-red-400" },
+                  { label:"متبقي", value:formatCurrency(job.remainingAmount||0), color:(job.remainingAmount||0)>0?"text-red-400":"text-gray-400" },
+                ].map((s) => (
+                  <div key={s.label} className="bg-surface-2 rounded-xl p-2 text-center">
+                    <p className={`text-xs font-extrabold tabular-nums ${s.color}`}>{s.value}</p>
+                    <p className="text-[10px] text-gray-500 mt-0.5">{s.label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Maintenance */}
+      {maintenance.length > 0 && (
+        <>
+          <h2 className="text-sm font-bold text-gray-300 mb-3">سجل الصيانة</h2>
+          <Card>
+            <div className="divide-y divide-white/8">
+              {maintenance.map((m) => (
+                <div key={m.id} className="flex items-center justify-between px-5 py-3.5">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-200">{m.type}</p>
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-0.5">
+                      <CalendarIcon size={11}/> {formatDateShort(m.date)}
+                      {m.notes && <span>· {m.notes}</span>}
+                    </div>
+                  </div>
+                  <span className="text-sm font-bold text-amber-400">{formatCurrency(m.cost)}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </>
+      )}
+    </div>
+  );
+};
+
+export default EquipmentDetailPage;

@@ -1,0 +1,77 @@
+// src/hooks/useDashboard.js
+import { useMemo } from "react";
+import { useData } from "../contexts/DataContext";
+import {
+  aggregateJobs,
+  buildDailyRevenue,
+  groupByWorkType,
+  buildEquipmentReport,
+} from "../utils/calculations";
+import { calcTotalSalariesPaid } from "../utils/salaryCalculations";
+
+export const useDashboard = () => {
+  const {
+    jobs, equipment, maintenance, drivers,
+    settings, salaryEntries = [], driverCosts = [], loading,
+  } = useData();
+
+  const fuelPrice = settings.fuelPrice;
+
+  const totals = useMemo(
+    () => aggregateJobs(jobs, fuelPrice),
+    [jobs, fuelPrice]
+  );
+
+  const totalMaintCost = useMemo(
+    () => maintenance.reduce((s, m) => s + (Number(m.cost) || 0), 0),
+    [maintenance]
+  );
+
+  // ── Salaries = new salaryEntries (base+bonus) + old driverCosts ───────────
+  const totalSalaries = useMemo(() => {
+    const fromSalarySystem = calcTotalSalariesPaid(salaryEntries);
+    const fromDriverCosts  = driverCosts.reduce((s, c) => s + (Number(c.amount) || 0), 0);
+    return fromSalarySystem + fromDriverCosts;
+  }, [salaryEntries, driverCosts]);
+
+  const netProfit = totals.netProfit - totalMaintCost - totalSalaries;
+
+  const margin = totals.totalRevenue > 0
+    ? (netProfit / totals.totalRevenue) * 100
+    : 0;
+
+  const dailyRevenue      = useMemo(() => buildDailyRevenue(jobs, 7), [jobs]);
+  const workTypeBreakdown = useMemo(() => groupByWorkType(jobs), [jobs]);
+
+  const equipReport = useMemo(
+    () => buildEquipmentReport(equipment, jobs, maintenance, fuelPrice),
+    [equipment, jobs, maintenance, fuelPrice]
+  );
+
+  const bestEquipment = equipReport[0] ?? null;
+
+  const recentJobs = useMemo(
+    () => [...jobs].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5),
+    [jobs]
+  );
+
+  const miniRevenue = dailyRevenue.map((d) => d.revenue);
+
+  return {
+    totals,
+    totalMaintCost,
+    totalSalaries,
+    netProfit,
+    margin,
+    dailyRevenue,
+    workTypeBreakdown,
+    equipReport,
+    bestEquipment,
+    recentJobs,
+    miniRevenue,
+    equipment,
+    drivers,
+    fuelPrice,
+    loading,
+  };
+};
