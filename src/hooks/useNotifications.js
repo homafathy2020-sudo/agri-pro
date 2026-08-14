@@ -8,7 +8,7 @@ import { checkMaintenanceDue, checkOverdueDebts } from "../utils/calculations";
  * Returns sorted list of notifications with type, severity, and action info.
  */
 export const useNotifications = () => {
-  const { equipment, maintenance, jobs, settings, loading } = useData();
+  const { equipment, maintenance, jobs, payments, settings, loading } = useData();
 
   const maintenanceAlerts = useMemo(
     () => checkMaintenanceDue(equipment, maintenance, 14),
@@ -16,8 +16,8 @@ export const useNotifications = () => {
   );
 
   const debtAlerts = useMemo(
-    () => checkOverdueDebts(jobs, settings.fuelPrice, 30),
-    [jobs, settings.fuelPrice]
+    () => checkOverdueDebts(jobs, settings.fuelPrice, 30, payments),
+    [jobs, settings.fuelPrice, payments]
   );
 
   const notifications = useMemo(() => {

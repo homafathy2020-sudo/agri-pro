@@ -21,7 +21,10 @@ export const jobService = {
     const ref = await addDoc(col(), {
       ...data,
       userId,
-      createdAt: serverTimestamp(),
+      // ISO string (not serverTimestamp) so the exact creation moment is
+      // available immediately in local state — no reload needed to see it
+      // (serverTimestamp() resolves to null until Firestore round-trips it).
+      createdAt: new Date().toISOString(),
       updatedAt: serverTimestamp(),
     });
     return ref.id;

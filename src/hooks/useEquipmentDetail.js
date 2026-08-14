@@ -3,11 +3,11 @@ import { useMemo } from "react";
 import { useData } from "../contexts/DataContext";
 import {
   calcRevenue, calcFuelCost,
-  calcRemainingAmount, derivePaymentStatus,
+  calcRemainingAmount, derivePaymentStatus, getJobPaidAmount,
 } from "../utils/calculations";
 
 export const useEquipmentDetail = (equipmentId) => {
-  const { equipment, jobs, maintenance, settings, loading } = useData();
+  const { equipment, jobs, maintenance, payments, settings, loading } = useData();
 
   const eq = equipment.find((e) => e.id === equipmentId);
 
@@ -18,13 +18,13 @@ export const useEquipmentDetail = (equipmentId) => {
       .map((job) => {
         const revenue         = calcRevenue(job.acres, job.pricePerAcre);
         const fuelCost        = calcFuelCost(job.fuelUsed, settings.fuelPrice);
-        const profit          = revenue - fuelCost;
-        const amountPaid      = Number(job.amountPaid) || 0;
+        const profit           = revenue - fuelCost;
+        const amountPaid       = getJobPaidAmount(job, payments);
         const remainingAmount = calcRemainingAmount(revenue, amountPaid);
         const paymentStatus   = derivePaymentStatus(revenue, amountPaid);
         return { ...job, revenue, fuelCost, profit, amountPaid, remainingAmount, paymentStatus };
       }),
-    [jobs, equipmentId, settings.fuelPrice]
+    [jobs, equipmentId, settings.fuelPrice, payments]
   );
 
   const eqMaint = useMemo(

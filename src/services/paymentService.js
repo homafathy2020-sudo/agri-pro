@@ -29,7 +29,9 @@ export const paymentService = {
   },
 
   async add(userId, data) {
-    const ref = await addDoc(col(), { ...data, userId, createdAt: serverTimestamp() });
+    // ISO string (not serverTimestamp) so the exact moment the payment was
+    // recorded is available immediately in local state — see jobService.js.
+    const ref = await addDoc(col(), { ...data, userId, createdAt: new Date().toISOString() });
     return ref.id;
   },
 

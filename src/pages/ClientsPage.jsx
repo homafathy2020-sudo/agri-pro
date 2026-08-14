@@ -14,7 +14,7 @@ import { formatCurrency } from "../utils/formatters";
 const ClientsPage = () => {
   const { clients, totalDebt, loading } = useClients();
   const { jobs: enrichedJobs }  = useJobs();
-  const { updateJob }           = useData();  // ← updateJob مش addPayment
+  const { addPayment }          = useData();
   const [search,   setSearch]   = useState("");
   const [payModal, setPayModal] = useState(null);
 
@@ -35,12 +35,15 @@ const ClientsPage = () => {
     setPayModal({ job, jobRevenue: job.revenue, alreadyPaid: job.amountPaid || 0 });
   };
 
-  // ← يحدّث job.amountPaid مباشرة بدل ما يضيف في payments collection
+  // يسجّل دفعة كسجل مستقل في payments collection (نفس المصدر اللي
+  // بتقرأ منه JobCard تاريخ الدفعات) بدل ما يعدّل job.amountPaid مباشرة —
+  // بكده كل الدفعات بتظهر بتاريخها في تاريخ الدفعات لأي مكان بيعرضها.
   const handleSavePayment = async (data) => {
-    const newAmountPaid = (payModal.alreadyPaid || 0) + Number(data.amount);
-    await updateJob(payModal.job.id, {
-      ...payModal.job,
-      amountPaid: newAmountPaid,
+    await addPayment({
+      jobId: payModal.job.id,
+      amount: Number(data.amount),
+      date:   data.date,
+      notes:  data.notes,
     });
     setPayModal(null);
   };

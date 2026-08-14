@@ -2,7 +2,8 @@
 // Uses the browser's built-in print dialog — zero dependencies.
 // Creates a styled HTML document, opens it in a new window, triggers print.
 
-import { formatCurrency, formatNumber, formatDate } from "./formatters";
+import { formatCurrency, formatNumber, formatDate, formatDateTime } from "./formatters";
+import { getJobPaidAmount } from "./calculations";
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
 const BASE_CSS = `
@@ -68,14 +69,16 @@ const printWindow = (htmlContent, title) => {
 };
 
 // ── 1. Client Invoice ─────────────────────────────────────────────────────────
-export const printClientInvoice = ({ job, equipmentName, driverName, fuelPrice, payments = [] }) => {
+export const printClientInvoice = ({ job, equipmentName, driverName, fuelPrice, payments = [], maintenance = [] }) => {
   const revenue   = (job.acres || 0) * (job.pricePerAcre || 0);
   const fuelCost  = (job.fuelUsed || 0) * fuelPrice;
   const profit    = revenue - fuelCost;
-  const paymentEntries = payments.reduce((s, p) => s + (p.amount || 0), 0);
-  const totalPaid = (Number(job.amountPaid) || 0) + paymentEntries;
+  // مصدر واحد للمدفوع: مجموع سجلات payments، أو job.amountPaid كـ fallback
+  // للعمليات القديمة اللي اتسجلت قبل نظام الدفعات — مش الاتنين مع بعض.
+  const totalPaid = getJobPaidAmount(job, payments);
   const remaining = Math.max(0, revenue - totalPaid);
   const today     = new Date().toLocaleDateString("ar-EG");
+  const maintCost = maintenance.reduce((s, m) => s + (Number(m.cost) || 0), 0);
 
   const paymentBadge = remaining <= 0
     ? `<span class="badge badge-green">مدفوع بالكامل</span>`
@@ -85,9 +88,18 @@ export const printClientInvoice = ({ job, equipmentName, driverName, fuelPrice, 
 
   const paymentsRows = payments.map((p) => `
     <tr>
-      <td>${formatDate(p.date)}</td>
+      <td>${formatDateTime(p.createdAt || p.date)}</td>
       <td>${p.notes || "—"}</td>
       <td>${formatCurrency(p.amount)}</td>
+    </tr>
+  `).join("");
+
+  const maintRows = maintenance.map((m) => `
+    <tr>
+      <td>${formatDateTime(m.createdAt || m.date)}</td>
+      <td>${m.type || "—"}</td>
+      <td>${m.notes || "—"}</td>
+      <td>${formatCurrency(m.cost)}</td>
     </tr>
   `).join("");
 
@@ -100,7 +112,7 @@ export const printClientInvoice = ({ job, equipmentName, driverName, fuelPrice, 
         </div>
         <div class="meta">
           <p>تاريخ الطباعة: ${today}</p>
-          <p>تاريخ العملية: ${formatDate(job.date)}</p>
+          <p>تاريخ ووقت العملية: ${formatDateTime(job.createdAt || job.date)}</p>
           <p style="margin-top:6px">${paymentBadge}</p>
         </div>
       </div>
@@ -131,6 +143,8 @@ export const printClientInvoice = ({ job, equipmentName, driverName, fuelPrice, 
           <tr><td style="font-weight:600">المعدة المستخدمة</td><td>${equipmentName || "—"}</td></tr>
           <tr><td style="font-weight:600">السائق</td><td>${driverName || "—"}</td></tr>
           <tr><td style="font-weight:600">الوقود المستخدم</td><td>${formatNumber(job.fuelUsed)} لتر</td></tr>
+          <tr><td style="font-weight:600">تكلفة الوقود</td><td style="color:#991b1b">${formatCurrency(fuelCost)}</td></tr>
+          ${maintenance.length ? `<tr><td style="font-weight:600">تكلفة الصيانة (المعدة)</td><td style="color:#991b1b">${formatCurrency(maintCost)}</td></tr>` : ""}
         </table>
       </div>` : ""}
 
@@ -145,10 +159,20 @@ export const printClientInvoice = ({ job, equipmentName, driverName, fuelPrice, 
 
       ${paymentsRows ? `
       <div class="section">
-        <h2>سجل الدفعات</h2>
+        <h2>سجل الدفعات (${payments.length})</h2>
         <table>
-          <thead><tr><th>التاريخ</th><th>ملاحظات</th><th>المبلغ</th></tr></thead>
+          <thead><tr><th>التاريخ والوقت</th><th>ملاحظات</th><th>المبلغ</th></tr></thead>
           <tbody>${paymentsRows}</tbody>
+        </table>
+      </div>` : ""}
+
+      ${maintRows ? `
+      <div class="section">
+        <h2>سجل صيانة المعدة (${maintenance.length})</h2>
+        <table>
+          <thead><tr><th>التاريخ والوقت</th><th>نوع الصيانة</th><th>ملاحظات</th><th>التكلفة</th></tr></thead>
+          <tbody>${maintRows}</tbody>
+          <tr class="total-row"><td colspan="3">إجمالي تكلفة الصيانة</td><td style="color:#991b1b">${formatCurrency(maintCost)}</td></tr>
         </table>
       </div>` : ""}
 

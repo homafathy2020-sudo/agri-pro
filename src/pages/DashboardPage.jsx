@@ -18,7 +18,7 @@ import {
   AlertIcon, StarIcon, WORK_TYPE_ICON_MAP,
 } from "../components/ui/Icons";
 import { formatCurrency, formatNumber, formatDateShort } from "../utils/formatters";
-import { calcRevenue, calcFuelCost, calcRemainingAmount, derivePaymentStatus } from "../utils/calculations";
+import { calcRevenue, calcFuelCost, calcRemainingAmount, derivePaymentStatus, getJobPaidAmount } from "../utils/calculations";
 
 // ── Color palettes ────────────────────────────────────────────────────────
 const AREA_GREEN   = "#22c55e";
@@ -74,7 +74,7 @@ const DashboardPage = () => {
     dailyRevenue, workTypeBreakdown,
     equipReport, bestEquipment,
     recentJobs,
-    equipment, drivers,
+    equipment, drivers, payments,
     fuelPrice, loading,
   } = useDashboard();
 
@@ -398,7 +398,7 @@ const DashboardPage = () => {
               const drv = drivers.find((d)  => d.id === job.driverId);
               const revenue         = calcRevenue(job.acres, job.pricePerAcre);
               const fuelCost        = calcFuelCost(job.fuelUsed, fuelPrice);
-              const amountPaid      = Number(job.amountPaid) || 0;
+              const amountPaid      = getJobPaidAmount(job, payments);
               const remainingAmount = calcRemainingAmount(revenue, amountPaid);
               const paymentStatus   = derivePaymentStatus(revenue, amountPaid);
               const enriched = {

@@ -29,6 +29,23 @@ export const calcJobProfit = calcJobNetProfit;
 export const calcRemainingAmount = (revenue, amountPaid) =>
   Math.max(0, revenue - (Number(amountPaid) || 0));
 
+/**
+ * Single source of truth for "how much has this job been paid so far".
+ * The `payments` collection (individual instalments, each with its own date
+ * and notes) is the real record. If a job already has payment instalments,
+ * we sum those. Older jobs created before the payments system existed don't
+ * have any instalment docs, so we fall back to the legacy `job.amountPaid`
+ * field for them. Once a job has at least one instalment, that job's
+ * `amountPaid` field is no longer read — everything flows through `payments`.
+ */
+export const getJobPaidAmount = (job, payments = []) => {
+  const jobPayments = payments.filter((p) => p.jobId === job.id);
+  if (jobPayments.length > 0) {
+    return jobPayments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+  }
+  return Number(job.amountPaid) || 0; // legacy fallback
+};
+
 export const derivePaymentStatus = (revenue, amountPaid) => {
   const paid = Number(amountPaid) || 0;
   if (paid <= 0)           return "unpaid";
@@ -42,18 +59,18 @@ export const derivePaymentStatus = (revenue, amountPaid) => {
  * Aggregate stats for a list of raw jobs (from Firestore, no enrichment yet).
  * Returns totals used by dashboard, reports, and hooks.
  */
-export const aggregateJobs = (jobs, fuelPrice) => {
+export const aggregateJobs = (jobs, fuelPrice, payments = []) => {
   const totalRevenue  = jobs.reduce((s, j) => s + calcRevenue(j.acres, j.pricePerAcre), 0);
   const totalAcres    = jobs.reduce((s, j) => s + (Number(j.acres) || 0), 0);
   const totalFuel     = jobs.reduce((s, j) => s + (Number(j.fuelUsed) || 0), 0);
   const totalFuelCost = calcFuelCost(totalFuel, fuelPrice);
   const netProfit     = totalRevenue - totalFuelCost;
 
-  // Payment aggregates
-  const totalPaid      = jobs.reduce((s, j) => s + (Number(j.amountPaid) || 0), 0);
+  // Payment aggregates — derived from the payments collection (see getJobPaidAmount)
+  const totalPaid      = jobs.reduce((s, j) => s + getJobPaidAmount(j, payments), 0);
   const totalRemaining = jobs.reduce((s, j) => {
     const rev = calcRevenue(j.acres, j.pricePerAcre);
-    return s + calcRemainingAmount(rev, j.amountPaid);
+    return s + calcRemainingAmount(rev, getJobPaidAmount(j, payments));
   }, 0);
 
   return { totalRevenue, totalAcres, totalFuel, totalFuelCost, netProfit, totalPaid, totalRemaining };
@@ -62,11 +79,11 @@ export const aggregateJobs = (jobs, fuelPrice) => {
 /**
  * Build per-equipment report: jobs + maintenance costs → full P&L.
  */
-export const buildEquipmentReport = (equipment, jobs, maintenance, fuelPrice) =>
+export const buildEquipmentReport = (equipment, jobs, maintenance, fuelPrice, payments = []) =>
   equipment.map((eq) => {
     const eqJobs  = jobs.filter((j) => j.equipmentId === eq.id);
     const eqMaint = maintenance.filter((m) => m.equipmentId === eq.id);
-    const stats      = aggregateJobs(eqJobs, fuelPrice);
+    const stats      = aggregateJobs(eqJobs, fuelPrice, payments);
     const maintCost  = eqMaint.reduce((s, m) => s + (Number(m.cost) || 0), 0);
     const netProfit  = stats.netProfit - maintCost;
     const margin     = stats.totalRevenue > 0 ? (netProfit / stats.totalRevenue) * 100 : 0;
@@ -76,10 +93,10 @@ export const buildEquipmentReport = (equipment, jobs, maintenance, fuelPrice) =>
 /**
  * Build per-driver report.
  */
-export const buildDriverReport = (drivers, jobs, fuelPrice) =>
+export const buildDriverReport = (drivers, jobs, fuelPrice, payments = []) =>
   drivers.map((drv) => {
     const drvJobs = jobs.filter((j) => j.driverId === drv.id);
-    const stats   = aggregateJobs(drvJobs, fuelPrice);
+    const stats   = aggregateJobs(drvJobs, fuelPrice, payments);
     return { ...drv, ...stats, ops: drvJobs.length };
   }).sort((a, b) => b.totalRevenue - a.totalRevenue);
 
@@ -115,9 +132,9 @@ export const groupByWorkType = (jobs) => {
  * Aggregate all jobs for a single client name.
  * Returns the client's full financial summary.
  */
-export const buildClientSummary = (clientName, jobs, fuelPrice) => {
+export const buildClientSummary = (clientName, jobs, fuelPrice, payments = []) => {
   const clientJobs = jobs.filter((j) => j.client === clientName);
-  const stats      = aggregateJobs(clientJobs, fuelPrice);
+  const stats      = aggregateJobs(clientJobs, fuelPrice, payments);
   return {
     client:        clientName,
     jobs:          clientJobs,
@@ -132,10 +149,10 @@ export const buildClientSummary = (clientName, jobs, fuelPrice) => {
 /**
  * Build the full client list from jobs, sorted by debt (descending).
  */
-export const buildClientList = (jobs, fuelPrice) => {
+export const buildClientList = (jobs, fuelPrice, payments = []) => {
   const names = [...new Set(jobs.map((j) => j.client).filter(Boolean))];
   return names
-    .map((name) => buildClientSummary(name, jobs, fuelPrice))
+    .map((name) => buildClientSummary(name, jobs, fuelPrice, payments))
     .sort((a, b) => b.totalRemaining - a.totalRemaining);
 };
 
@@ -156,11 +173,11 @@ export const calcNetProfitAfterDriverCosts = (jobNetProfit, driverCosts) =>
 /**
  * Build per-driver full report including salary costs.
  */
-export const buildDriverReportWithCosts = (drivers, jobs, driverCosts, fuelPrice) =>
+export const buildDriverReportWithCosts = (drivers, jobs, driverCosts, fuelPrice, payments = []) =>
   drivers.map((drv) => {
     const drvJobs  = jobs.filter((j) => j.driverId === drv.id);
     const drvCosts = driverCosts.filter((c) => c.driverId === drv.id);
-    const stats    = aggregateJobs(drvJobs, fuelPrice);
+    const stats    = aggregateJobs(drvJobs, fuelPrice, payments);
     const totalCosts = calcDriverTotalCost(drvCosts);
     const netAfterCosts = stats.netProfit - totalCosts;
     return {
@@ -223,12 +240,12 @@ export const checkMaintenanceDue = (equipment, maintenance, warningDays = 7) => 
 /**
  * Check clients with overdue debt (jobs older than X days unpaid).
  */
-export const checkOverdueDebts = (jobs, fuelPrice, overdueDays = 30) => {
+export const checkOverdueDebts = (jobs, fuelPrice, overdueDays = 30, payments = []) => {
   const today = new Date();
   return jobs
     .filter((j) => {
       const revenue   = calcRevenue(j.acres, j.pricePerAcre);
-      const remaining = calcRemainingAmount(revenue, j.amountPaid);
+      const remaining = calcRemainingAmount(revenue, getJobPaidAmount(j, payments));
       if (remaining <= 0) return false;
       const jobDate  = new Date(j.date);
       const daysDiff = Math.floor((today - jobDate) / 86400000);
@@ -236,7 +253,7 @@ export const checkOverdueDebts = (jobs, fuelPrice, overdueDays = 30) => {
     })
     .map((j) => {
       const revenue   = calcRevenue(j.acres, j.pricePerAcre);
-      const remaining = calcRemainingAmount(revenue, j.amountPaid);
+      const remaining = calcRemainingAmount(revenue, getJobPaidAmount(j, payments));
       const daysDiff  = Math.floor((today - new Date(j.date)) / 86400000);
       return { job: j, remaining, daysDiff };
     })

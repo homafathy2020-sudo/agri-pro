@@ -16,6 +16,25 @@ export const formatCurrency = (value) =>
   `${formatNumber(value)} ج.م`;
 
 /**
+ * Format a value into a full Arabic date + time.
+ * Accepts: ISO datetime string, JS Date, or a Firestore Timestamp (has .toDate()).
+ * A plain "YYYY-MM-DD" string (no time component — e.g. legacy records saved
+ * before createdAt existed) has no real time to show, so it falls back to a
+ * date-only format rather than falsely implying midnight is the actual time.
+ */
+export const formatDateTime = (value) => {
+  if (!value) return "—";
+  const isDateOnly = typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
+  if (isDateOnly) return formatDate(value);
+  const d = typeof value?.toDate === "function" ? value.toDate() : new Date(value);
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleString("ar-EG", {
+    year: "numeric", month: "long", day: "numeric",
+    hour: "numeric", minute: "2-digit", hour12: true,
+  });
+};
+
+/**
  * Format an ISO date string → full Arabic locale date.
  */
 export const formatDate = (dateStr) => {

@@ -9,7 +9,6 @@ import { Card, CardHeader, CardBody, SummaryRow, EmptyState, ProgressBar } from 
 import Button            from "../components/ui/Button";
 import LoadingScreen     from "../components/ui/LoadingScreen";
 import { formatCurrency, formatNumber, formatDateShort } from "../utils/formatters";
-import { calcRevenue, calcRemainingAmount, derivePaymentStatus } from "../utils/calculations";
 import { DriverIcon, AcreIcon, FuelIcon, CalendarIcon, TractorIcon } from "../components/ui/Icons";
 
 const ClientDetailPage = () => {
@@ -77,10 +76,13 @@ const ClientDetailPage = () => {
           {jobs
             .sort((a, b) => b.date.localeCompare(a.date))
             .map((job) => {
-              const revenue    = calcRevenue(job.acres, job.pricePerAcre);
-              const paid       = Number(job.amountPaid) || 0;
-              const remaining  = calcRemainingAmount(revenue, paid);
-              const status     = derivePaymentStatus(revenue, paid);
+              // job is already enriched by useClients (getClientSummary) with
+              // amountPaid / remainingAmount / paymentStatus derived from
+              // the payments collection — no need to recompute here.
+              const revenue    = job.revenue;
+              const paid       = job.amountPaid;
+              const remaining  = job.remainingAmount;
+              const status     = job.paymentStatus;
               const eq         = equipment.find((e) => e.id === job.equipmentId);
 
               return (

@@ -3,11 +3,11 @@ import { useMemo, useState } from "react";
 import { useData } from "../contexts/DataContext";
 import {
   aggregateJobs, calcRevenue, calcFuelCost,
-  calcRemainingAmount, derivePaymentStatus,
+  calcRemainingAmount, derivePaymentStatus, getJobPaidAmount,
 } from "../utils/calculations";
 
 export const useJobs = () => {
-  const { jobs, settings, loading, addJob, updateJob, deleteJob } = useData();
+  const { jobs, payments, settings, loading, addJob, updateJob, deleteJob } = useData();
 
   const [filters, setFilters] = useState({
     equipmentId:"", driverId:"", workType:"",
@@ -17,8 +17,8 @@ export const useJobs = () => {
   const enrichJob = (job) => {
     const revenue         = calcRevenue(job.acres, job.pricePerAcre);
     const fuelCost        = calcFuelCost(job.fuelUsed, settings.fuelPrice);
-    const profit          = revenue - fuelCost;
-    const amountPaid      = Number(job.amountPaid) || 0;
+    const profit           = revenue - fuelCost;
+    const amountPaid       = getJobPaidAmount(job, payments);
     const remainingAmount = calcRemainingAmount(revenue, amountPaid);
     const paymentStatus   = derivePaymentStatus(revenue, amountPaid);
     return { ...job, revenue, fuelCost, profit, amountPaid, remainingAmount, paymentStatus };
@@ -34,18 +34,18 @@ export const useJobs = () => {
         if (filters.dateTo      && j.date        >  filters.dateTo)       return false;
         if (filters.paymentStatus) {
           const rev    = calcRevenue(j.acres, j.pricePerAcre);
-          const paid   = Number(j.amountPaid) || 0;
+          const paid   = getJobPaidAmount(j, payments);
           const status = derivePaymentStatus(rev, paid);
           if (status !== filters.paymentStatus) return false;
         }
         return true;
       })
       .sort((a, b) => b.date.localeCompare(a.date));
-  }, [jobs, filters]);
+  }, [jobs, filters, payments]);
 
   const totals = useMemo(
-    () => aggregateJobs(filtered, settings.fuelPrice),
-    [filtered, settings.fuelPrice]
+    () => aggregateJobs(filtered, settings.fuelPrice, payments),
+    [filtered, settings.fuelPrice, payments]
   );
 
   const clearFilters = () =>

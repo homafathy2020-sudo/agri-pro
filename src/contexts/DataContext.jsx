@@ -107,7 +107,7 @@ export const DataProvider = ({ children }) => {
   const updateEquipment = useCallback(async (id,d) => { await equipmentService.update(id,d);               dispatch({ type:"UPDATE_EQUIPMENT", payload:{id,...d} }); toast.success("تم تحديث المعدة");       }, []);
   const deleteEquipment = useCallback(async (id) => { await equipmentService.remove(id);                   dispatch({ type:"DELETE_EQUIPMENT", payload:id });        toast.success("تم حذف المعدة");         }, []);
 
-  const addJob    = useCallback(async (d) => { const id = await jobService.add(user.uid, d);               dispatch({ type:"ADD_JOB",    payload:{id,...d} }); toast.success("تم تسجيل العملية");     }, [user]);
+  const addJob    = useCallback(async (d) => { const id = await jobService.add(user.uid, d);               dispatch({ type:"ADD_JOB",    payload:{id,...d} }); toast.success("تم تسجيل العملية");     return id; }, [user]);
   const updateJob = useCallback(async (id,d) => { await jobService.update(id,d);                           dispatch({ type:"UPDATE_JOB", payload:{id,...d} }); toast.success("تم تحديث العملية");     }, []);
   const deleteJob = useCallback(async (id) => { await jobService.remove(id);                               dispatch({ type:"DELETE_JOB", payload:id });        toast.success("تم حذف العملية");       }, []);
 

@@ -37,6 +37,16 @@ service cloud.firestore {
       allow create: if isSignedIn() && hasUserId() && isOwner(request.resource.data.userId);
       allow update, delete: if isSignedIn() && ownsDoc();
     }
+    match /salaryEntries/{id} {
+      allow read:   if isSignedIn() && ownsDoc();
+      allow create: if isSignedIn() && hasUserId() && isOwner(request.resource.data.userId);
+      allow update, delete: if isSignedIn() && ownsDoc();
+    }
+    match /attendance/{id} {
+      allow read:   if isSignedIn() && ownsDoc();
+      allow create: if isSignedIn() && hasUserId() && isOwner(request.resource.data.userId);
+      allow update, delete: if isSignedIn() && ownsDoc();
+    }
     match /settings/{userId} {
       allow read, write: if isSignedIn() && isOwner(userId);
     }

@@ -1,10 +1,10 @@
 // src/hooks/useClients.js
 import { useMemo, useCallback } from "react";
 import { useData } from "../contexts/DataContext";
-import { calcRevenue, calcRemainingAmount, derivePaymentStatus } from "../utils/calculations";
+import { calcRevenue, calcRemainingAmount, derivePaymentStatus, getJobPaidAmount } from "../utils/calculations";
 
 export const useClients = () => {
-  const { jobs, settings, loading } = useData();
+  const { jobs, payments, settings, loading } = useData();
 
   const clients = useMemo(() => {
     const map = {};
@@ -13,7 +13,7 @@ export const useClients = () => {
       if (!name) return;
       if (!map[name]) map[name] = { client:name, ops:0, totalRevenue:0, totalAcres:0, totalPaid:0, totalRemaining:0 };
       const revenue   = calcRevenue(job.acres, job.pricePerAcre);
-      const paid      = Number(job.amountPaid) || 0;
+      const paid      = getJobPaidAmount(job, payments);
       const remaining = calcRemainingAmount(revenue, paid);
       map[name].ops            += 1;
       map[name].totalRevenue   += revenue;
@@ -22,7 +22,7 @@ export const useClients = () => {
       map[name].totalRemaining += remaining;
     });
     return Object.values(map).sort((a, b) => b.totalRemaining - a.totalRemaining);
-  }, [jobs]);
+  }, [jobs, payments]);
 
   const totalDebt = useMemo(
     () => clients.reduce((s, c) => s + c.totalRemaining, 0),
@@ -34,7 +34,7 @@ export const useClients = () => {
     const summary = { client:clientName, ops:clientJobs.length, jobs:[], totalRevenue:0, totalPaid:0, totalRemaining:0 };
     clientJobs.forEach((job) => {
       const revenue   = calcRevenue(job.acres, job.pricePerAcre);
-      const paid      = Number(job.amountPaid) || 0;
+      const paid      = getJobPaidAmount(job, payments);
       const remaining = calcRemainingAmount(revenue, paid);
       const status    = derivePaymentStatus(revenue, paid);
       summary.totalRevenue   += revenue;
@@ -43,7 +43,7 @@ export const useClients = () => {
       summary.jobs.push({ ...job, revenue, amountPaid:paid, remainingAmount:remaining, paymentStatus:status });
     });
     return summary;
-  }, [jobs]);
+  }, [jobs, payments]);
 
   return { clients, totalDebt, loading, getClientSummary };
 };

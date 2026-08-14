@@ -5,15 +5,15 @@ import { buildDriverReportWithCosts } from "../utils/calculations";
 
 export const useDriverCosts = () => {
   const {
-    driverCosts, drivers, jobs, settings,
+    driverCosts, drivers, jobs, payments, settings,
     addDriverCost, updateDriverCost, deleteDriverCost,
     loading,
   } = useData();
 
   /** Full driver report including costs */
   const driverReport = useMemo(
-    () => buildDriverReportWithCosts(drivers, jobs, driverCosts, settings.fuelPrice),
-    [drivers, jobs, driverCosts, settings.fuelPrice]
+    () => buildDriverReportWithCosts(drivers, jobs, driverCosts, settings.fuelPrice, payments),
+    [drivers, jobs, driverCosts, settings.fuelPrice, payments]
   );
 
   /** Costs for a specific driver, sorted newest first */

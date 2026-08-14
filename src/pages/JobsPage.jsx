@@ -26,7 +26,7 @@ const SummaryBadge = ({ Icon, label, value, color }) => (
 
 const JobsPage = () => {
   const { jobs, totals, filters, setFilters, clearFilters, hasActiveFilters, loading, addJob, updateJob, deleteJob, fuelPrice } = useJobs();
-  const { equipment, drivers } = useData();
+  const { equipment, drivers, addPayment } = useData();
   const { confirm, confirmState } = useConfirm();
   const [modal, setModal] = useState(null);
 
@@ -35,8 +35,22 @@ const JobsPage = () => {
   const closeModal = ()      => setModal(null);
 
   const handleSave = async (formData) => {
-    if (modal.mode === "add") await addJob(formData);
-    else await updateJob(modal.data.id, formData);
+    if (modal.mode === "add") {
+      const { amountPaid, ...jobData } = formData;
+      const newJobId = await addJob(jobData);
+      // لو المستخدم دخل دفعة مقدّمة عند التسجيل، بنسجّلها كدفعة فعلية
+      // في payments collection بدل ما تفضل بس رقم جوه الـ job.
+      if (Number(amountPaid) > 0) {
+        await addPayment({
+          jobId: newJobId,
+          amount: Number(amountPaid),
+          date: jobData.date,
+          notes: "دفعة مقدّمة عند تسجيل العملية",
+        });
+      }
+    } else {
+      await updateJob(modal.data.id, formData);
+    }
   };
 
   const handleDelete = async (id) => {

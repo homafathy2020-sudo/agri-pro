@@ -21,7 +21,9 @@ export const maintenanceService = {
     const ref = await addDoc(col(), {
       ...data,
       userId,
-      createdAt: serverTimestamp(),
+      // ISO string (not serverTimestamp) so the exact creation moment is
+      // available immediately in local state — see jobService.js for why.
+      createdAt: new Date().toISOString(),
       updatedAt: serverTimestamp(),
     });
     return ref.id;

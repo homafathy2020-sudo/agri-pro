@@ -4,12 +4,12 @@ import { useData } from "../contexts/DataContext";
 import { buildDriverReport } from "../utils/calculations";
 
 export const useDrivers = () => {
-  const { drivers, jobs, settings, loading,
+  const { drivers, jobs, payments, settings, loading,
           addDriver, updateDriver, deleteDriver } = useData();
 
   const report = useMemo(
-    () => buildDriverReport(drivers, jobs, settings.fuelPrice),
-    [drivers, jobs, settings.fuelPrice]
+    () => buildDriverReport(drivers, jobs, settings.fuelPrice, payments),
+    [drivers, jobs, settings.fuelPrice, payments]
   );
 
   const getById = (id) => drivers.find((d) => d.id === id);

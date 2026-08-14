@@ -11,15 +11,15 @@ import { calcTotalSalariesPaid } from "../utils/salaryCalculations";
 
 export const useDashboard = () => {
   const {
-    jobs, equipment, maintenance, drivers,
+    jobs, equipment, maintenance, drivers, payments = [],
     settings, salaryEntries = [], driverCosts = [], loading,
   } = useData();
 
   const fuelPrice = settings.fuelPrice;
 
   const totals = useMemo(
-    () => aggregateJobs(jobs, fuelPrice),
-    [jobs, fuelPrice]
+    () => aggregateJobs(jobs, fuelPrice, payments),
+    [jobs, fuelPrice, payments]
   );
 
   const totalMaintCost = useMemo(
@@ -44,8 +44,8 @@ export const useDashboard = () => {
   const workTypeBreakdown = useMemo(() => groupByWorkType(jobs), [jobs]);
 
   const equipReport = useMemo(
-    () => buildEquipmentReport(equipment, jobs, maintenance, fuelPrice),
-    [equipment, jobs, maintenance, fuelPrice]
+    () => buildEquipmentReport(equipment, jobs, maintenance, fuelPrice, payments),
+    [equipment, jobs, maintenance, fuelPrice, payments]
   );
 
   const bestEquipment = equipReport[0] ?? null;
@@ -71,6 +71,7 @@ export const useDashboard = () => {
     miniRevenue,
     equipment,
     drivers,
+    payments,
     fuelPrice,
     loading,
   };

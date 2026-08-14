@@ -34,7 +34,7 @@ const JobCard = ({
   onEdit, onDelete,
   showPrint = true,
 }) => {
-  const { payments = [], settings } = useData();
+  const { payments = [], maintenance = [], settings } = useData();
   const [showPayments, setShowPayments] = useState(false);
 
   const {
@@ -47,15 +47,18 @@ const JobCard = ({
 
   const WorkIcon  = WORK_TYPE_ICON_MAP[workType] ?? WrenchIcon;
   const isUnpaid  = paymentStatus === "unpaid" && revenue > 0;
-  const jobPayments = payments.filter((p) => p.jobId === job.id);
+  const jobPayments    = payments.filter((p) => p.jobId === job.id);
+  // صيانة المعدة اللي استخدمت في العملية دي — بتتعرض في الفاتورة للشفافية
+  const jobMaintenance = maintenance.filter((m) => m.equipmentId === job.equipmentId);
 
   const handlePrint = () => {
     printClientInvoice({
       job,
       equipmentName,
       driverName,
-      fuelPrice: settings.fuelPrice,
-      payments:  jobPayments,
+      fuelPrice:   settings.fuelPrice,
+      payments:    jobPayments,
+      maintenance: jobMaintenance,
     });
   };
 

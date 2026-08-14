@@ -9,6 +9,7 @@ import { calcRevenue, calcFuelCost, calcRemainingAmount } from "../../utils/calc
 import { formatCurrency, todayISO } from "../../utils/formatters";
 
 const JobForm = ({ initial, equipment, drivers, fuelPrice, onSave, onClose }) => {
+  const isEdit = !!initial;
   const isOtherInitially = initial?.workType === "أخرى";
   const [showCustomWorkType, setShowCustomWorkType] = useState(isOtherInitially);
 
@@ -40,10 +41,12 @@ const JobForm = ({ initial, equipment, drivers, fuelPrice, onSave, onClose }) =>
     name: ["acres", "pricePerAcre", "fuelUsed", "amountPaid"],
   });
 
-  const revenue   = calcRevenue(acres, pricePerAcre);
-  const fuelCost  = calcFuelCost(fuelUsed, fuelPrice);
-  const profit    = revenue - fuelCost;
-  const remaining = calcRemainingAmount(revenue, amountPaid);
+  const revenue      = calcRevenue(acres, pricePerAcre);
+  const fuelCost     = calcFuelCost(fuelUsed, fuelPrice);
+  const profit       = revenue - fuelCost;
+  // في وضع التعديل الحقل مخفي، فبنستخدم القيمة الأصلية للعرض فقط (معلوماتي).
+  const displayPaid  = isEdit ? (initial?.amountPaid || 0) : (Number(amountPaid) || 0);
+  const remaining    = calcRemainingAmount(revenue, displayPaid);
 
   const handleEquipmentChange = (e) => {
     const eq = equipment.find((x) => x.id === e.target.value);
@@ -73,7 +76,10 @@ const JobForm = ({ initial, equipment, drivers, fuelPrice, onSave, onClose }) =>
       fuelUsed:     Number(data.fuelUsed)     || 0,
       date:         data.date,
       notes:        data.notes,
-      amountPaid:   Number(data.amountPaid)   || 0,
+      // على الإنشاء: قيمة أولية تُستخدم لعمل دفعة أولى تلقائياً (شوف JobsPage).
+      // على التعديل: بيانات الدفع بقت مصدرها payments collection مش الحقل ده،
+      // فبنحافظ على القيمة القديمة زي ما هي وما بنغيّرهاش من هنا.
+      amountPaid:   isEdit ? (initial.amountPaid || 0) : (Number(data.amountPaid) || 0),
     });
     onClose();
   };
@@ -182,19 +188,30 @@ const JobForm = ({ initial, equipment, drivers, fuelPrice, onSave, onClose }) =>
           )}
         />
 
-        {/* Amount paid */}
-        <Controller
-          name="amountPaid"
-          control={control}
-          render={({ field }) => (
-            <NumberInput
-              label="المبلغ المدفوع (ج.م)"
-              placeholder="0"
-              hint={revenue > 0 ? `الإجمالي: ${formatCurrency(revenue)}` : undefined}
-              {...field}
-            />
-          )}
-        />
+        {/* Amount paid — only editable at creation time (initial down-payment).
+            After creation, payments are tracked via the payments collection
+            (صفحة العملاء / "استلام دفعة") so this field is hidden on edit. */}
+        {isEdit ? (
+          <div className="flex flex-col justify-end">
+            <p className="text-xs text-gray-500 mb-1.5">المبلغ المدفوع</p>
+            <p className="text-sm text-gray-400 bg-surface-2 border border-white/8 rounded-xl px-3 py-2.5">
+              لتسجيل دفعة جديدة استخدم صفحة العملاء
+            </p>
+          </div>
+        ) : (
+          <Controller
+            name="amountPaid"
+            control={control}
+            render={({ field }) => (
+              <NumberInput
+                label="دفعة مقدّمة عند التسجيل (ج.م)"
+                placeholder="0"
+                hint={revenue > 0 ? `الإجمالي: ${formatCurrency(revenue)}` : undefined}
+                {...field}
+              />
+            )}
+          />
+        )}
 
         {/* Notes */}
         <div className="sm:col-span-2">
@@ -221,7 +238,7 @@ const JobForm = ({ initial, equipment, drivers, fuelPrice, onSave, onClose }) =>
           {revenue > 0 && (
             <>
               <div className="border-t border-white/8 my-2" />
-              <SummaryRow label="تم دفعه" value={formatCurrency(Number(amountPaid) || 0)} valueColor="text-green-400" />
+              <SummaryRow label="تم دفعه" value={formatCurrency(displayPaid)} valueColor="text-green-400" />
               <SummaryRow
                 label="المتبقي"
                 value={formatCurrency(remaining)}
