@@ -142,9 +142,38 @@ export const DataProvider = ({ children }) => {
   const updateAttendance = useCallback(async (id,d) => { await attendanceService.update(id,d);             dispatch({ type:"UPDATE_ATTENDANCE", payload:{id,...d} }); toast.success("تم تحديث الحضور");   }, []);
   const deleteAttendance = useCallback(async (id) => { await attendanceService.remove(id);                 dispatch({ type:"DELETE_ATTENDANCE", payload:id });        toast.success("تم حذف السجل");      }, []);
 
-  const addCustody    = useCallback(async (d) => { const id = await custodyService.add(user.uid, d);      dispatch({ type:"ADD_CUSTODY",    payload:{id,...d} }); toast.success(d.type === "expense" ? "تم تسجيل الصرف" : "تم تسجيل الإضافة"); }, [user]);
-  const updateCustody = useCallback(async (id,d) => { await custodyService.update(id,d);                  dispatch({ type:"UPDATE_CUSTODY", payload:{id,...d} }); toast.success("تم تحديث السجل");        }, []);
-  const deleteCustody = useCallback(async (id) => { await custodyService.remove(id);                      dispatch({ type:"DELETE_CUSTODY", payload:id });        toast.success("تم حذف السجل");          }, []);
+  const addCustody    = useCallback(async (d) => {
+    try {
+      const id = await custodyService.add(user.uid, d);
+      dispatch({ type:"ADD_CUSTODY", payload:{id,...d} });
+      toast.success(d.type === "expense" ? "تم تسجيل الصرف" : "تم تسجيل الإضافة");
+    } catch (err) {
+      toast.error(err?.code === "permission-denied"
+        ? "لا يوجد صلاحية للكتابة — تأكد من نشر قواعد Firestore"
+        : "حدث خطأ أثناء الحفظ");
+      throw err;
+    }
+  }, [user]);
+  const updateCustody = useCallback(async (id,d) => {
+    try {
+      await custodyService.update(id,d);
+      dispatch({ type:"UPDATE_CUSTODY", payload:{id,...d} });
+      toast.success("تم تحديث السجل");
+    } catch (err) {
+      toast.error("حدث خطأ أثناء التحديث");
+      throw err;
+    }
+  }, []);
+  const deleteCustody = useCallback(async (id) => {
+    try {
+      await custodyService.remove(id);
+      dispatch({ type:"DELETE_CUSTODY", payload:id });
+      toast.success("تم حذف السجل");
+    } catch (err) {
+      toast.error("حدث خطأ أثناء الحذف");
+      throw err;
+    }
+  }, []);
 
   const saveSettings = useCallback(async (d) => {
     await settingsService.save(user.uid, d);

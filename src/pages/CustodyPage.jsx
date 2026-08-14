@@ -11,12 +11,13 @@ import { Card, StatCard, EmptyState, SummaryRow } from "../components/ui/Card";
 import LoadingScreen   from "../components/ui/LoadingScreen";
 import {
   PlusIcon, WalletIcon, ArrowUpCircleIcon, ArrowDownCircleIcon,
-  TrashIcon, EditIcon, CalendarIcon, AlertIcon, TractorIcon, DriverIcon,
+  TrashIcon, EditIcon, CalendarIcon, AlertIcon, TractorIcon, DriverIcon, PrintIcon,
 } from "../components/ui/Icons";
 import { formatCurrency, formatDateShort, todayISO } from "../utils/formatters";
 import {
   CUSTODY_TYPES, CUSTODY_EXPENSE_CATEGORY_LABELS,
 } from "../config/constants";
+import { printCustodyReport } from "../utils/pdfGenerator";
 
 const CATEGORY_ICONS = {
   equipment: TractorIcon,
@@ -44,6 +45,17 @@ const CustodyPage = () => {
     if (ok) deleteCustody(id);
   };
 
+  const handlePrint = () => {
+    printCustodyReport({
+      transactions: transactions,
+      totalDeposits,
+      totalExpenses,
+      balance,
+      expensesByCategory,
+      getLinkedName,
+    });
+  };
+
   if (loading) return <LoadingScreen />;
 
   return (
@@ -58,11 +70,14 @@ const CustodyPage = () => {
           <p className="text-sm text-gray-500 mt-0.5">فلوس رجل الأعمال ومصروفاتها على الميكنة والسائقين</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => setModal({ mode: "add", type: CUSTODY_TYPES.DEPOSIT })}
+          <Button variant="ghost" onClick={handlePrint} icon={<PrintIcon size={16} />} title="طباعة تقرير شامل بالعهدة">
+            طباعة تقرير
+          </Button>
+          <Button variant="info" onClick={() => setModal({ mode: "add", type: CUSTODY_TYPES.DEPOSIT })}
             icon={<ArrowUpCircleIcon size={16} />}>
             إضافة فلوس
           </Button>
-          <Button onClick={() => setModal({ mode: "add", type: CUSTODY_TYPES.EXPENSE })}
+          <Button variant="danger" onClick={() => setModal({ mode: "add", type: CUSTODY_TYPES.EXPENSE })}
             icon={<ArrowDownCircleIcon size={16} />}>
             صرف فلوس
           </Button>

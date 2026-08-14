@@ -419,3 +419,88 @@ export const printDriverPayslip = ({ driver, month, summary, entries, attendance
 
   printWindow(html, `كشف راتب - ${driver.name} - ${monthLabel}`);
 };
+
+// ── 5. Custody Report (العهدة) ────────────────────────────────────────────────
+export const printCustodyReport = ({ transactions, totalDeposits, totalExpenses, balance, expensesByCategory, getLinkedName }) => {
+  const today = new Date().toLocaleDateString("ar-EG");
+
+  const categoryLabels = { equipment: "ميكنة", driver: "سائقين", other: "أخرى" };
+
+  // Sort oldest → newest for a chronological ledger read
+  const sorted = [...transactions].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+
+  const rows = sorted.map((t) => {
+    const isDeposit = t.type === "deposit";
+    const linkedName = getLinkedName ? getLinkedName(t) : null;
+    const desc = isDeposit
+      ? (t.source || "إضافة فلوس")
+      : (t.category === "other" && t.otherLabel ? t.otherLabel : (categoryLabels[t.category] || "صرف"));
+    return `
+    <tr>
+      <td>${formatDate(t.date)}</td>
+      <td>
+        <span class="badge ${isDeposit ? "badge-green" : "badge-red"}">${isDeposit ? "إضافة" : "صرف"}</span>
+      </td>
+      <td>${desc}${linkedName ? ` · ${linkedName}` : ""}</td>
+      <td>${t.notes || "—"}</td>
+      <td style="color:${isDeposit ? "#15803d" : "#991b1b"};font-weight:700">
+        ${isDeposit ? "+" : "-"} ${formatCurrency(t.amount)}
+      </td>
+    </tr>`;
+  }).join("");
+
+  const categoryRows = Object.entries(categoryLabels).map(([key, label]) => {
+    const amount = expensesByCategory?.[key] || 0;
+    if (amount === 0) return "";
+    return `<tr><td style="font-weight:600">${label}</td><td style="color:#991b1b">${formatCurrency(amount)}</td></tr>`;
+  }).join("");
+
+  const html = `
+    <div class="page">
+      <div class="header">
+        <div>
+          <h1>تقرير العهدة</h1>
+          <p class="brand">زراعي برو · سجل شامل بحركات العهدة</p>
+        </div>
+        <div class="meta">
+          <p>تاريخ الطباعة: ${today}</p>
+          <p>عدد الحركات: ${sorted.length}</p>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="stat-box"><div class="stat-val" style="color:#15803d">${formatCurrency(totalDeposits)}</div><div class="stat-lbl">إجمالي المُضاف</div></div>
+        <div class="stat-box"><div class="stat-val" style="color:#991b1b">${formatCurrency(totalExpenses)}</div><div class="stat-lbl">إجمالي المصروف</div></div>
+        <div class="stat-box" style="grid-column:1 / -1;">
+          <div class="stat-val" style="color:${balance>=0?"#15803d":"#991b1b"}">${formatCurrency(balance)}</div>
+          <div class="stat-lbl">الرصيد المتبقي</div>
+        </div>
+      </div>
+
+      ${categoryRows ? `
+      <div class="section">
+        <h2>المصروفات حسب البند</h2>
+        <table>
+          <tbody>${categoryRows}</tbody>
+        </table>
+      </div>` : ""}
+
+      ${rows ? `
+      <div class="section">
+        <h2>سجل الحركات بالتواريخ (${sorted.length})</h2>
+        <table>
+          <thead><tr><th>التاريخ</th><th>النوع</th><th>البيان</th><th>ملاحظات</th><th>المبلغ</th></tr></thead>
+          <tbody>${rows}</tbody>
+          <tr class="total-row">
+            <td colspan="4">الرصيد المتبقي</td>
+            <td style="color:${balance>=0?"#15803d":"#991b1b"}">${formatCurrency(balance)}</td>
+          </tr>
+        </table>
+      </div>` : `<div class="section"><p style="color:#666;text-align:center;padding:20px 0;">لا توجد حركات مسجلة بعد</p></div>`}
+
+      <div class="footer">زراعي برو · تقرير العهدة · ${today}</div>
+    </div>
+  `;
+
+  printWindow(html, `تقرير العهدة - ${today}`);
+};

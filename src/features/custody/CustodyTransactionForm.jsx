@@ -135,7 +135,7 @@ const CustodyTransactionForm = ({ initial, drivers, equipment, onSave, onClose }
 
       <div className="flex gap-3 justify-end mt-6 pt-4 border-t border-white/8">
         <Button type="button" variant="ghost" onClick={onClose}>إلغاء</Button>
-        <Button type="submit" loading={isSubmitting}>
+        <Button type="submit" variant={isExpense ? "danger" : "info"} loading={isSubmitting}>
           {isExpense ? "تسجيل الصرف" : "تسجيل الإضافة"}
         </Button>
       </div>
