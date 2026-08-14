@@ -5,7 +5,7 @@ import { useNotifications }  from "../hooks/useNotifications";
 import LoadingScreen         from "../components/ui/LoadingScreen";
 import { Card, EmptyState }  from "../components/ui/Card";
 import Button                from "../components/ui/Button";
-import { AlertIcon, WrenchIcon, DriverIcon } from "../components/ui/Icons";
+import { AlertIcon, WrenchIcon, DriverIcon, WalletIcon } from "../components/ui/Icons";
 
 const SEVERITY_STYLE = {
   high:   {
@@ -27,8 +27,9 @@ const SEVERITY_STYLE = {
 };
 
 const TYPE_ICONS = {
-  maintenance_due: WrenchIcon,
-  debt_overdue:    DriverIcon,
+  maintenance_due:   WrenchIcon,
+  debt_overdue:      DriverIcon,
+  custody_overdrawn: WalletIcon,
 };
 
 const NotificationsPage = () => {

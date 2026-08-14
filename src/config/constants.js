@@ -13,6 +13,7 @@ export const COLLECTIONS = {
   ATTENDANCE:     "attendance",
   NOTIFICATIONS:  "notifications",
   BACKUPS:        "backups",
+  CUSTODY:        "custodyTransactions",
 };
 
 // ─── Backup ───────────────────────────────────────────────────────────────────
@@ -123,15 +124,17 @@ export const DRIVER_COST_TYPES = [
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 export const NOTIFICATION_TYPES = {
-  MAINTENANCE_DUE: "maintenance_due",
-  DEBT_OVERDUE:    "debt_overdue",
-  GENERAL:         "general",
+  MAINTENANCE_DUE:   "maintenance_due",
+  DEBT_OVERDUE:      "debt_overdue",
+  CUSTODY_OVERDRAWN: "custody_overdrawn",
+  GENERAL:           "general",
 };
 
 export const NOTIFICATION_LABELS = {
-  maintenance_due: "موعد صيانة",
-  debt_overdue:    "دين متأخر",
-  general:         "عام",
+  maintenance_due:   "موعد صيانة",
+  debt_overdue:      "دين متأخر",
+  custody_overdrawn: "عهدة بالسالب",
+  general:           "عام",
 };
 
 // ─── Misc ─────────────────────────────────────────────────────────────────────
@@ -192,4 +195,29 @@ export const ATTENDANCE_LABELS = {
   absent:  "غياب",
   late:    "تأخير",
   half:    "نصف يوم",
+};
+
+// ─── Custody (العهدة) ──────────────────────────────────────────────────────────
+// رجل الأعمال بيسلّم الشركة مبلغ (عهدة) بشكل دوري، وبيتصرف منه على الميكنة والسواقين.
+export const CUSTODY_TYPES = {
+  DEPOSIT: "deposit", // إضافة فلوس (تسليم من رجل الأعمال)
+  EXPENSE: "expense", // صرف فلوس (مصروف يتخصم من الرصيد)
+};
+
+export const CUSTODY_TYPE_LABELS = {
+  deposit: "إضافة فلوس",
+  expense: "صرف فلوس",
+};
+
+// تصنيف المصروف — يفيد في التقارير (فين بتروح الفلوس)
+export const CUSTODY_EXPENSE_CATEGORIES = {
+  EQUIPMENT: "equipment", // ميكنة
+  DRIVER:    "driver",    // سائقين
+  OTHER:     "other",     // أخرى
+};
+
+export const CUSTODY_EXPENSE_CATEGORY_LABELS = {
+  equipment: "ميكنة",
+  driver:    "سائقين",
+  other:     "أخرى",
 };

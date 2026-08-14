@@ -11,6 +11,7 @@ import { paymentService }      from "../services/paymentService";
 import { driverCostService }   from "../services/driverCostService";
 import { salaryService }       from "../services/salaryService";
 import { attendanceService }   from "../services/attendanceService";
+import { custodyService }      from "../services/custodyService";
 import { DEFAULT_FUEL_PRICE }  from "../config/constants";
 
 const initialState = {
@@ -22,6 +23,7 @@ const initialState = {
   driverCosts:   [],
   salaryEntries: [],
   attendance:    [],
+  custody:       [],
   settings:      { fuelPrice: DEFAULT_FUEL_PRICE },
   loading:       true,
   error:         null,
@@ -65,6 +67,10 @@ const reducer = (state, action) => {
     case "UPDATE_ATTENDANCE": return { ...state, attendance: state.attendance.map(a => a.id === action.payload.id ? action.payload : a) };
     case "DELETE_ATTENDANCE": return { ...state, attendance: state.attendance.filter(a => a.id !== action.payload) };
 
+    case "ADD_CUSTODY":    return { ...state, custody: [action.payload, ...state.custody] };
+    case "UPDATE_CUSTODY": return { ...state, custody: state.custody.map(c => c.id === action.payload.id ? action.payload : c) };
+    case "DELETE_CUSTODY": return { ...state, custody: state.custody.filter(c => c.id !== action.payload) };
+
     case "UPDATE_SETTINGS": return { ...state, settings: { ...state.settings, ...action.payload } };
     default: return state;
   }
@@ -89,13 +95,14 @@ export const DataProvider = ({ children }) => {
           maintenanceService.getAll(user.uid),
           settingsService.get(user.uid),
         ]);
-        const [payments, driverCosts, salaryEntries, attendance] = await Promise.all([
+        const [payments, driverCosts, salaryEntries, attendance, custody] = await Promise.all([
           safeFetch(paymentService.getAll(user.uid)),
           safeFetch(driverCostService.getAll(user.uid)),
           safeFetch(salaryService.getAll(user.uid)),
           safeFetch(attendanceService.getAll(user.uid)),
+          safeFetch(custodyService.getAll(user.uid)),
         ]);
-        dispatch({ type: "SET_ALL", payload: { equipment, jobs, drivers, maintenance, settings, payments, driverCosts, salaryEntries, attendance } });
+        dispatch({ type: "SET_ALL", payload: { equipment, jobs, drivers, maintenance, settings, payments, driverCosts, salaryEntries, attendance, custody } });
       } catch (err) {
         dispatch({ type: "SET_ERROR", payload: err.message });
         toast.error("خطأ في تحميل البيانات");
@@ -135,6 +142,10 @@ export const DataProvider = ({ children }) => {
   const updateAttendance = useCallback(async (id,d) => { await attendanceService.update(id,d);             dispatch({ type:"UPDATE_ATTENDANCE", payload:{id,...d} }); toast.success("تم تحديث الحضور");   }, []);
   const deleteAttendance = useCallback(async (id) => { await attendanceService.remove(id);                 dispatch({ type:"DELETE_ATTENDANCE", payload:id });        toast.success("تم حذف السجل");      }, []);
 
+  const addCustody    = useCallback(async (d) => { const id = await custodyService.add(user.uid, d);      dispatch({ type:"ADD_CUSTODY",    payload:{id,...d} }); toast.success(d.type === "expense" ? "تم تسجيل الصرف" : "تم تسجيل الإضافة"); }, [user]);
+  const updateCustody = useCallback(async (id,d) => { await custodyService.update(id,d);                  dispatch({ type:"UPDATE_CUSTODY", payload:{id,...d} }); toast.success("تم تحديث السجل");        }, []);
+  const deleteCustody = useCallback(async (id) => { await custodyService.remove(id);                      dispatch({ type:"DELETE_CUSTODY", payload:id });        toast.success("تم حذف السجل");          }, []);
+
   const saveSettings = useCallback(async (d) => {
     await settingsService.save(user.uid, d);
     dispatch({ type:"UPDATE_SETTINGS", payload:d });
@@ -151,6 +162,7 @@ export const DataProvider = ({ children }) => {
     addDriverCost, updateDriverCost, deleteDriverCost,
     addSalaryEntry, updateSalaryEntry, deleteSalaryEntry,
     addAttendance, updateAttendance, deleteAttendance,
+    addCustody, updateCustody, deleteCustody,
     saveSettings,
   };
 

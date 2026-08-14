@@ -16,6 +16,7 @@ import JobsPage               from "./pages/JobsPage";
 import DriversPage            from "./pages/DriversPage";
 import DriverDetailPage       from "./pages/DriverDetailPage";
 import MaintenancePage        from "./pages/MaintenancePage";
+import CustodyPage            from "./pages/CustodyPage";
 import ReportsPage            from "./pages/ReportsPage";
 import ClientsPage            from "./pages/ClientsPage";
 import ClientDetailPage       from "./pages/ClientDetailPage";
@@ -36,6 +37,7 @@ const App = () => (
           <Route path="drivers"                 element={<DriversPage />} />
           <Route path="drivers/:driverId"       element={<DriverDetailPage />} />
           <Route path="maintenance"             element={<MaintenancePage />} />
+          <Route path="custody"                 element={<CustodyPage />} />
           <Route path="reports"                 element={<ReportsPage />} />
           <Route path="clients"                 element={<ClientsPage />} />
           <Route path="clients/:clientName"     element={<ClientDetailPage />} />
