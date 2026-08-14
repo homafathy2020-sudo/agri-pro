@@ -7,22 +7,22 @@ import { useState, useCallback } from "react";
  *  - ConfirmState exposes { open, targetId, accept, reject }
  */
 export const useConfirm = () => {
-  const [state, setState] = useState({ open: false, targetId: null, resolve: null });
+  const [state, setState] = useState({ open: false, targetId: null, message: null, resolve: null });
 
-  const confirm = useCallback((id) =>
+  const confirm = useCallback((id, message = null) =>
     new Promise((resolve) => {
-      setState({ open: true, targetId: id, resolve });
+      setState({ open: true, targetId: id, message, resolve });
     }),
   []);
 
   const accept = useCallback(() => {
     state.resolve && state.resolve(true);
-    setState({ open: false, targetId: null, resolve: null });
+    setState({ open: false, targetId: null, message: null, resolve: null });
   }, [state]);
 
   const reject = useCallback(() => {
     state.resolve && state.resolve(false);
-    setState({ open: false, targetId: null, resolve: null });
+    setState({ open: false, targetId: null, message: null, resolve: null });
   }, [state]);
 
   return {

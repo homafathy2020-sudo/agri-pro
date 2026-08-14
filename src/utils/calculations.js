@@ -156,40 +156,6 @@ export const buildClientList = (jobs, fuelPrice, payments = []) => {
     .sort((a, b) => b.totalRemaining - a.totalRemaining);
 };
 
-// ─── Driver cost calculations ─────────────────────────────────────────────────
-
-/**
- * Sum all driver costs for a given driver in a date range.
- */
-export const calcDriverTotalCost = (driverCosts) =>
-  driverCosts.reduce((s, c) => s + (Number(c.amount) || 0), 0);
-
-/**
- * Net profit after subtracting driver costs from job profits.
- */
-export const calcNetProfitAfterDriverCosts = (jobNetProfit, driverCosts) =>
-  jobNetProfit - calcDriverTotalCost(driverCosts);
-
-/**
- * Build per-driver full report including salary costs.
- */
-export const buildDriverReportWithCosts = (drivers, jobs, driverCosts, fuelPrice, payments = []) =>
-  drivers.map((drv) => {
-    const drvJobs  = jobs.filter((j) => j.driverId === drv.id);
-    const drvCosts = driverCosts.filter((c) => c.driverId === drv.id);
-    const stats    = aggregateJobs(drvJobs, fuelPrice, payments);
-    const totalCosts = calcDriverTotalCost(drvCosts);
-    const netAfterCosts = stats.netProfit - totalCosts;
-    return {
-      ...drv,
-      ...stats,
-      ops: drvJobs.length,
-      totalCosts,
-      netAfterCosts,
-      costs: drvCosts,
-    };
-  }).sort((a, b) => b.totalRevenue - a.totalRevenue);
-
 // ─── Payment instalments ──────────────────────────────────────────────────────
 
 /**

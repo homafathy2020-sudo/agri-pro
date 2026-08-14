@@ -62,8 +62,8 @@ const Legend = ({ items }) => (
 // ── ReportsPage ───────────────────────────────────────────────────────────
 const ReportsPage = () => {
   const { report: equipReport, loading: eLoading } = useEquipment();
-  const { salaryEntries = [], driverCosts = [] } = useData();
-  const totalSalariesPaid = calcTotalSalariesPaid(salaryEntries) + driverCosts.reduce((s,c) => s+(Number(c.amount)||0), 0);
+  const { salaryEntries = [] } = useData();
+  const totalSalariesPaid = calcTotalSalariesPaid(salaryEntries);
   const { report: driverReport, loading: dLoading } = useDrivers();
   const [tab, setTab] = useState("equipment");
 

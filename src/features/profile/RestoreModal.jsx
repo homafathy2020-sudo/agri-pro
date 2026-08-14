@@ -15,7 +15,6 @@ const COUNT_LABELS = {
   drivers:       "السائقين",
   maintenance:   "الصيانة",
   payments:      "الدفعات",
-  driverCosts:   "تكاليف السائقين",
   salaryEntries: "المرتبات",
   attendance:    "الحضور",
 };
@@ -39,7 +38,6 @@ const RestoreModal = ({ open, onClose }) => {
     drivers:       data.drivers?.length       || 0,
     maintenance:   data.maintenance?.length   || 0,
     payments:      data.payments?.length      || 0,
-    driverCosts:   data.driverCosts?.length   || 0,
     salaryEntries: data.salaryEntries?.length || 0,
     attendance:    data.attendance?.length    || 0,
   };
@@ -81,7 +79,6 @@ const RestoreModal = ({ open, onClose }) => {
         drivers:       data.drivers,
         maintenance:   data.maintenance,
         payments:      data.payments,
-        driverCosts:   data.driverCosts,
         salaryEntries: data.salaryEntries,
         attendance:    data.attendance,
         settings:      data.settings,

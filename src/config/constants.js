@@ -111,16 +111,16 @@ export const PAYMENT_STATUS_VARIANTS = {
   unpaid:  "red",
 };
 
-// ─── Driver Costs ─────────────────────────────────────────────────────────────
-export const DRIVER_COST_TYPES = [
-  "راتب شهري",
-  "بدل وقود",
-  "بدل سكن",
-  "حافز",
-  "سلفة",
-  "خصم",
-  "أخرى",
-];
+// ─── Driver Status ────────────────────────────────────────────────────────────
+export const DRIVER_STATUS = {
+  ACTIVE:   "active",
+  INACTIVE: "inactive",
+};
+
+export const DRIVER_STATUS_LABELS = {
+  active:   "نشط",
+  inactive: "غير نشط",
+};
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 export const NOTIFICATION_TYPES = {

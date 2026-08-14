@@ -12,7 +12,7 @@ import { calcTotalSalariesPaid } from "../utils/salaryCalculations";
 export const useDashboard = () => {
   const {
     jobs, equipment, maintenance, drivers, payments = [],
-    settings, salaryEntries = [], driverCosts = [], loading,
+    settings, salaryEntries = [], loading,
   } = useData();
 
   const fuelPrice = settings.fuelPrice;
@@ -27,12 +27,10 @@ export const useDashboard = () => {
     [maintenance]
   );
 
-  // ── Salaries = new salaryEntries (base+bonus) + old driverCosts ───────────
-  const totalSalaries = useMemo(() => {
-    const fromSalarySystem = calcTotalSalariesPaid(salaryEntries);
-    const fromDriverCosts  = driverCosts.reduce((s, c) => s + (Number(c.amount) || 0), 0);
-    return fromSalarySystem + fromDriverCosts;
-  }, [salaryEntries, driverCosts]);
+  const totalSalaries = useMemo(
+    () => calcTotalSalariesPaid(salaryEntries),
+    [salaryEntries]
+  );
 
   const netProfit = totals.netProfit - totalMaintCost - totalSalaries;
 

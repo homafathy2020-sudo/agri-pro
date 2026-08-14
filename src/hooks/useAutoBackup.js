@@ -46,7 +46,6 @@ export const useAutoBackup = () => {
           drivers:       data.drivers,
           maintenance:   data.maintenance,
           payments:      data.payments,
-          driverCosts:   data.driverCosts,
           salaryEntries: data.salaryEntries,
           attendance:    data.attendance,
           settings:      data.settings,

@@ -1,8 +1,9 @@
 // src/features/drivers/DriverForm.jsx
 import React from "react";
 import { useForm, Controller } from "react-hook-form";
-import { Input, NumberInput } from "../../components/ui/Input";
+import { Input, NumberInput, Select } from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
+import { DRIVER_STATUS, DRIVER_STATUS_LABELS } from "../../config/constants";
 
 const DriverForm = ({ initial, onSave, onClose }) => {
   const {
@@ -11,11 +12,15 @@ const DriverForm = ({ initial, onSave, onClose }) => {
     control,
     formState: { errors, isSubmitting },
   } = useForm({
-    defaultValues: initial ?? { name: "", phone: "", salary: "" },
+    defaultValues: initial ?? { name: "", phone: "", salary: "", status: DRIVER_STATUS.ACTIVE },
   });
 
   const onSubmit = async (data) => {
-    await onSave({ ...data, salary: Number(data.salary) || 0 });
+    await onSave({
+      ...data,
+      salary: Number(data.salary) || 0,
+      status: data.status || DRIVER_STATUS.ACTIVE,
+    });
     onClose();
   };
 
@@ -50,6 +55,12 @@ const DriverForm = ({ initial, onSave, onClose }) => {
             />
           )}
         />
+
+        <Select label="الحالة" {...register("status")}>
+          {Object.entries(DRIVER_STATUS_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
+        </Select>
 
       </div>
 

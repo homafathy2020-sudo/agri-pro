@@ -8,11 +8,15 @@ import { driverService }       from "../services/driverService";
 import { maintenanceService }  from "../services/maintenanceService";
 import { settingsService }     from "../services/settingsService";
 import { paymentService }      from "../services/paymentService";
+// driverCostService is kept only to read/clean up the legacy `driverCosts`
+// collection during the one-time migration below — it's no longer exposed
+// for creating new records (see migrateDriverCosts.js).
 import { driverCostService }   from "../services/driverCostService";
 import { salaryService }       from "../services/salaryService";
 import { attendanceService }   from "../services/attendanceService";
 import { custodyService }      from "../services/custodyService";
 import { DEFAULT_FUEL_PRICE }  from "../config/constants";
+import { driverCostToSalaryEntry } from "../utils/migrateDriverCosts";
 
 const initialState = {
   equipment:     [],
@@ -20,7 +24,6 @@ const initialState = {
   drivers:       [],
   maintenance:   [],
   payments:      [],
-  driverCosts:   [],
   salaryEntries: [],
   attendance:    [],
   custody:       [],
@@ -54,10 +57,6 @@ const reducer = (state, action) => {
     case "ADD_PAYMENT":    return { ...state, payments: [action.payload, ...state.payments] };
     case "UPDATE_PAYMENT": return { ...state, payments: state.payments.map(p => p.id === action.payload.id ? action.payload : p) };
     case "DELETE_PAYMENT": return { ...state, payments: state.payments.filter(p => p.id !== action.payload) };
-
-    case "ADD_DRIVER_COST":    return { ...state, driverCosts: [action.payload, ...state.driverCosts] };
-    case "UPDATE_DRIVER_COST": return { ...state, driverCosts: state.driverCosts.map(c => c.id === action.payload.id ? action.payload : c) };
-    case "DELETE_DRIVER_COST": return { ...state, driverCosts: state.driverCosts.filter(c => c.id !== action.payload) };
 
     case "ADD_SALARY":    return { ...state, salaryEntries: [action.payload, ...state.salaryEntries] };
     case "UPDATE_SALARY": return { ...state, salaryEntries: state.salaryEntries.map(s => s.id === action.payload.id ? action.payload : s) };
@@ -102,7 +101,29 @@ export const DataProvider = ({ children }) => {
           safeFetch(attendanceService.getAll(user.uid)),
           safeFetch(custodyService.getAll(user.uid)),
         ]);
-        dispatch({ type: "SET_ALL", payload: { equipment, jobs, drivers, maintenance, settings, payments, driverCosts, salaryEntries, attendance, custody } });
+
+        // One-time merge: fold any leftover legacy driverCosts docs into
+        // salaryEntries, then remove the legacy docs so this only runs once.
+        let mergedSalaryEntries = salaryEntries;
+        if (driverCosts.length > 0) {
+          try {
+            const migrated = await Promise.all(
+              driverCosts.map(async (cost) => {
+                const payload = driverCostToSalaryEntry(cost);
+                const id = await salaryService.add(user.uid, payload);
+                await driverCostService.remove(cost.id);
+                return { id, ...payload };
+              })
+            );
+            mergedSalaryEntries = [...migrated, ...salaryEntries];
+            toast.success(`تم دمج ${migrated.length} من تكاليف السائقين القديمة داخل نظام الرواتب`);
+          } catch (migrateErr) {
+            // Non-fatal — leave legacy docs in place, try again next load.
+            console.warn("driverCosts migration failed:", migrateErr);
+          }
+        }
+
+        dispatch({ type: "SET_ALL", payload: { equipment, jobs, drivers, maintenance, settings, payments, salaryEntries: mergedSalaryEntries, attendance, custody } });
       } catch (err) {
         dispatch({ type: "SET_ERROR", payload: err.message });
         toast.error("خطأ في تحميل البيانات");
@@ -129,10 +150,6 @@ export const DataProvider = ({ children }) => {
   const addPayment    = useCallback(async (d) => { const id = await paymentService.add(user.uid, d);       dispatch({ type:"ADD_PAYMENT",    payload:{id,...d} }); toast.success("تم تسجيل الدفعة");     }, [user]);
   const updatePayment = useCallback(async (id,d) => { await paymentService.update(id,d);                   dispatch({ type:"UPDATE_PAYMENT", payload:{id,...d} }); toast.success("تم تحديث الدفعة");     }, []);
   const deletePayment = useCallback(async (id) => { await paymentService.remove(id);                       dispatch({ type:"DELETE_PAYMENT", payload:id });        toast.success("تم حذف الدفعة");       }, []);
-
-  const addDriverCost    = useCallback(async (d) => { const id = await driverCostService.add(user.uid, d); dispatch({ type:"ADD_DRIVER_COST",    payload:{id,...d} }); toast.success("تم تسجيل التكلفة");  }, [user]);
-  const updateDriverCost = useCallback(async (id,d) => { await driverCostService.update(id,d);             dispatch({ type:"UPDATE_DRIVER_COST", payload:{id,...d} }); toast.success("تم تحديث التكلفة");  }, []);
-  const deleteDriverCost = useCallback(async (id) => { await driverCostService.remove(id);                 dispatch({ type:"DELETE_DRIVER_COST", payload:id });        toast.success("تم حذف التكلفة");    }, []);
 
   const addSalaryEntry    = useCallback(async (d) => { const id = await salaryService.add(user.uid, d);    dispatch({ type:"ADD_SALARY",    payload:{id,...d} }); toast.success("تم التسجيل");           }, [user]);
   const updateSalaryEntry = useCallback(async (id,d) => { await salaryService.update(id,d);                dispatch({ type:"UPDATE_SALARY", payload:{id,...d} }); toast.success("تم التحديث");           }, []);
@@ -188,7 +205,6 @@ export const DataProvider = ({ children }) => {
     addDriver, updateDriver, deleteDriver,
     addMaintenance, updateMaintenance, deleteMaintenance,
     addPayment, updatePayment, deletePayment,
-    addDriverCost, updateDriverCost, deleteDriverCost,
     addSalaryEntry, updateSalaryEntry, deleteSalaryEntry,
     addAttendance, updateAttendance, deleteAttendance,
     addCustody, updateCustody, deleteCustody,

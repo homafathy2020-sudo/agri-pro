@@ -1,9 +1,13 @@
 // src/features/drivers/DriverCard.jsx
 import React from "react";
-import { Card } from "../../components/ui/Card";
+import { useNavigate } from "react-router-dom";
+import { Card, Badge } from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
-import { EditIcon, TrashIcon, PhoneIcon } from "../../components/ui/Icons";
+import {
+  EditIcon, TrashIcon, PhoneIcon, AlertIcon, WalletIcon, TractorIcon,
+} from "../../components/ui/Icons";
 import { formatCurrency, formatNumber, getInitial } from "../../utils/formatters";
+import { DRIVER_STATUS } from "../../config/constants";
 
 const StatItem = ({ label, value, color = "text-gray-200" }) => (
   <div className="flex flex-col gap-0.5">
@@ -13,10 +17,16 @@ const StatItem = ({ label, value, color = "text-gray-200" }) => (
 );
 
 const DriverCard = ({ driver, onEdit, onDelete }) => {
-  const { name, phone, salary, totalRevenue = 0, totalAcres = 0, ops = 0 } = driver;
+  const navigate = useNavigate();
+  const {
+    id, name, phone, totalAcres = 0, ops = 0,
+    status, outstandingAdvance = 0, unpaidThisMonth, assignedEquipment = [],
+  } = driver;
+
+  const isInactive = status === DRIVER_STATUS.INACTIVE;
 
   return (
-    <Card hover>
+    <Card hover className={isInactive ? "opacity-60" : ""}>
       <div className="p-5">
         <div className="flex gap-4 items-start">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-brand-700 to-blue-700 flex items-center justify-center text-xl font-extrabold text-white flex-shrink-0 shadow-lg">
@@ -24,26 +34,56 @@ const DriverCard = ({ driver, onEdit, onDelete }) => {
           </div>
 
           <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-extrabold text-gray-100 truncate">{name}</h3>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-sm font-extrabold text-gray-100 truncate">{name}</h3>
+              {isInactive && <Badge variant="gray">غير نشط</Badge>}
+            </div>
+
             {phone && (
               <div className="flex items-center gap-1.5 mt-0.5">
                 <PhoneIcon size={11} className="text-gray-500" />
                 <p className="text-xs text-gray-500" style={{ direction: "ltr" }}>{phone}</p>
               </div>
             )}
+
+            {/* Only ops + acres — no revenue on the list, see driver detail for financials */}
             <div className="flex gap-4 mt-3 flex-wrap">
-              <StatItem label="أفدنة"   value={formatNumber(totalAcres)}    color="text-blue-400" />
-              <StatItem label="إيراد"   value={formatCurrency(totalRevenue)} color="text-amber-400" />
-              <StatItem label="عمليات"  value={ops} />
-              {salary > 0 && (
-                <StatItem label="الراتب" value={formatCurrency(salary)} color="text-green-400" />
-              )}
+              <StatItem label="أفدنة"  value={formatNumber(totalAcres)} color="text-blue-400" />
+              <StatItem label="عمليات" value={ops} />
             </div>
+
+            {/* Alerts / status badges */}
+            {(unpaidThisMonth || outstandingAdvance > 0 || assignedEquipment.length > 0) && (
+              <div className="flex items-center gap-2 flex-wrap mt-3">
+                {unpaidThisMonth && (
+                  <Badge variant="amber">
+                    <AlertIcon size={11} /> لسه ما اتصرفش راتب الشهر ده
+                  </Badge>
+                )}
+                {outstandingAdvance > 0 && (
+                  <Badge variant="red">
+                    <WalletIcon size={11} /> سلفة متبقية {formatCurrency(outstandingAdvance)}
+                  </Badge>
+                )}
+                {assignedEquipment.map((eqName) => (
+                  <Badge key={eqName} variant="blue">
+                    <TractorIcon size={11} /> {eqName}
+                  </Badge>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col gap-2 flex-shrink-0">
-            <Button variant="secondary" size="xs" onClick={onEdit}   icon={<EditIcon size={13} />}  className="px-3" />
-            <Button variant="ghost"     size="xs" onClick={onDelete} icon={<TrashIcon size={13} />} className="px-3" />
+            <Button variant="secondary" size="sm" onClick={() => navigate(`/drivers/${id}`)}>
+              الرواتب والحضور
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="ghost" size="xs" icon={<EditIcon size={13} />}
+                className="flex-1" onClick={onEdit} />
+              <Button variant="ghost" size="xs" icon={<TrashIcon size={13} />}
+                className="flex-1" onClick={onDelete} />
+            </div>
           </div>
         </div>
       </div>

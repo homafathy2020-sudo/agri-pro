@@ -18,7 +18,6 @@ const BACKUP_COLLECTIONS = [
   ["drivers",       COLLECTIONS.DRIVERS],
   ["maintenance",   COLLECTIONS.MAINTENANCE],
   ["payments",      COLLECTIONS.PAYMENTS],
-  ["driverCosts",   COLLECTIONS.DRIVER_COSTS],
   ["salaryEntries", COLLECTIONS.SALARY_ENTRIES],
   ["attendance",    COLLECTIONS.ATTENDANCE],
 ];
