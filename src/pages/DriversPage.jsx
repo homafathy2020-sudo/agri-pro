@@ -1,6 +1,7 @@
 // src/pages/DriversPage.jsx
 import React, { useState, useMemo } from "react";
 import { useDrivers }     from "../hooks/useDrivers";
+import { useSalary }      from "../hooks/useSalary";
 import { useConfirm }     from "../hooks/useConfirm";
 import DriverForm         from "../features/drivers/DriverForm";
 import DriverCard         from "../features/drivers/DriverCard";
@@ -10,27 +11,43 @@ import Button             from "../components/ui/Button";
 import { StatCard, EmptyState } from "../components/ui/Card";
 import LoadingScreen      from "../components/ui/LoadingScreen";
 import {
-  PlusIcon, DriverIcon, RevenueIcon, ClearIcon,
+  PlusIcon, DriverIcon, RevenueIcon, ClearIcon, CheckCircleIcon,
 } from "../components/ui/Icons";
-import { formatCurrency } from "../utils/formatters";
-import { DRIVER_STATUS } from "../config/constants";
+import { formatCurrency, todayISO } from "../utils/formatters";
+import { DRIVER_STATUS, SALARY_ENTRY_TYPES } from "../config/constants";
 
 const DriversPage = () => {
   const {
     report, loading, addDriver, updateDriver, deleteDriver,
     getDriverDependencyCounts,
   } = useDrivers();
+  const { addSalaryEntry, salaryEntries, currentMonth } = useSalary();
   const { confirm, confirmState } = useConfirm();
   const [modal, setModal]         = useState(null);
   const [search, setSearch]       = useState("");
   const [showInactive, setShowInactive] = useState(false);
+  const [payTarget, setPayTarget] = useState(null); // driver currently being paid via quick-pay
+  const [paying, setPaying]       = useState(false);
 
-  // Business-wide totals across ALL drivers' jobs — not affected by search/filter.
-  const totals = useMemo(() => report.reduce((acc, d) => ({
-    revenue:   acc.revenue   + (d.totalRevenue   || 0),
-    paid:      acc.paid      + (d.totalPaid      || 0),
-    remaining: acc.remaining + (d.totalRemaining || 0),
-  }), { revenue: 0, paid: 0, remaining: 0 }), [report]);
+  // Salary-wide totals for THIS MONTH — across all drivers (not machine/job revenue).
+  const salaryTotals = useMemo(() => {
+    const activeWithSalary = report.filter(
+      (d) => d.status !== DRIVER_STATUS.INACTIVE && Number(d.salary) > 0
+    );
+    const due = activeWithSalary.reduce((s, d) => s + (Number(d.salary) || 0), 0);
+
+    const paid = salaryEntries
+      .filter((e) =>
+        e.type === SALARY_ENTRY_TYPES.BASE &&
+        e.paid &&
+        (e.date || "").startsWith(currentMonth)
+      )
+      .reduce((s, e) => s + (Number(e.amount) || 0), 0);
+
+    const remaining = Math.max(0, due - paid);
+
+    return { due, paid, remaining };
+  }, [report, salaryEntries, currentMonth]);
 
   const visibleDrivers = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -72,6 +89,25 @@ const DriversPage = () => {
     if (ok) deleteDriver(drv.id);
   };
 
+  const handleConfirmPaySalary = async () => {
+    if (!payTarget) return;
+    setPaying(true);
+    try {
+      await addSalaryEntry({
+        driverId: payTarget.id,
+        type:     SALARY_ENTRY_TYPES.BASE,
+        amount:   Number(payTarget.salary) || 0,
+        date:     todayISO(),
+        paid:     true,
+        reason:   "",
+        notes:    "صرف سريع من قسم السائقين",
+      });
+      setPayTarget(null);
+    } finally {
+      setPaying(false);
+    }
+  };
+
   if (loading) return <LoadingScreen />;
 
   return (
@@ -90,11 +126,11 @@ const DriversPage = () => {
         </Button>
       </div>
 
-      {/* KPIs — business-wide, across all drivers' jobs */}
+      {/* KPIs — driver SALARIES this month (not machine/job revenue) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-        <StatCard icon={<RevenueIcon size={24}/>} label="إجمالي المستحق"  value={formatCurrency(totals.revenue)}   color="amber" sensitive/>
-        <StatCard icon={<RevenueIcon size={24}/>} label="إجمالي الواصل"   value={formatCurrency(totals.paid)}      color="green" sensitive/>
-        <StatCard icon={<RevenueIcon size={24}/>} label="إجمالي المتبقي"  value={formatCurrency(totals.remaining)} color={totals.remaining > 0 ? "amber" : "green"} sensitive/>
+        <StatCard icon={<RevenueIcon size={24}/>} label="إجمالي رواتب الشهر المستحقة"  value={formatCurrency(salaryTotals.due)}       color="amber" sensitive/>
+        <StatCard icon={<RevenueIcon size={24}/>} label="إجمالي الرواتب المصروفة"       value={formatCurrency(salaryTotals.paid)}      color="green" sensitive/>
+        <StatCard icon={<RevenueIcon size={24}/>} label="إجمالي المتبقي"                value={formatCurrency(salaryTotals.remaining)} color={salaryTotals.remaining > 0 ? "amber" : "green"} sensitive/>
       </div>
 
       {/* Search + inactive toggle */}
@@ -150,6 +186,7 @@ const DriversPage = () => {
               driver={drv}
               onEdit={() => setModal({ mode:"edit", data:drv })}
               onDelete={() => handleDeleteDriver(drv)}
+              onPaySalary={(d) => setPayTarget(d)}
             />
           ))}
         </div>
@@ -166,6 +203,30 @@ const DriversPage = () => {
 
       <ConfirmDialog open={confirmState.open} onClose={confirmState.reject}
         onConfirm={confirmState.accept} message={confirmState.message}/>
+
+      {/* Quick "pay salary" confirmation */}
+      <Modal open={!!payTarget} onClose={() => !paying && setPayTarget(null)} title="صرف الراتب" size="sm">
+        {payTarget && (
+          <>
+            <p className="text-sm text-gray-400 mb-6 leading-relaxed">
+              هل تريد صرف الراتب الأساسي للسائق{" "}
+              <span className="font-bold text-gray-200">{payTarget.name}</span>{" "}
+              بمبلغ{" "}
+              <span className="font-bold text-green-400">{formatCurrency(payTarget.salary || 0)}</span>{" "}
+              عن شهر {new Date().toLocaleDateString("ar-EG", { month: "long", year: "numeric" })}؟
+            </p>
+            <div className="flex gap-3 justify-end">
+              <Button variant="ghost" size="sm" disabled={paying} onClick={() => setPayTarget(null)}>إلغاء</Button>
+              <Button variant="primary" size="sm" loading={paying}
+                className="!bg-green-600 hover:!bg-green-500 !shadow-green-900/40"
+                icon={<CheckCircleIcon size={14} />}
+                onClick={handleConfirmPaySalary}>
+                تأكيد الصرف
+              </Button>
+            </div>
+          </>
+        )}
+      </Modal>
     </div>
   );
 };

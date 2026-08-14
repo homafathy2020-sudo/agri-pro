@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, Badge } from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import {
-  EditIcon, TrashIcon, PhoneIcon, AlertIcon, WalletIcon, TractorIcon,
+  EditIcon, TrashIcon, PhoneIcon, AlertIcon, WalletIcon, TractorIcon, CheckCircleIcon,
 } from "../../components/ui/Icons";
 import { formatCurrency, formatNumber, getInitial } from "../../utils/formatters";
 import { DRIVER_STATUS } from "../../config/constants";
@@ -16,10 +16,10 @@ const StatItem = ({ label, value, color = "text-gray-200" }) => (
   </div>
 );
 
-const DriverCard = ({ driver, onEdit, onDelete }) => {
+const DriverCard = ({ driver, onEdit, onDelete, onPaySalary }) => {
   const navigate = useNavigate();
   const {
-    id, name, phone, totalAcres = 0, ops = 0,
+    id, name, phone, totalAcres = 0, ops = 0, salary = 0,
     status, outstandingAdvance = 0, unpaidThisMonth, assignedEquipment = [],
   } = driver;
 
@@ -75,6 +75,17 @@ const DriverCard = ({ driver, onEdit, onDelete }) => {
           </div>
 
           <div className="flex flex-col gap-2 flex-shrink-0">
+            {salary > 0 && unpaidThisMonth && (
+              <Button
+                variant="primary"
+                size="sm"
+                icon={<CheckCircleIcon size={14} />}
+                className="!bg-green-600 hover:!bg-green-500 !shadow-green-900/40"
+                onClick={() => onPaySalary(driver)}
+              >
+                صرف الراتب
+              </Button>
+            )}
             <Button variant="secondary" size="sm" onClick={() => navigate(`/drivers/${id}`)}>
               الرواتب والحضور
             </Button>
