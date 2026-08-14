@@ -3,13 +3,14 @@ import React, { useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { Input, Select, NumberInput } from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
-import {
-  SALARY_ENTRY_TYPES, SALARY_ENTRY_LABELS,
-  DEDUCTION_REASONS, BONUS_REASONS,
-} from "../../config/constants";
+import { SALARY_ENTRY_TYPES, SALARY_ENTRY_LABELS } from "../../config/constants";
 import { todayISO } from "../../utils/formatters";
 
-const TYPE_OPTIONS = Object.entries(SALARY_ENTRY_LABELS).map(([value, label]) => ({ value, label }));
+// القيد بيبقى إما خصم أو حافز بس — نوع الخصم/الحافز بيتكتب حر جنبه
+const TYPE_OPTIONS = [
+  { value: SALARY_ENTRY_TYPES.DEDUCTION, label: SALARY_ENTRY_LABELS.deduction },
+  { value: SALARY_ENTRY_TYPES.BONUS,     label: SALARY_ENTRY_LABELS.bonus },
+];
 
 const SalaryEntryForm = ({ driverId, driverName, onSave, onClose }) => {
   const {
@@ -17,7 +18,7 @@ const SalaryEntryForm = ({ driverId, driverName, onSave, onClose }) => {
     formState: { errors, isSubmitting },
   } = useForm({
     defaultValues: {
-      type:   SALARY_ENTRY_TYPES.BASE,
+      type:   SALARY_ENTRY_TYPES.DEDUCTION,
       amount: "",
       reason: "",
       date:   todayISO(),
@@ -27,18 +28,14 @@ const SalaryEntryForm = ({ driverId, driverName, onSave, onClose }) => {
   });
 
   const type = watch("type");
-
-  const reasonOptions =
-    type === SALARY_ENTRY_TYPES.DEDUCTION ? DEDUCTION_REASONS :
-    type === SALARY_ENTRY_TYPES.BONUS     ? BONUS_REASONS     : [];
+  const isBonus = type === SALARY_ENTRY_TYPES.BONUS;
 
   const onSubmit = async (data) => {
     await onSave({
       ...data,
       driverId,
       amount: Number(data.amount) || 0,
-      paid:   data.type === SALARY_ENTRY_TYPES.BASE || data.type === SALARY_ENTRY_TYPES.BONUS
-                ? !!data.paid : true,
+      paid:   isBonus ? !!data.paid : true,
     });
     onClose();
   };
@@ -71,16 +68,17 @@ const SalaryEntryForm = ({ driverId, driverName, onSave, onClose }) => {
           )}
         />
 
-        {reasonOptions.length > 0 && (
-          <Select label="السبب" {...register("reason")}>
-            <option value="">— اختر السبب —</option>
-            {reasonOptions.map((r) => <option key={r}>{r}</option>)}
-          </Select>
-        )}
+        <div className="sm:col-span-2">
+          <Input
+            label={isBonus ? "نوع الحافز" : "نوع الخصم"}
+            placeholder={isBonus ? "مثلاً: حافز أداء، بدل وقود..." : "مثلاً: غياب، تأخير..."}
+            {...register("reason")}
+          />
+        </div>
 
         <Input label="التاريخ" type="date" {...register("date")} />
 
-        {(type === SALARY_ENTRY_TYPES.BASE || type === SALARY_ENTRY_TYPES.BONUS) && (
+        {isBonus && (
           <div className="flex items-center gap-3 bg-surface-2 rounded-xl px-4 py-3">
             <input
               type="checkbox"
