@@ -5,17 +5,18 @@ import { SALARY_ENTRY_TYPES } from "../config/constants";
  * Calculate net salary for a driver in a specific month.
  * entries = all salary entries for that driver in that month
  */
-export const calcMonthlySalary = (entries) => {
+export const calcMonthlySalary = (entries, defaultBase = 0) => {
   let base      = 0;
   let bonuses   = 0;
   let deductions = 0;
   let advances  = 0;
   let advanceRepayments = 0;
+  let hasBaseEntry = false;
 
   entries.forEach((e) => {
     const amount = Number(e.amount) || 0;
     switch (e.type) {
-      case SALARY_ENTRY_TYPES.BASE:          base             += amount; break;
+      case SALARY_ENTRY_TYPES.BASE:          base += amount; hasBaseEntry = true; break;
       case SALARY_ENTRY_TYPES.BONUS:         bonuses          += amount; break;
       case SALARY_ENTRY_TYPES.DEDUCTION:     deductions       += amount; break;
       case SALARY_ENTRY_TYPES.ADVANCE:       advances         += amount; break;
@@ -23,6 +24,11 @@ export const calcMonthlySalary = (entries) => {
       default: break;
     }
   });
+
+  // إذا لم يُسجَّل قيد "راتب أساسي" لهذا الشهر بعد، استخدم الراتب الأساسي
+  // المُحدَّد في بيانات السائق نفسه، عشان القيمة تتطابق دايمًا مع كارت
+  // "الراتب الأساسي" فوق وميظهرش صفر.
+  if (!hasBaseEntry) base = Number(defaultBase) || 0;
 
   const gross = base + bonuses;
   const net   = gross - deductions - advanceRepayments;

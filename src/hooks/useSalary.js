@@ -29,9 +29,10 @@ export const useSalary = () => {
   const getMonthSummary = useCallback(
     (driverId, yearMonth) => {
       const entries = getMonthEntries(salaryEntries, driverId, yearMonth);
-      return { ...calcMonthlySalary(entries), entries };
+      const driver  = drivers.find((d) => d.id === driverId);
+      return { ...calcMonthlySalary(entries, driver?.salary), entries };
     },
-    [salaryEntries]
+    [salaryEntries, drivers]
   );
 
   const getOutstandingAdvances = useCallback(

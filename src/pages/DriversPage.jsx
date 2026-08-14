@@ -34,7 +34,25 @@ const DriversPage = () => {
     const activeWithSalary = report.filter(
       (d) => d.status !== DRIVER_STATUS.INACTIVE && Number(d.salary) > 0
     );
-    const due = activeWithSalary.reduce((s, d) => s + (Number(d.salary) || 0), 0);
+    const baseDue = activeWithSalary.reduce((s, d) => s + (Number(d.salary) || 0), 0);
+
+    // الحوافز بتزيد المستحق، والخصومات (وسداد السلف) بتقلله — نفس منطق ملخص
+    // الشهر في صفحة السائق، عشان الرقمين يفضلوا متطابقين دايمًا.
+    const bonusesThisMonth = salaryEntries
+      .filter((e) =>
+        e.type === SALARY_ENTRY_TYPES.BONUS &&
+        (e.date || "").startsWith(currentMonth)
+      )
+      .reduce((s, e) => s + (Number(e.amount) || 0), 0);
+
+    const deductionsThisMonth = salaryEntries
+      .filter((e) =>
+        (e.type === SALARY_ENTRY_TYPES.DEDUCTION || e.type === SALARY_ENTRY_TYPES.ADVANCE_REPAY) &&
+        (e.date || "").startsWith(currentMonth)
+      )
+      .reduce((s, e) => s + (Number(e.amount) || 0), 0);
+
+    const due = Math.max(0, baseDue + bonusesThisMonth - deductionsThisMonth);
 
     const paid = salaryEntries
       .filter((e) =>

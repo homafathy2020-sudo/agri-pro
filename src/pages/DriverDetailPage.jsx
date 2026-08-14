@@ -12,8 +12,8 @@ import Button              from "../components/ui/Button";
 import { Card, CardHeader, CardBody, SummaryRow, StatCard, EmptyState, Badge } from "../components/ui/Card";
 import LoadingScreen       from "../components/ui/LoadingScreen";
 import {
-  PlusIcon, TrashIcon, CalendarIcon, RevenueIcon,
-  AcreIcon, DriverIcon, AlertIcon, ChartIcon,
+  PlusIcon, TrashIcon, CalendarIcon,
+  AcreIcon, DriverIcon, AlertIcon, StarIcon,
 } from "../components/ui/Icons";
 import {
   formatCurrency, formatNumber, formatDateShort, getInitial,
@@ -50,7 +50,7 @@ const DriverDetailPage = () => {
   const navigate      = useNavigate();
   const { report }    = useDrivers();
   const {
-    getMonthSummary, getDriverEntries, getOutstandingAdvances,
+    getMonthSummary, getDriverEntries,
     getDriverAttendance, getAttendanceSummary,
     addSalaryEntry, deleteSalaryEntry,
     addAttendance,  deleteAttendance,
@@ -72,7 +72,6 @@ const DriverDetailPage = () => {
 
   const monthlySummary   = getMonthSummary(driverId, selectedMonth);
   const allEntries       = getDriverEntries(driverId);
-  const outstandingAdv   = getOutstandingAdvances(driverId);
   const attendanceRecs   = getDriverAttendance(driverId);
   const attendSummary    = getAttendanceSummary(driverId, selectedMonth);
 
@@ -135,12 +134,12 @@ const DriverDetailPage = () => {
         </Button>
       </div>
 
-      {/* KPI cards */}
+      {/* KPI cards — كل القيم دي جايه من نفس ملخص الشهر تحت، فهي دايمًا متطابقة */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-        <StatCard icon={<RevenueIcon size={22}/>} label="إجمالي الإيراد"  value={formatCurrency(driver.totalRevenue || 0)} color="amber" />
+        <StatCard icon={<DriverIcon size={22}/>}  label="الراتب الأساسي" value={formatCurrency(monthlySummary.base)}       color="green" />
+        <StatCard icon={<StarIcon size={22}/>}    label="الحوافز"        value={formatCurrency(monthlySummary.bonuses)}    color="blue" />
+        <StatCard icon={<AlertIcon size={22}/>}   label="الخصومات"       value={formatCurrency(monthlySummary.deductions)} color="red" />
         <StatCard icon={<AcreIcon size={22}/>}    label="إجمالي الأفدنة" value={`${formatNumber(driver.totalAcres || 0)} ف`} color="blue" />
-        <StatCard icon={<ChartIcon size={22}/>}   label="السلف المتبقية" value={formatCurrency(outstandingAdv)} color={outstandingAdv > 0 ? "orange" : "green"} />
-        <StatCard icon={<DriverIcon size={22}/>}  label="الراتب الأساسي" value={driver.salary > 0 ? formatCurrency(driver.salary) : "—"} color="green" />
       </div>
 
       {/* Month selector */}
