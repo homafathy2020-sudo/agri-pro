@@ -1,6 +1,7 @@
 // src/components/ui/Card.jsx
 import React from "react";
 import clsx from "clsx";
+import { usePrivacy } from "../../contexts/PrivacyContext";
 
 export const Card = ({ children, className, hover = false, ...props }) => (
   <div className={clsx(
@@ -87,8 +88,11 @@ const STAT_ACCENTS = {
   },
 };
 
-export const StatCard = ({ icon, label, value, color = "green" }) => {
+export const StatCard = ({ icon, label, value, color = "green", sensitive = false }) => {
   const accent = STAT_ACCENTS[color] || STAT_ACCENTS.green;
+  const { isPrivate } = usePrivacy();
+  const hidden = sensitive && isPrivate;
+
   return (
     <div className={clsx(
       "relative bg-surface border rounded-2xl p-5 overflow-hidden flex flex-col items-center text-center gap-3",
@@ -108,7 +112,10 @@ export const StatCard = ({ icon, label, value, color = "green" }) => {
       </div>
 
       {/* Value */}
-      <div className={clsx("text-2xl font-extrabold tabular-nums leading-tight", accent.value)}>
+      <div
+        className={clsx("text-2xl font-extrabold tabular-nums leading-tight transition-[filter] duration-300", accent.value)}
+        style={{ filter: hidden ? "blur(9px)" : "none", userSelect: hidden ? "none" : "auto" }}
+      >
         {value}
       </div>
 
@@ -136,12 +143,21 @@ export const Divider = ({ className }) => (
   <hr className={clsx("border-0 border-t border-white/8", className)} />
 );
 
-export const SummaryRow = ({ label, value, valueColor = "text-gray-200", bold = false }) => (
-  <div className="flex items-center justify-between py-2.5 border-b border-white/8 last:border-0">
-    <span className="text-sm text-gray-400">{label}</span>
-    <span className={clsx("text-sm font-bold", valueColor, bold && "text-base")}>{value}</span>
-  </div>
-);
+export const SummaryRow = ({ label, value, valueColor = "text-gray-200", bold = false, sensitive = false }) => {
+  const { isPrivate } = usePrivacy();
+  const hidden = sensitive && isPrivate;
+  return (
+    <div className="flex items-center justify-between py-2.5 border-b border-white/8 last:border-0">
+      <span className="text-sm text-gray-400">{label}</span>
+      <span
+        className={clsx("text-sm font-bold transition-[filter] duration-300", valueColor, bold && "text-base")}
+        style={{ filter: hidden ? "blur(6px)" : "none", userSelect: hidden ? "none" : "auto" }}
+      >
+        {value}
+      </span>
+    </div>
+  );
+};
 
 export const ProgressBar = ({ value, max = 100, color = "bg-brand-500" }) => {
   const pct = Math.min(100, Math.max(0, (value / Math.max(max, 1)) * 100));

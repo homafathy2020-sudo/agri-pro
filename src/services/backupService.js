@@ -1,0 +1,120 @@
+// src/services/backupService.js
+import {
+  collection, doc,
+  addDoc, getDoc, getDocs, setDoc, deleteDoc,
+  query, where, orderBy, serverTimestamp, writeBatch,
+} from "firebase/firestore";
+import { db } from "../config/firebase";
+import { COLLECTIONS, MAX_BACKUPS_KEPT } from "../config/constants";
+
+const metaRef      = (userId) => doc(db, COLLECTIONS.BACKUPS, userId);
+const snapshotsCol = (userId) => collection(db, COLLECTIONS.BACKUPS, userId, "snapshots");
+const snapshotRef  = (userId, id) => doc(db, COLLECTIONS.BACKUPS, userId, "snapshots", id);
+
+// Data-bearing collections included in every backup/restore (settings handled separately below).
+const BACKUP_COLLECTIONS = [
+  ["equipment",     COLLECTIONS.EQUIPMENT],
+  ["jobs",          COLLECTIONS.JOBS],
+  ["drivers",       COLLECTIONS.DRIVERS],
+  ["maintenance",   COLLECTIONS.MAINTENANCE],
+  ["payments",      COLLECTIONS.PAYMENTS],
+  ["driverCosts",   COLLECTIONS.DRIVER_COSTS],
+  ["salaryEntries", COLLECTIONS.SALARY_ENTRIES],
+  ["attendance",    COLLECTIONS.ATTENDANCE],
+];
+
+const countsFor = (data) =>
+  BACKUP_COLLECTIONS.reduce((acc, [key]) => {
+    acc[key] = Array.isArray(data[key]) ? data[key].length : 0;
+    return acc;
+  }, {});
+
+// Overwrite a single collection (scoped to userId) with the given snapshot items:
+// deletes any live doc not present in the snapshot, and upserts every snapshot
+// item back under its original id. Batched in chunks of 450 writes.
+const restoreCollection = async (colName, userId, items) => {
+  const colRef = collection(db, colName);
+  const liveSnap = await getDocs(query(colRef, where("userId", "==", userId)));
+  const snapshotIds = new Set(items.map((it) => it.id).filter(Boolean));
+
+  const ops = [];
+  liveSnap.docs.forEach((d) => {
+    if (!snapshotIds.has(d.id)) ops.push({ type: "delete", ref: d.ref });
+  });
+  items.forEach((item) => {
+    const { id, ...rest } = item;
+    const ref = id ? doc(db, colName, id) : doc(colRef);
+    ops.push({ type: "set", ref, data: { ...rest, userId } });
+  });
+
+  for (let i = 0; i < ops.length; i += 450) {
+    const batch = writeBatch(db);
+    ops.slice(i, i + 450).forEach((op) => {
+      if (op.type === "delete") batch.delete(op.ref);
+      else batch.set(op.ref, op.data);
+    });
+    await batch.commit();
+  }
+};
+
+export const backupService = {
+  /** Backup metadata: { lastBackupAt, lastBackupId }. */
+  async getMeta(userId) {
+    const snap = await getDoc(metaRef(userId));
+    return snap.exists() ? snap.data() : null;
+  },
+
+  /** Snapshot list (without the heavy `data` payload), newest first. */
+  async list(userId) {
+    const q = query(snapshotsCol(userId), orderBy("createdAt", "desc"));
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => {
+      const { data, ...rest } = d.data();
+      return { id: d.id, ...rest };
+    });
+  },
+
+  /** Full data payload for one snapshot. */
+  async getSnapshot(userId, snapshotId) {
+    const snap = await getDoc(snapshotRef(userId, snapshotId));
+    if (!snap.exists()) throw new Error("النسخة الاحتياطية غير موجودة");
+    return JSON.parse(snap.data().data);
+  },
+
+  /**
+   * Save a full snapshot of the user's data, update the meta doc,
+   * and prune older snapshots beyond MAX_BACKUPS_KEPT.
+   */
+  async createBackup(userId, data) {
+    const ref = await addDoc(snapshotsCol(userId), {
+      data:      JSON.stringify(data),
+      counts:    countsFor(data),
+      createdAt: serverTimestamp(),
+    });
+
+    await setDoc(metaRef(userId), {
+      userId,
+      lastBackupAt: serverTimestamp(),
+      lastBackupId: ref.id,
+    }, { merge: true });
+
+    const all = await this.list(userId);
+    const stale = all.slice(MAX_BACKUPS_KEPT);
+    await Promise.all(stale.map((b) => deleteDoc(snapshotRef(userId, b.id))));
+
+    return ref.id;
+  },
+
+  /**
+   * Overwrite the user's live data with a snapshot's data.
+   * Caller is responsible for taking a fresh "safety" backup first.
+   */
+  async restoreSnapshot(userId, snapshotData) {
+    for (const [key, colName] of BACKUP_COLLECTIONS) {
+      await restoreCollection(colName, userId, snapshotData[key] || []);
+    }
+    if (snapshotData.settings) {
+      await setDoc(doc(db, COLLECTIONS.SETTINGS, userId), snapshotData.settings);
+    }
+  },
+};

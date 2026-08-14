@@ -50,5 +50,15 @@ service cloud.firestore {
     match /settings/{userId} {
       allow read, write: if isSignedIn() && isOwner(userId);
     }
+
+    // Automatic + manual data backups. Doc id under /backups is the userId
+    // itself (metadata: lastBackupAt), snapshots live in a subcollection.
+    match /backups/{userId} {
+      allow read, write: if isSignedIn() && isOwner(userId);
+
+      match /snapshots/{snapshotId} {
+        allow read, write: if isSignedIn() && isOwner(userId);
+      }
+    }
   }
 }

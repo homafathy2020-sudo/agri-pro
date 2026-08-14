@@ -6,6 +6,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useData } from "../../contexts/DataContext";
 import { useNotifications } from "../../hooks/useNotifications";
 import { formatInputNumber, parseInputNumber } from "../../utils/formatters";
+import ProfileModal from "../../features/profile/ProfileModal";
 import {
   HomeIcon, TractorIcon, ClipboardIcon,
   DriverIcon, WrenchIcon, ChartIcon,
@@ -27,6 +28,8 @@ const Sidebar = ({ onClose }) => {
   const { user, logout }           = useAuth();
   const { settings, saveSettings } = useData();
   const { totalCount, highCount }  = useNotifications();
+
+  const [profileOpen, setProfileOpen] = React.useState(false);
 
   const [fuelDisplay, setFuelDisplay] = React.useState(
     () => formatInputNumber(settings.fuelPrice)
@@ -116,7 +119,10 @@ const Sidebar = ({ onClose }) => {
 
       {/* User */}
       <div className="px-4 pb-5 pt-2 border-t border-white/8">
-        <div className="flex items-center gap-3">
+        <button
+          onClick={() => setProfileOpen(true)}
+          className="w-full flex items-center gap-3 text-right rounded-xl p-1.5 -m-1.5 transition-colors hover:bg-white/5"
+        >
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-700 to-blue-700 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">
             {(user?.displayName || user?.email || "م").charAt(0).toUpperCase()}
           </div>
@@ -124,12 +130,17 @@ const Sidebar = ({ onClose }) => {
             <p className="text-xs font-bold text-gray-200 truncate">{user?.displayName || "المستخدم"}</p>
             <p className="text-[10px] text-gray-500 truncate">{user?.email}</p>
           </div>
-          <button onClick={logout}
-            className="text-gray-500 hover:text-red-400 transition-colors p-1.5 rounded-lg hover:bg-red-900/20">
+          <span
+            onClick={(e) => { e.stopPropagation(); logout(); }}
+            title="تسجيل الخروج"
+            className="text-gray-500 hover:text-red-400 transition-colors p-1.5 rounded-lg hover:bg-red-900/20 flex-shrink-0"
+          >
             <LogoutIcon size={16} />
-          </button>
-        </div>
+          </span>
+        </button>
       </div>
+
+      <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
     </aside>
   );
 };

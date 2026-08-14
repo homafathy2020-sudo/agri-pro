@@ -146,6 +146,17 @@ export const CheckCircleIcon = (p) => <Icon {...p} d={["M22 11.08V12a10 10 0 11-
 export const XCircleIcon     = (p) => <Icon {...p} d={["M12 22a10 10 0 100-20 10 10 0 000 20z", "M15 9l-6 6M9 9l6 6"]} />;
 export const InfoIcon        = (p) => <Icon {...p} d={["M12 22a10 10 0 100-20 10 10 0 000 20z", "M12 8h.01M12 12v4"]} />;
 
+// ── Privacy ───────────────────────────────────────────────
+export const EyeIcon = (p) => <Icon {...p} d={[
+  "M1 12s4-7.5 11-7.5S23 12 23 12s-4 7.5-11 7.5S1 12 1 12z",
+  "M12 15a3 3 0 100-6 3 3 0 000 6z"
+]} />;
+
+export const EyeOffIcon = (p) => <Icon {...p} d={[
+  "M17.94 17.94A10.94 10.94 0 0112 19.5C5 19.5 1 12 1 12a19.4 19.4 0 015.06-5.94M9.9 4.66A10.6 10.6 0 0112 4.5c7 0 11 7.5 11 7.5a19.5 19.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24",
+  "M1 1l22 22"
+]} />;
+
 // ── Work types ────────────────────────────────────────────
 export const PlowIcon = (p) => (
   <svg width={p.size||20} height={p.size||20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={p.className}>
@@ -202,4 +213,33 @@ export const PrintIcon = (p) => <Icon {...p} d={[
   "M6 9V2h12v7",
   "M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2",
   "M6 14h12v8H6z",
+]} />;
+
+// ── Profile / Account ─────────────────────────────────────
+export const UserIcon = (p) => <Icon {...p} d={[
+  "M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2",
+  "M12 11a4 4 0 100-8 4 4 0 000 8z",
+]} />;
+
+export const LockIcon = (p) => <Icon {...p} d={[
+  "M5 11h14v9a1 1 0 01-1 1H6a1 1 0 01-1-1v-9z",
+  "M8 11V7a4 4 0 118 0v4",
+]} />;
+
+export const CloudUploadIcon = (p) => <Icon {...p} d={[
+  "M7 18a5 5 0 01-1-9.9A6 6 0 0117.9 9H18a4 4 0 010 8h-1",
+  "M12 12v9",
+  "M9 15l3-3 3 3",
+]} />;
+
+export const ChevronLeftIcon = (p) => <Icon {...p} d="M15 18l-6-6 6-6" />;
+
+export const ClockIcon = (p) => <Icon {...p} d={[
+  "M12 22a10 10 0 100-20 10 10 0 000 20z",
+  "M12 6v6l4 2",
+]} />;
+
+export const RestoreIcon = (p) => <Icon {...p} d={[
+  "M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8",
+  "M3 3v5h5",
 ]} />;

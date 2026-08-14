@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 
 import { AuthProvider }       from "./contexts/AuthContext";
+import { PrivacyProvider }    from "./contexts/PrivacyContext";
 import ProtectedRoute         from "./components/layout/ProtectedRoute";
 import AppLayout              from "./components/layout/AppLayout";
 
@@ -23,6 +24,7 @@ import NotificationsPage      from "./pages/NotificationsPage";
 const App = () => (
   <BrowserRouter>
     <AuthProvider>
+    <PrivacyProvider>
       <Routes>
         <Route path="/auth" element={<AuthPage />} />
 
@@ -57,6 +59,7 @@ const App = () => (
           error:   { iconTheme: { primary:"#ef4444", secondary:"#fff" } },
         }}
       />
+    </PrivacyProvider>
     </AuthProvider>
   </BrowserRouter>
 );

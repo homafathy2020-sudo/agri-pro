@@ -5,10 +5,13 @@ import Sidebar      from "./Sidebar";
 import TopBar       from "./TopBar";
 import BottomNav    from "./BottomNav";
 import OfflineBanner from "../ui/OfflineBanner";
+import { useAutoBackup } from "../../hooks/useAutoBackup";
 
 const AppLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { pathname } = useLocation();
+
+  useAutoBackup();
 
   useEffect(() => { setSidebarOpen(false); }, [pathname]);
 

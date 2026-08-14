@@ -9,8 +9,11 @@ import {
 } from "recharts";
 import { useDashboard }  from "../hooks/useDashboard";
 import { useClients }    from "../hooks/useClients";
+import { usePrivacy }    from "../contexts/PrivacyContext";
 import { StatCard, Card, CardHeader, CardBody, SummaryRow, EmptyState } from "../components/ui/Card";
 import LoadingScreen     from "../components/ui/LoadingScreen";
+import PrivacyToggle     from "../components/ui/PrivacyToggle";
+import Sensitive         from "../components/ui/Sensitive";
 import JobCard           from "../features/jobs/JobCard";
 import {
   RevenueIcon, AcreIcon, FuelIcon, ProfitIcon,
@@ -80,6 +83,7 @@ const DashboardPage = () => {
 
   const { clients, totalDebt } = useClients();
   const totalCollected = clients.reduce((s, c) => s + c.totalPaid, 0);
+  const { isPrivate } = usePrivacy();
 
   if (loading) return <LoadingScreen />;
 
@@ -95,13 +99,16 @@ const DashboardPage = () => {
   return (
     <div className="p-4 lg:p-6 space-y-6 max-w-7xl mx-auto" dir="rtl">
 
+      {/* ── Privacy toggle ───────────────────────────────────── */}
+      <PrivacyToggle />
+
       {/* ── KPI Cards ──────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 lg:gap-4">
-        <StatCard icon={<RevenueIcon size={26}/>} label="إجمالي الإيرادات" value={formatCurrency(totalRevenue)} color="amber"/>
-        <StatCard icon={<RevenueIcon size={26}/>} label="تم تحصيله" value={formatCurrency(totalCollected)} color="green"/>
+        <StatCard icon={<RevenueIcon size={26}/>} label="إجمالي الإيرادات" value={formatCurrency(totalRevenue)} color="amber" sensitive/>
+        <StatCard icon={<RevenueIcon size={26}/>} label="تم تحصيله" value={formatCurrency(totalCollected)} color="green" sensitive/>
         <StatCard icon={<AcreIcon size={26}/>} label="إجمالي الأفدنة" value={formatNumber(totalAcres)} color="blue"/>
         <StatCard icon={<FuelIcon size={26}/>} label="إجمالي الوقود" value={`${formatNumber(totalFuel)} ل`} color="orange"/>
-        <StatCard icon={<ProfitIcon size={26}/>} label="صافي الربح" value={formatCurrency(netProfit)} color={netProfit>=0?"purple":"red"}/>
+        <StatCard icon={<ProfitIcon size={26}/>} label="صافي الربح" value={formatCurrency(netProfit)} color={netProfit>=0?"purple":"red"} sensitive/>
       </div>
 
       {/* ── Debt alert ─────────────────────────────────────── */}
@@ -119,7 +126,10 @@ const DashboardPage = () => {
               </p>
             </div>
           </div>
-          <span className="text-base font-extrabold text-amber-400 tabular-nums flex-shrink-0">
+          <span
+            className="text-base font-extrabold text-amber-400 tabular-nums flex-shrink-0 transition-[filter] duration-300"
+            style={{ filter: isPrivate ? "blur(6px)" : "none", userSelect: isPrivate ? "none" : "auto" }}
+          >
             {formatCurrency(totalDebt)}
           </span>
         </div>
@@ -139,6 +149,7 @@ const DashboardPage = () => {
                 description="سجّل أول عملية لتظهر الرسوم البيانية"
               />
             ) : (
+              <Sensitive hint blur={12}>
               <ResponsiveContainer width="100%" height={200}>
                 <AreaChart data={dailyRevenue} margin={{ top:12, right:8, left:0, bottom:0 }}>
                   <defs>
@@ -172,6 +183,7 @@ const DashboardPage = () => {
                   />
                 </AreaChart>
               </ResponsiveContainer>
+              </Sensitive>
             )}
           </CardBody>
         </Card>
@@ -180,13 +192,13 @@ const DashboardPage = () => {
         <Card>
           <CardHeader title="الملخص المالي"/>
           <CardBody>
-            <SummaryRow label="إجمالي الإيراد"  value={formatCurrency(totalRevenue)}         valueColor="text-amber-400"/>
-            <SummaryRow label="تكلفة الوقود"    value={formatCurrency(totals.totalFuelCost)} valueColor="text-red-400"/>
-            <SummaryRow label="تكاليف الصيانة"  value={formatCurrency(totalMaintCost)}  valueColor="text-red-400"/>
-            <SummaryRow label="مرتبات السائقين" value={formatCurrency(totalSalaries||0)} valueColor="text-red-400"/>
+            <SummaryRow label="إجمالي الإيراد"  value={formatCurrency(totalRevenue)}         valueColor="text-amber-400" sensitive/>
+            <SummaryRow label="تكلفة الوقود"    value={formatCurrency(totals.totalFuelCost)} valueColor="text-red-400" sensitive/>
+            <SummaryRow label="تكاليف الصيانة"  value={formatCurrency(totalMaintCost)}  valueColor="text-red-400" sensitive/>
+            <SummaryRow label="مرتبات السائقين" value={formatCurrency(totalSalaries||0)} valueColor="text-red-400" sensitive/>
             <div className="border-t border-white/8 mt-2 pt-2">
               <SummaryRow label="صافي الربح" value={formatCurrency(netProfit)}
-                valueColor={netProfit>=0?"text-green-400":"text-red-400"} bold/>
+                valueColor={netProfit>=0?"text-green-400":"text-red-400"} bold sensitive/>
             </div>
             {totalRevenue > 0 && (
               <div className="mt-4">
@@ -207,7 +219,12 @@ const DashboardPage = () => {
                   <p className="text-[10px] font-bold text-brand-400">أفضل معدة أداء</p>
                 </div>
                 <p className="text-sm font-bold text-gray-200">{bestEquipment.name}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{formatCurrency(bestEquipment.totalRevenue)} إيراد</p>
+                <p
+                  className="text-xs text-gray-400 mt-0.5 inline-block transition-[filter] duration-300"
+                  style={{ filter: isPrivate ? "blur(5px)" : "none", userSelect: isPrivate ? "none" : "auto" }}
+                >
+                  {formatCurrency(bestEquipment.totalRevenue)} إيراد
+                </p>
               </div>
             )}
           </CardBody>
@@ -239,7 +256,10 @@ const DashboardPage = () => {
                     <p className="text-xs text-gray-500">{c.ops} عملية</p>
                   </div>
                 </div>
-                <span className="text-sm font-extrabold text-amber-400 tabular-nums">
+                <span
+                  className="text-sm font-extrabold text-amber-400 tabular-nums transition-[filter] duration-300"
+                  style={{ filter: isPrivate ? "blur(6px)" : "none", userSelect: isPrivate ? "none" : "auto" }}
+                >
                   {formatCurrency(c.totalRemaining)}
                 </span>
               </div>
@@ -328,6 +348,7 @@ const DashboardPage = () => {
             <Card>
               <CardHeader title="إيراد المعدات"/>
               <CardBody>
+                <Sensitive hint blur={12}>
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={barData} margin={{ top:12, right:8, left:0, bottom:24 }}
                     barCategoryGap="35%">
@@ -366,6 +387,7 @@ const DashboardPage = () => {
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
+                </Sensitive>
               </CardBody>
             </Card>
           )}

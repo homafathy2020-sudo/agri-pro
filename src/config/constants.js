@@ -2,15 +2,22 @@
 
 // ─── Firestore Collections ────────────────────────────────────────────────────
 export const COLLECTIONS = {
-  EQUIPMENT:     "equipment",
-  JOBS:          "jobs",
-  DRIVERS:       "drivers",
-  MAINTENANCE:   "maintenance",
-  SETTINGS:      "settings",
-  PAYMENTS:      "payments",
-  DRIVER_COSTS:  "driverCosts",
-  NOTIFICATIONS: "notifications",
+  EQUIPMENT:      "equipment",
+  JOBS:           "jobs",
+  DRIVERS:        "drivers",
+  MAINTENANCE:    "maintenance",
+  SETTINGS:       "settings",
+  PAYMENTS:       "payments",
+  DRIVER_COSTS:   "driverCosts",
+  SALARY_ENTRIES: "salaryEntries",
+  ATTENDANCE:     "attendance",
+  NOTIFICATIONS:  "notifications",
+  BACKUPS:        "backups",
 };
+
+// ─── Backup ───────────────────────────────────────────────────────────────────
+export const BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
+export const MAX_BACKUPS_KEPT   = 7;                    // keep last 7 snapshots
 
 // ─── Equipment ────────────────────────────────────────────────────────────────
 export const EQUIPMENT_TYPES = [
