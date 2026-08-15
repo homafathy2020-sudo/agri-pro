@@ -87,12 +87,17 @@ export const DataProvider = ({ children }) => {
     (async () => {
       try {
         dispatch({ type: "SET_LOADING", payload: true });
+        // Every collection is fetched independently (safeFetch) so that a
+        // single failed read — e.g. offline on a brand-new device with no
+        // local cache yet for that one collection — doesn't take down the
+        // whole dashboard. Each one just falls back to an empty list/default
+        // and the rest of the app still loads normally.
         const [equipment, jobs, drivers, maintenance, settings] = await Promise.all([
-          equipmentService.getAll(user.uid),
-          jobService.getAll(user.uid),
-          driverService.getAll(user.uid),
-          maintenanceService.getAll(user.uid),
-          settingsService.get(user.uid),
+          safeFetch(equipmentService.getAll(user.uid)),
+          safeFetch(jobService.getAll(user.uid)),
+          safeFetch(driverService.getAll(user.uid)),
+          safeFetch(maintenanceService.getAll(user.uid)),
+          settingsService.get(user.uid).catch(() => ({ fuelPrice: DEFAULT_FUEL_PRICE })),
         ]);
         const [payments, driverCosts, salaryEntries, attendance, custody] = await Promise.all([
           safeFetch(paymentService.getAll(user.uid)),

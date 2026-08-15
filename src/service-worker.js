@@ -6,7 +6,7 @@
 // (precache) كل ملفات الموقع (JS/CSS/HTML) وقت أول تحميل،
 // وبعدين المتصفح بيقرأها من الجهاز مباشرة من غير ما يحتاج نت.
 // بيانات Firestore نفسها بالفعل عندها كاش محلي منفصل (IndexedDB)
-// من إعداد enableIndexedDbPersistence في src/config/firebase.js.
+// من إعداد persistentLocalCache في src/config/firebase.js.
 //
 // لازم الملف ده يفضل جوه src/ عشان react-scripts (CRA) يعرف
 // يلاقيه وقت الـ build ويحقن فيه __WB_MANIFEST بأسماء الملفات
@@ -60,7 +60,7 @@ registerRoute(
 
 // طلبات Firestore/Firebase: سيبها تروح للنت أولًا، ولو مفيش نت
 // خليها ترجع تفشل بهدوء — Firestore SDK نفسه عنده كاش IndexedDB
-// منفصل (enableIndexedDbPersistence) بيتكفل بالبيانات أوف لاين،
+// منفصل (persistentLocalCache) بيتكفل بالبيانات أوف لاين،
 // فمش محتاجين الـ service worker يتدخل في طلبات الشبكة دي.
 registerRoute(
   ({ url }) =>
