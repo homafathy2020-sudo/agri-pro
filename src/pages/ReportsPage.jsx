@@ -10,6 +10,7 @@ import { useDrivers }      from "../hooks/useDrivers";
 import EquipmentReportCard from "../features/reports/EquipmentReportCard";
 import DriverReportCard    from "../features/reports/DriverReportCard";
 import { Card, CardHeader, CardBody, EmptyState } from "../components/ui/Card";
+import { ChartCard } from "../components/ui/ChartCard";
 import LoadingScreen       from "../components/ui/LoadingScreen";
 import { TractorIcon, DriverIcon, ChartIcon, RevenueIcon, AcreIcon, FuelIcon } from "../components/ui/Icons";
 import { formatCurrency, formatNumber } from "../utils/formatters";
@@ -146,10 +147,21 @@ const ReportsPage = () => {
           </div>
 
           {/* Chart 1 — Revenue vs Profit */}
-          <Card className="mb-5">
-            <CardHeader title="الإيراد مقابل الربح الصافي لكل معدة"/>
-            <CardBody>
-              <ResponsiveContainer width="100%" height={260}>
+          <ChartCard
+            className="mb-5"
+            title="الإيراد مقابل الربح الصافي لكل معدة"
+            height={260}
+            expandedHeight={460}
+            footer={
+              <Legend items={[
+                { color:"#f59e0b", label:"الإيراد" },
+                { color:"#22c55e", label:"الربح الصافي" },
+                { color:"#ef4444", label:"الخسارة" },
+              ]}/>
+            }
+          >
+            {(h) => (
+              <ResponsiveContainer width="100%" height={h}>
                 <BarChart data={revenueVsProfit} margin={{ top:16, right:8, left:0, bottom:28 }}
                   barCategoryGap="30%" barGap={4}>
                   <defs>
@@ -187,22 +199,26 @@ const ReportsPage = () => {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
-              <Legend items={[
-                { color:"#f59e0b", label:"الإيراد" },
-                { color:"#22c55e", label:"الربح الصافي" },
-                { color:"#ef4444", label:"الخسارة" },
-              ]}/>
-            </CardBody>
-          </Card>
+            )}
+          </ChartCard>
 
           {/* Chart 2 + 3 side by side */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
 
             {/* Cost breakdown stacked */}
-            <Card>
-              <CardHeader title="تفصيل التكاليف لكل معدة"/>
-              <CardBody>
-                <ResponsiveContainer width="100%" height={220}>
+            <ChartCard
+              title="تفصيل التكاليف لكل معدة"
+              height={220}
+              expandedHeight={420}
+              footer={
+                <Legend items={[
+                  { color:"#3b82f6", label:"وقود" },
+                  { color:"#8b5cf6", label:"صيانة" },
+                ]}/>
+              }
+            >
+              {(h) => (
+                <ResponsiveContainer width="100%" height={h}>
                   <BarChart data={costBreakdown} margin={{ top:8, right:8, left:0, bottom:24 }}>
                     <defs>
                       {costBreakdown.map((_, i) => (
@@ -232,18 +248,13 @@ const ReportsPage = () => {
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-                <Legend items={[
-                  { color:"#3b82f6", label:"وقود" },
-                  { color:"#8b5cf6", label:"صيانة" },
-                ]}/>
-              </CardBody>
-            </Card>
+              )}
+            </ChartCard>
 
             {/* Horizontal acres bar */}
-            <Card>
-              <CardHeader title="الأفدنة لكل معدة"/>
-              <CardBody>
-                <ResponsiveContainer width="100%" height={220}>
+            <ChartCard title="الأفدنة لكل معدة" height={220} expandedHeight={420}>
+              {(h) => (
+                <ResponsiveContainer width="100%" height={h}>
                   <BarChart layout="vertical" data={acresData}
                     margin={{ top:4, right:44, left:4, bottom:4 }}>
                     <defs>
@@ -276,17 +287,16 @@ const ReportsPage = () => {
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-              </CardBody>
-            </Card>
+              )}
+            </ChartCard>
           </div>
 
           {/* Chart 4 — Radial margin */}
           {marginData.length > 0 && (
-            <Card className="mb-5">
-              <CardHeader title="هامش الربح لكل معدة (%)"/>
-              <CardBody>
+            <ChartCard className="mb-5" title="هامش الربح لكل معدة (%)" height={200} expandedHeight={380}>
+              {(h) => (
                 <div className="flex flex-col lg:flex-row items-center gap-6">
-                  <div style={{ width:"100%", height:200 }}>
+                  <div style={{ width:"100%", height:h }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <RadialBarChart innerRadius="25%" outerRadius="90%"
                         data={marginData} startAngle={180} endAngle={0}>
@@ -313,8 +323,8 @@ const ReportsPage = () => {
                     ))}
                   </div>
                 </div>
-              </CardBody>
-            </Card>
+              )}
+            </ChartCard>
           )}
         </>
       )}

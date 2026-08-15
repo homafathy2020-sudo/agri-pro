@@ -76,6 +76,13 @@ export const SaveIcon = (p) => <Icon {...p} d={[
 
 export const CloseIcon = (p) => <Icon {...p} d="M18 6L6 18M6 6l12 12" />;
 
+export const ExpandIcon = (p) => <Icon {...p} d={[
+  "M8 3H5a2 2 0 00-2 2v3",
+  "M16 3h3a2 2 0 012 2v3",
+  "M21 16v3a2 2 0 01-2 2h-3",
+  "M3 16v3a2 2 0 002 2h3",
+]} />;
+
 export const FilterIcon = (p) => <Icon {...p} d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />;
 
 export const ClearIcon = (p) => <Icon {...p} d={[

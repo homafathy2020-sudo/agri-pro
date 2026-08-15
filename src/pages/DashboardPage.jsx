@@ -11,6 +11,7 @@ import { useDashboard }  from "../hooks/useDashboard";
 import { useClients }    from "../hooks/useClients";
 import { usePrivacy }    from "../contexts/PrivacyContext";
 import { StatCard, Card, CardHeader, CardBody, SummaryRow, EmptyState } from "../components/ui/Card";
+import { ChartCard } from "../components/ui/ChartCard";
 import LoadingScreen     from "../components/ui/LoadingScreen";
 import PrivacyToggle     from "../components/ui/PrivacyToggle";
 import Sensitive         from "../components/ui/Sensitive";
@@ -139,54 +140,63 @@ const DashboardPage = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         {/* Area chart — last 7 days */}
-        <Card className="lg:col-span-2">
-          <CardHeader title="الإيرادات — آخر 7 أيام"/>
-          <CardBody>
-            {totalRevenue === 0 ? (
+        {totalRevenue === 0 ? (
+          <Card className="lg:col-span-2">
+            <CardHeader title="الإيرادات — آخر 7 أيام"/>
+            <CardBody>
               <EmptyState
                 icon={<ChartIcon size={48} className="text-gray-600 mx-auto mb-2"/>}
                 title="لا توجد بيانات بعد"
                 description="سجّل أول عملية لتظهر الرسوم البيانية"
               />
-            ) : (
+            </CardBody>
+          </Card>
+        ) : (
+          <ChartCard
+            className="lg:col-span-2"
+            title="الإيرادات — آخر 7 أيام"
+            height={200}
+            expandedHeight={440}
+          >
+            {(h) => (
               <Sensitive hint blur={12}>
-              <ResponsiveContainer width="100%" height={200}>
-                <AreaChart data={dailyRevenue} margin={{ top:12, right:8, left:0, bottom:0 }}>
-                  <defs>
-                    <linearGradient id="dashAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%"   stopColor={AREA_GREEN} stopOpacity={0.35}/>
-                      <stop offset="100%" stopColor={AREA_GREEN} stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)"/>
-                  <XAxis
-                    dataKey="date"
-                    tick={{ fontSize:10, fill:"#6b7280" }}
-                    axisLine={false} tickLine={false}
-                    tickFormatter={formatDateShort}
-                  />
-                  <YAxis
-                    tick={{ fontSize:10, fill:"#4b5563" }}
-                    axisLine={false} tickLine={false}
-                    tickFormatter={shortNum}
-                  />
-                  <Tooltip content={<AreaTooltip/>}/>
-                  <Area
-                    type="monotone"
-                    dataKey="revenue"
-                    name="الإيراد"
-                    stroke={AREA_GREEN}
-                    strokeWidth={2.5}
-                    fill="url(#dashAreaGrad)"
-                    dot={{ r:3, fill:AREA_GREEN, strokeWidth:0 }}
-                    activeDot={{ r:5, fill:AREA_GREEN, strokeWidth:0 }}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+                <ResponsiveContainer width="100%" height={h}>
+                  <AreaChart data={dailyRevenue} margin={{ top:12, right:8, left:0, bottom:0 }}>
+                    <defs>
+                      <linearGradient id="dashAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%"   stopColor={AREA_GREEN} stopOpacity={0.35}/>
+                        <stop offset="100%" stopColor={AREA_GREEN} stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)"/>
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize:10, fill:"#6b7280" }}
+                      axisLine={false} tickLine={false}
+                      tickFormatter={formatDateShort}
+                    />
+                    <YAxis
+                      tick={{ fontSize:10, fill:"#4b5563" }}
+                      axisLine={false} tickLine={false}
+                      tickFormatter={shortNum}
+                    />
+                    <Tooltip content={<AreaTooltip/>}/>
+                    <Area
+                      type="monotone"
+                      dataKey="revenue"
+                      name="الإيراد"
+                      stroke={AREA_GREEN}
+                      strokeWidth={2.5}
+                      fill="url(#dashAreaGrad)"
+                      dot={{ r:3, fill:AREA_GREEN, strokeWidth:0 }}
+                      activeDot={{ r:5, fill:AREA_GREEN, strokeWidth:0 }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
               </Sensitive>
             )}
-          </CardBody>
-        </Card>
+          </ChartCard>
+        )}
 
         {/* Financial summary */}
         <Card>
@@ -273,11 +283,10 @@ const DashboardPage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
           {/* Pie — work type breakdown */}
-          <Card>
-            <CardHeader title="توزيع أنواع العمل (أفدنة)"/>
-            <CardBody>
+          <ChartCard title="توزيع أنواع العمل (أفدنة)" height={180} expandedHeight={320}>
+            {(h) => (
               <div className="flex items-center gap-4">
-                <div style={{ width:"45%", height:180, flexShrink:0 }}>
+                <div style={{ width:"45%", height:h, flexShrink:0 }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <defs>
@@ -340,56 +349,55 @@ const DashboardPage = () => {
                   })}
                 </div>
               </div>
-            </CardBody>
-          </Card>
+            )}
+          </ChartCard>
 
           {/* Bar — equipment revenue */}
           {barData.length > 0 && (
-            <Card>
-              <CardHeader title="إيراد المعدات"/>
-              <CardBody>
+            <ChartCard title="إيراد المعدات" height={200} expandedHeight={420}>
+              {(h) => (
                 <Sensitive hint blur={12}>
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={barData} margin={{ top:12, right:8, left:0, bottom:24 }}
-                    barCategoryGap="35%">
-                    <defs>
-                      {barData.map((_, i) => (
-                        <linearGradient key={i} id={`dashBar${i}`} x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%"   stopColor={BAR_COLORS[i%BAR_COLORS.length]} stopOpacity={0.95}/>
-                          <stop offset="100%" stopColor={BAR_COLORS[i%BAR_COLORS.length]} stopOpacity={0.6}/>
-                        </linearGradient>
-                      ))}
-                    </defs>
-                    <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)"/>
-                    <XAxis
-                      dataKey="name"
-                      tick={{ fontSize:10, fill:"#6b7280", fontFamily:"Cairo" }}
-                      axisLine={false} tickLine={false}
-                      angle={-15} textAnchor="end" interval={0} dy={6}
-                    />
-                    <YAxis
-                      tick={{ fontSize:10, fill:"#4b5563" }}
-                      axisLine={false} tickLine={false}
-                      tickFormatter={shortNum}
-                    />
-                    <Tooltip content={<BarTooltip/>}
-                      cursor={{ fill:"rgba(255,255,255,0.04)", radius:6 }}/>
-                    <Bar dataKey="revenue" name="الإيراد" radius={[8,8,0,0]} maxBarSize={52}>
-                      {barData.map((_, i) => (
-                        <Cell key={i} fill={`url(#dashBar${i})`}/>
-                      ))}
-                      <LabelList
-                        dataKey="revenue"
-                        position="top"
-                        style={{ fill:"#9ca3af", fontSize:9 }}
-                        formatter={shortNum}
+                  <ResponsiveContainer width="100%" height={h}>
+                    <BarChart data={barData} margin={{ top:12, right:8, left:0, bottom:24 }}
+                      barCategoryGap="35%">
+                      <defs>
+                        {barData.map((_, i) => (
+                          <linearGradient key={i} id={`dashBar${i}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%"   stopColor={BAR_COLORS[i%BAR_COLORS.length]} stopOpacity={0.95}/>
+                            <stop offset="100%" stopColor={BAR_COLORS[i%BAR_COLORS.length]} stopOpacity={0.6}/>
+                          </linearGradient>
+                        ))}
+                      </defs>
+                      <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)"/>
+                      <XAxis
+                        dataKey="name"
+                        tick={{ fontSize:10, fill:"#6b7280", fontFamily:"Cairo" }}
+                        axisLine={false} tickLine={false}
+                        angle={-15} textAnchor="end" interval={0} dy={6}
                       />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                      <YAxis
+                        tick={{ fontSize:10, fill:"#4b5563" }}
+                        axisLine={false} tickLine={false}
+                        tickFormatter={shortNum}
+                      />
+                      <Tooltip content={<BarTooltip/>}
+                        cursor={{ fill:"rgba(255,255,255,0.04)", radius:6 }}/>
+                      <Bar dataKey="revenue" name="الإيراد" radius={[8,8,0,0]} maxBarSize={52}>
+                        {barData.map((_, i) => (
+                          <Cell key={i} fill={`url(#dashBar${i})`}/>
+                        ))}
+                        <LabelList
+                          dataKey="revenue"
+                          position="top"
+                          style={{ fill:"#9ca3af", fontSize:9 }}
+                          formatter={shortNum}
+                        />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
                 </Sensitive>
-              </CardBody>
-            </Card>
+              )}
+            </ChartCard>
           )}
         </div>
       )}
