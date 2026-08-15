@@ -35,7 +35,7 @@ const SalaryEntryForm = ({ driverId, driverName, onSave, onClose }) => {
       ...data,
       driverId,
       amount: Number(data.amount) || 0,
-      paid:   isBonus ? !!data.paid : true,
+      paid:   true,
     });
     onClose();
   };
@@ -77,20 +77,6 @@ const SalaryEntryForm = ({ driverId, driverName, onSave, onClose }) => {
         </div>
 
         <Input label="التاريخ" type="date" {...register("date")} />
-
-        {isBonus && (
-          <div className="flex items-center gap-3 bg-surface-2 rounded-xl px-4 py-3">
-            <input
-              type="checkbox"
-              id="paid-check"
-              className="w-4 h-4 accent-brand-600"
-              {...register("paid")}
-            />
-            <label htmlFor="paid-check" className="text-sm text-gray-300 cursor-pointer">
-              تم الصرف فعلاً
-            </label>
-          </div>
-        )}
 
         <div className="sm:col-span-2">
           <Input label="ملاحظات" placeholder="تفاصيل إضافية..." {...register("notes")} />

@@ -1,40 +1,33 @@
 @echo off
-chcp 65001 >nul
-title رفع التعديلات على GitHub
+title Push to GitHub
 
 echo ========================================
-echo   جاري رفع التعديلات على GitHub...
+echo   Pushing changes to GitHub...
 echo ========================================
 echo.
 
-REM لازم الملف ده يكون في نفس مجلد المشروع (جنب مجلد .git وملف package.json)
 cd /d "%~dp0"
 
-echo [1/3] بضيف كل الملفات المعدّلة...
+echo [1/3] Adding all changed files...
 git add .
 
 echo.
-echo [2/3] بعمل commit...
-set timestamp=%date% %time%
-git commit -m "تحديث تلقائي - %timestamp%"
-
-if %errorlevel% neq 0 (
-    echo.
-    echo لا يوجد تعديلات جديدة يتم عمل commit لها، هنكمل نتأكد من الـ push على أي حال...
-)
+echo [2/3] Committing...
+for /f "delims=" %%i in ('powershell -NoProfile -Command "Get-Date -Format yyyy-MM-dd_HH-mm-ss"') do set stamp=%%i
+git commit -m "Auto update - %stamp%"
 
 echo.
-echo [3/3] بعمل push على GitHub...
+echo [3/3] Pushing to GitHub...
 git push
 
 echo.
 if %errorlevel% equ 0 (
     echo ========================================
-    echo   تم الرفع بنجاح!
+    echo   Push completed successfully!
     echo ========================================
 ) else (
     echo ========================================
-    echo   حصل خطأ أثناء الرفع - راجع الرسالة اللي فوق
+    echo   An error occurred during push - see message above
     echo ========================================
 )
 
