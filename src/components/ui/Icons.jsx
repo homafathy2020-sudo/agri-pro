@@ -214,12 +214,20 @@ export const WaterIcon = (p) => (
 
 // ── Map of work type → icon component ────────────────────
 export const WORK_TYPE_ICON_MAP = {
-  "حرث":   PlowIcon,
-  "زراعة": SeedIcon,
-  "تسوية": LevelIcon,
-  "ري":    WaterIcon,
-  "حصاد":  AcreIcon,
-  "أخرى":  WrenchIcon,
+  "المحراث":      PlowIcon,
+  "القلاب":       PlowIcon,
+  "السبسيولار":   PlowIcon,
+  "معدة تسوية":   LevelIcon,
+  "الدسك":        LevelIcon,
+  "الرشاشة":      WaterIcon,
+  "كومباين":      AcreIcon,
+  "بلانتر بنجر":  SeedIcon,
+  "بلانتر ذرة":   SeedIcon,
+  "سطارة":        SeedIcon,
+  "هولمر حصاد":   AcreIcon,
+  "بدارة خدمة":   LevelIcon,
+  "بدارة خضري":   LevelIcon,
+  "أخرى":         WrenchIcon,
 };
 
 // ── Map of equipment type → icon component ────────────────

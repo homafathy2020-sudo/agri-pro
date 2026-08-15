@@ -24,7 +24,7 @@ const JobForm = ({ initial, equipment, drivers, fuelPrice, onSave, onClose }) =>
       equipmentId:    "",
       driverId:       "",
       client:         "",
-      workType:       "حرث",
+      workType:       "المحراث",
       customWorkType: "",
       acres:          "",
       pricePerAcre:   "",
