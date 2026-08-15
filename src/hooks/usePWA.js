@@ -13,10 +13,9 @@ export const usePWA = () => {
   const [isInstalled,   setIsInstalled]   = useState(false);
 
   useEffect(() => {
-    // Register service worker
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
-    }
+    // ملاحظة: تسجيل الـ service worker بقى بيحصل مرة واحدة بس، من
+    // src/index.js (عن طريق serviceWorkerRegistration.register())، من أول
+    // ما التطبيق يفتح — مش من هنا، ومش بعد تسجيل الدخول.
 
     // Check if running as installed PWA
     if (window.matchMedia("(display-mode: standalone)").matches) {
