@@ -12,13 +12,16 @@ import { auth } from "../../config/firebase";
 import { useAuth } from "../../contexts/AuthContext";
 import { useData } from "../../contexts/DataContext";
 import { backupService } from "../../services/backupService";
+import { exportService } from "../../services/exportService";
 import { formatDateTime } from "../../utils/formatters";
 import Modal from "../../components/ui/Modal";
 import Button from "../../components/ui/Button";
 import RestoreModal from "./RestoreModal";
+import ImportModal from "./ImportModal";
 import {
   LockIcon, CloudUploadIcon, EditIcon, SaveIcon,
   EyeIcon, EyeOffIcon, ClockIcon, RestoreIcon,
+  DownloadIcon, UploadFileIcon,
 } from "../../components/ui/Icons";
 
 // ── Small section wrapper ───────────────────────────────────
@@ -116,6 +119,12 @@ const ProfileModal = ({ open, onClose }) => {
   const [loadingMeta, setLoadingMeta] = useState(false);
   const [backingUp, setBackingUp] = useState(false);
   const [restoreOpen, setRestoreOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const lastExportKey = user ? `lastLocalExportAt:${user.uid}` : null;
+  const [lastExportAt, setLastExportAt] = useState(
+    () => (lastExportKey ? localStorage.getItem(lastExportKey) : null)
+  );
 
   const loadMeta = useCallback(async () => {
     if (!user) return;
@@ -153,6 +162,31 @@ const ProfileModal = ({ open, onClose }) => {
       toast.error("تعذر عمل النسخة الاحتياطية");
     } finally {
       setBackingUp(false);
+    }
+  };
+
+  // ── تنزيل نسخة على جهاز المستخدم (بره Firebase تمامًا) ──────
+  const downloadLocalBackup = () => {
+    setExporting(true);
+    try {
+      exportService.downloadBackupFile({
+        equipment:     data.equipment,
+        jobs:          data.jobs,
+        drivers:       data.drivers,
+        maintenance:   data.maintenance,
+        payments:      data.payments,
+        salaryEntries: data.salaryEntries,
+        attendance:    data.attendance,
+        settings:      data.settings,
+      });
+      const now = String(Date.now());
+      if (lastExportKey) localStorage.setItem(lastExportKey, now);
+      setLastExportAt(now);
+      toast.success("اتنزّل ملف النسخة الاحتياطية على جهازك");
+    } catch (err) {
+      toast.error("تعذر تنزيل النسخة الاحتياطية");
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -256,9 +290,42 @@ const ProfileModal = ({ open, onClose }) => {
           </button>
         </Section>
 
+        {/* ── نسخة احتياطية على جهازك (خارج Firebase تمامًا) ── */}
+        <Section icon={<DownloadIcon size={16} />} title="نسخة احتياطية على جهازك">
+          <div className="flex items-center gap-2 text-xs text-gray-400 mb-3">
+            <ClockIcon size={13} className="flex-shrink-0" />
+            {lastExportAt ? (
+              <span>آخر تنزيل على الجهاز: {formatDateTime(new Date(Number(lastExportAt)))}</span>
+            ) : (
+              <span className="text-amber-400 font-semibold">لسه منزّلتش نسخة على جهازك — دي مهمة جدًا</span>
+            )}
+          </div>
+          <p className="text-[11px] text-gray-500 mb-3 leading-relaxed">
+            النسخة اللي فوق بتتخزن جوه نفس حساب Firebase. النسخة دي بتنزل ملف فعلي على تليفونك/جهازك، فلو حصلت أي مشكلة في الحساب نفسه، البيانات بتفضل عندك محفوظة برة. يستحسن تنزّل نسخة كل فترة (خصوصًا بعد أي شغل مهم).
+          </p>
+          <Button
+            type="button" size="sm" variant="secondary" className="w-full"
+            icon={<DownloadIcon size={15} />}
+            loading={exporting}
+            onClick={downloadLocalBackup}
+          >
+            تنزيل نسخة على جهازك
+          </Button>
+
+          <button
+            type="button"
+            onClick={() => setImportOpen(true)}
+            className="w-full flex items-center justify-center gap-1.5 text-xs text-gray-500 hover:text-amber-400 mt-3 transition-colors"
+          >
+            <UploadFileIcon size={13} />
+            استرجاع من ملف محلي
+          </button>
+        </Section>
+
       </div>
 
       <RestoreModal open={restoreOpen} onClose={() => setRestoreOpen(false)} />
+      <ImportModal open={importOpen} onClose={() => setImportOpen(false)} />
     </Modal>
   );
 };

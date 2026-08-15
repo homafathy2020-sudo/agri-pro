@@ -270,6 +270,18 @@ export const ClockIcon = (p) => <Icon {...p} d={[
   "M12 6v6l4 2",
 ]} />;
 
+export const DownloadIcon = (p) => <Icon {...p} d={[
+  "M12 3v12",
+  "M7 10l5 5 5-5",
+  "M4 21h16",
+]} />;
+
+export const UploadFileIcon = (p) => <Icon {...p} d={[
+  "M12 21V9",
+  "M7 14l5-5 5 5",
+  "M4 21h16",
+]} />;
+
 export const RestoreIcon = (p) => <Icon {...p} d={[
   "M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8",
   "M3 3v5h5",
