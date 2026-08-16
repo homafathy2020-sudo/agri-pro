@@ -4,12 +4,16 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useEquipmentDetail } from "../hooks/useEquipmentDetail";
 import { useData }            from "../contexts/DataContext";
 import PaymentBadge           from "../features/clients/PaymentBadge";
-import { Card, CardHeader, CardBody, StatCard, SummaryRow, EmptyState, ProgressBar } from "../components/ui/Card";
+import { Card, CardHeader, CardBody, StatCard, SummaryRow, EmptyState, ProgressBar, Badge } from "../components/ui/Card";
 import Button                 from "../components/ui/Button";
 import LoadingScreen          from "../components/ui/LoadingScreen";
 import { formatCurrency, formatNumber, formatDateShort, formatPercent } from "../utils/formatters";
-import { TractorIcon, FuelIcon, AcreIcon, WrenchIcon, RevenueIcon, ProfitIcon, CalendarIcon, DriverIcon } from "../components/ui/Icons";
+import {
+  TractorIcon, FuelIcon, AcreIcon, WrenchIcon, RevenueIcon, ProfitIcon, CalendarIcon, DriverIcon,
+  EQUIP_TYPE_ICON_MAP, LinkIcon, OilCanIcon,
+} from "../components/ui/Icons";
 import { printEquipmentReport } from "../utils/pdfGenerator";
+import { EQUIPMENT_CATEGORY } from "../config/constants";
 
 // Inline print SVG
 const PrintSVG = () => (
@@ -24,7 +28,7 @@ const PrintSVG = () => (
 const EquipmentDetailPage = () => {
   const { equipmentId } = useParams();
   const navigate        = useNavigate();
-  const { drivers }     = useData();
+  const { drivers, equipment: allEquipment } = useData();
   const {
     equipment, jobs, maintenance,
     stats, maintCost, netProfit, margin,
@@ -37,6 +41,12 @@ const EquipmentDetailPage = () => {
   );
 
   const driver = drivers.find((d) => d.id === equipment.driverId);
+  const isAttachment = equipment.category === EQUIPMENT_CATEGORY.ATTACHMENT;
+  const parent = isAttachment ? allEquipment.find((e) => e.id === equipment.parentEquipmentId) : null;
+  const EquipIcon = EQUIP_TYPE_ICON_MAP[equipment.type] ?? TractorIcon;
+  const accent = isAttachment
+    ? { iconBg: "from-orange-900/60 to-surface-3", iconBorder: "border-orange-800/30", iconColor: "text-orange-400" }
+    : { iconBg: "from-green-900/60 to-surface-3",  iconBorder: "border-green-800/30",  iconColor: "text-green-400"  };
 
   const handlePrint = () => {
     printEquipmentReport({
@@ -58,16 +68,19 @@ const EquipmentDetailPage = () => {
       </button>
 
       {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
-        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-900/60 to-surface-3 border border-brand-800/30 flex items-center justify-center">
-          <TractorIcon size={28} className="text-brand-400"/>
+      <div className="flex items-center gap-4 mb-4">
+        <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${accent.iconBg} border ${accent.iconBorder} flex items-center justify-center`}>
+          <EquipIcon size={28} className={accent.iconColor}/>
         </div>
         <div className="flex-1">
-          <h1 className="text-xl font-extrabold text-gray-100">{equipment.name}</h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-xl font-extrabold text-gray-100">{equipment.name}</h1>
+            <Badge variant={isAttachment ? "amber" : "green"}>{isAttachment ? "ملحق" : "أساسية"}</Badge>
+          </div>
           <p className="text-sm text-gray-500">
             {equipment.type}
-            {driver && ` · ${driver.name}`}
-            {equipment.fuelRate > 0 && ` · ${equipment.fuelRate} لتر/ساعة`}
+            {driver && ` · السائق: ${driver.name}`}
+            {!isAttachment && equipment.fuelRate > 0 && ` · ${equipment.fuelRate} لتر/ساعة`}
           </p>
         </div>
         {/* Print button */}
@@ -75,6 +88,32 @@ const EquipmentDetailPage = () => {
           <PrintSVG/>
           <span className="mr-1.5">طباعة تقرير</span>
         </Button>
+      </div>
+
+      {/* Category-specific info strip */}
+      <div className="flex flex-wrap gap-3 mb-6">
+        {isAttachment ? (
+          <>
+            <div className="flex items-center gap-2 bg-orange-900/20 border border-orange-800/40 rounded-xl px-4 py-2.5 text-sm">
+              <LinkIcon size={15} className="text-orange-400"/>
+              <span className="text-gray-400">متعلقة على:</span>
+              <span className="font-bold text-orange-300">{parent ? parent.name : "غير محددة"}</span>
+            </div>
+            <div className="flex items-center gap-2 bg-surface border border-white/8 rounded-xl px-4 py-2.5 text-sm">
+              <CalendarIcon size={15} className="text-gray-400"/>
+              <span className="text-gray-400">آخر تشحيم:</span>
+              <span className="font-bold text-gray-200">{equipment.lastGreaseDate ? formatDateShort(equipment.lastGreaseDate) : "—"}</span>
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center gap-2 bg-surface border border-white/8 rounded-xl px-4 py-2.5 text-sm">
+            <OilCanIcon size={15} className="text-gray-400"/>
+            <span className="text-gray-400">عداد آخر غيار زيت:</span>
+            <span className="font-bold text-gray-200">
+              {equipment.lastOilChangeMeter || equipment.lastOilChangeMeter === 0 ? formatNumber(equipment.lastOilChangeMeter) : "—"}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* KPIs */}

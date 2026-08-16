@@ -1,5 +1,6 @@
 // src/pages/EquipmentPage.jsx
-import React, { useState } from "react";
+import React, { useMemo } from "react";
+import { useState } from "react";
 import { useEquipment } from "../hooks/useEquipment";
 import { useDrivers }   from "../hooks/useDrivers";
 import { useJobs }      from "../hooks/useJobs";
@@ -12,7 +13,8 @@ import ConfirmDialog    from "../components/ui/ConfirmDialog";
 import Button           from "../components/ui/Button";
 import { EmptyState }   from "../components/ui/Card";
 import LoadingScreen    from "../components/ui/LoadingScreen";
-import { PlusIcon, TractorIcon } from "../components/ui/Icons";
+import { PlusIcon, TractorIcon, LinkIcon } from "../components/ui/Icons";
+import { EQUIPMENT_CATEGORY } from "../config/constants";
 
 const EquipmentPage = () => {
   const { report, loading, addEquipment, updateEquipment, deleteEquipment } = useEquipment();
@@ -20,6 +22,18 @@ const EquipmentPage = () => {
   const { addJob, fuelPrice }    = useJobs();
   const { confirm, confirmState } = useConfirm();
   const [modal, setModal] = useState(null);
+
+  const baseList = useMemo(
+    () => report.filter((eq) => (eq.category || EQUIPMENT_CATEGORY.BASE) === EQUIPMENT_CATEGORY.BASE),
+    [report]
+  );
+  const attachmentList = useMemo(
+    () => report.filter((eq) => eq.category === EQUIPMENT_CATEGORY.ATTACHMENT),
+    [report]
+  );
+
+  const getDriver = (driverId) => driverReport.find((d) => d.id === driverId);
+  const getParent = (parentId) => report.find((eq) => eq.id === parentId);
 
   const handleSaveEquipment = async (formData) => {
     if (modal.mode === "add") await addEquipment(formData);
@@ -47,7 +61,9 @@ const EquipmentPage = () => {
             <TractorIcon size={22} className="text-brand-400"/>
             إدارة المعدات
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">{report.length} معدة مسجلة</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {baseList.length} معدة أساسية · {attachmentList.length} ملحق
+          </p>
         </div>
         <Button onClick={() => setModal({ mode:"add" })} icon={<PlusIcon size={16}/>}>إضافة معدة</Button>
       </div>
@@ -60,15 +76,62 @@ const EquipmentPage = () => {
           action={<Button onClick={() => setModal({ mode:"add" })} icon={<PlusIcon size={16}/>}>إضافة أول معدة</Button>}
         />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          {report.map((eq) => (
-            <EquipmentCard key={eq.id} equipment={eq}
-              onEdit={()       => setModal({ mode:"edit", data:eq })}
-              onDelete={()     => handleDelete(eq.id)}
-              onQuickJob={()   => setModal({ mode:"quickJob", equipmentId:eq.id, driverId:eq.driverId })}
+        <>
+          {/* ── Base equipment ─────────────────────────────── */}
+          <div className="flex items-center gap-2 mb-3">
+            <span className="w-2 h-2 rounded-full bg-green-500"/>
+            <h2 className="text-sm font-bold text-gray-300">المعدات الأساسية</h2>
+            <span className="text-xs text-gray-500">({baseList.length})</span>
+          </div>
+          {baseList.length === 0 ? (
+            <div className="mb-8">
+              <EmptyState
+                icon={<TractorIcon size={36} className="text-gray-600 mx-auto mb-2"/>}
+                title="لا توجد معدات أساسية بعد"
+                description="أضف جرارًا أو عربية لتبدأ"
+              />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mb-8">
+              {baseList.map((eq) => (
+                <EquipmentCard key={eq.id} equipment={eq}
+                  driver={getDriver(eq.driverId)}
+                  onEdit={()       => setModal({ mode:"edit", data:eq })}
+                  onDelete={()     => handleDelete(eq.id)}
+                  onQuickJob={()   => setModal({ mode:"quickJob", equipmentId:eq.id, driverId:eq.driverId })}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* ── Attachments ─────────────────────────────────── */}
+          <div className="flex items-center gap-2 mb-3">
+            <span className="w-2 h-2 rounded-full bg-orange-500"/>
+            <h2 className="text-sm font-bold text-gray-300 flex items-center gap-1.5">
+              <LinkIcon size={14} className="text-orange-400"/> الملحقات
+            </h2>
+            <span className="text-xs text-gray-500">({attachmentList.length})</span>
+          </div>
+          {attachmentList.length === 0 ? (
+            <EmptyState
+              icon={<LinkIcon size={36} className="text-gray-600 mx-auto mb-2"/>}
+              title="لا توجد ملحقات بعد"
+              description="أضف معدات الحرث والزراعة وحدد الجرار المتعلقة عليه"
             />
-          ))}
-        </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              {attachmentList.map((eq) => (
+                <EquipmentCard key={eq.id} equipment={eq}
+                  driver={getDriver(eq.driverId)}
+                  parent={getParent(eq.parentEquipmentId)}
+                  onEdit={()       => setModal({ mode:"edit", data:eq })}
+                  onDelete={()     => handleDelete(eq.id)}
+                  onQuickJob={()   => setModal({ mode:"quickJob", equipmentId:eq.id, driverId:eq.driverId })}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {/* Add / Edit equipment */}
@@ -76,7 +139,7 @@ const EquipmentPage = () => {
         onClose={() => setModal(null)}
         title={modal?.mode==="add" ? "إضافة معدة جديدة" : "تعديل المعدة"}>
         {(modal?.mode==="add" || modal?.mode==="edit") && (
-          <EquipmentForm initial={modal.data} drivers={driverReport}
+          <EquipmentForm initial={modal.data} drivers={driverReport} baseEquipment={baseList}
             onSave={handleSaveEquipment} onClose={() => setModal(null)}/>
         )}
       </Modal>

@@ -212,6 +212,30 @@ export const WaterIcon = (p) => (
   </svg>
 );
 
+export const TruckIcon = (p) => (
+  <svg width={p.size||20} height={p.size||20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={p.className}>
+    <path d="M2 8h11v9H2z"/>
+    <path d="M13 11h4l3 3v3h-7z"/>
+    <circle cx="6" cy="18" r="1.8"/>
+    <circle cx="17" cy="18" r="1.8"/>
+  </svg>
+);
+
+export const LinkIcon = (p) => (
+  <svg width={p.size||20} height={p.size||20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={p.className}>
+    <path d="M9 12a4 4 0 004 4h3a4 4 0 000-8h-1"/>
+    <path d="M15 12a4 4 0 00-4-4H8a4 4 0 000 8h1"/>
+  </svg>
+);
+
+export const OilCanIcon = (p) => (
+  <svg width={p.size||20} height={p.size||20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={p.className}>
+    <path d="M4 10h9l4-4h3l-2 4"/>
+    <path d="M4 10v8a2 2 0 002 2h7a2 2 0 002-2v-8"/>
+    <path d="M8 14h3"/>
+  </svg>
+);
+
 // ── Map of work type → icon component ────────────────────
 export const WORK_TYPE_ICON_MAP = {
   "المحراث":      PlowIcon,
@@ -233,6 +257,7 @@ export const WORK_TYPE_ICON_MAP = {
 // ── Map of equipment type → icon component ────────────────
 export const EQUIP_TYPE_ICON_MAP = {
   "جرار":        TractorIcon,
+  "عربية":       TruckIcon,
   "معدة حرث":   PlowIcon,
   "معدة زراعة": SeedIcon,
   "مضخة مياه":  WaterIcon,

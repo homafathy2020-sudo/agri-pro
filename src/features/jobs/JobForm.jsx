@@ -96,7 +96,11 @@ const JobForm = ({ initial, equipment, drivers, fuelPrice, onSave, onClose }) =>
           onChange={(e) => { register("equipmentId").onChange(e); handleEquipmentChange(e); }}
         >
           <option value="">— اختر المعدة —</option>
-          {equipment.map((eq) => <option key={eq.id} value={eq.id}>{eq.name}</option>)}
+          {equipment.map((eq) => (
+            <option key={eq.id} value={eq.id}>
+              {eq.name}{eq.category === "attachment" ? " (ملحق)" : ""}
+            </option>
+          ))}
         </Select>
 
         {/* Driver */}

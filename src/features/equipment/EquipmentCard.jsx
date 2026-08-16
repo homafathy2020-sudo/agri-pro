@@ -3,28 +3,48 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, Badge } from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
-import { EditIcon, TrashIcon, PlusIcon, EQUIP_TYPE_ICON_MAP, TractorIcon } from "../../components/ui/Icons";
-import { formatCurrency, formatNumber } from "../../utils/formatters";
-import { EQUIPMENT_STATUS_LABELS } from "../../config/constants";
+import {
+  EditIcon, TrashIcon, PlusIcon, EQUIP_TYPE_ICON_MAP, TractorIcon,
+  DriverIcon, LinkIcon, OilCanIcon, CalendarIcon,
+} from "../../components/ui/Icons";
+import { formatCurrency, formatNumber, formatDateShort } from "../../utils/formatters";
+import { EQUIPMENT_STATUS_LABELS, EQUIPMENT_CATEGORY } from "../../config/constants";
 
 const STATUS_VARIANT = { active: "green", maintenance: "amber", inactive: "gray" };
 
-const EquipmentCard = ({ equipment, onEdit, onDelete, onQuickJob }) => {
+const EquipmentCard = ({ equipment, driver, parent, onEdit, onDelete, onQuickJob }) => {
   const navigate = useNavigate();
   const {
-    id, name, type, status = "active",
+    id, name, type, status = "active", category = EQUIPMENT_CATEGORY.BASE,
     totalRevenue = 0, totalAcres = 0, ops = 0,
+    lastOilChangeMeter, lastGreaseDate,
   } = equipment;
 
+  const isAttachment = category === EQUIPMENT_CATEGORY.ATTACHMENT;
   const EquipIcon = EQUIP_TYPE_ICON_MAP[type] ?? TractorIcon;
 
+  const accent = isAttachment
+    ? {
+        iconBg: "bg-orange-500/10", iconColor: "text-orange-400",
+        border: "border-orange-500/20", topBar: "bg-orange-500",
+        catBadge: "amber",
+      }
+    : {
+        iconBg: "bg-green-500/10", iconColor: "text-green-400",
+        border: "border-green-500/20", topBar: "bg-green-500",
+        catBadge: "green",
+      };
+
   return (
-    <Card hover>
+    <Card hover className={`relative overflow-hidden border ${accent.border}`}>
+      {/* Top category-color bar */}
+      <div className={`absolute top-0 inset-x-0 h-0.5 ${accent.topBar}`} />
+
       <div className="p-5">
         <div className="flex items-start gap-3">
           {/* Icon */}
-          <div className="w-11 h-11 rounded-2xl bg-surface-2 border border-white/10 flex items-center justify-center flex-shrink-0">
-            <EquipIcon size={22} className="text-brand-400"/>
+          <div className={`w-11 h-11 rounded-2xl border border-white/10 flex items-center justify-center flex-shrink-0 ${accent.iconBg}`}>
+            <EquipIcon size={22} className={accent.iconColor}/>
           </div>
 
           {/* Info */}
@@ -34,8 +54,39 @@ const EquipmentCard = ({ equipment, onEdit, onDelete, onQuickJob }) => {
               <Badge variant={STATUS_VARIANT[status]}>
                 {EQUIPMENT_STATUS_LABELS[status]}
               </Badge>
+              <Badge variant={accent.catBadge}>
+                {isAttachment ? "ملحق" : "أساسية"}
+              </Badge>
             </div>
             <p className="text-xs text-gray-500 mt-0.5">{type}</p>
+
+            {/* Relationship / driver / service info */}
+            <div className="flex flex-col gap-1 mt-2">
+              {isAttachment && (
+                <div className="flex items-center gap-1.5 text-xs text-orange-300/90">
+                  <LinkIcon size={12}/>
+                  <span>متعلقة على: {parent ? parent.name : "—"}</span>
+                </div>
+              )}
+              {driver && (
+                <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                  <DriverIcon size={12}/>
+                  <span>السائق: {driver.name}</span>
+                </div>
+              )}
+              {!isAttachment && (
+                <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                  <OilCanIcon size={12}/>
+                  <span>آخر غيار زيت: {lastOilChangeMeter || lastOilChangeMeter === 0 ? formatNumber(lastOilChangeMeter) : "—"}</span>
+                </div>
+              )}
+              {isAttachment && (
+                <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                  <CalendarIcon size={12}/>
+                  <span>آخر تشحيم: {lastGreaseDate ? formatDateShort(lastGreaseDate) : "—"}</span>
+                </div>
+              )}
+            </div>
 
             {/* Stats */}
             <div className="flex gap-4 mt-3 flex-wrap">
