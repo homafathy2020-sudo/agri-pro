@@ -41,8 +41,10 @@ const EquipmentDetailPage = () => {
   );
 
   const driver = drivers.find((d) => d.id === equipment.driverId);
+  const driverLabel = driver?.name || equipment.customDriverName || null;
   const isAttachment = equipment.category === EQUIPMENT_CATEGORY.ATTACHMENT;
   const parent = isAttachment ? allEquipment.find((e) => e.id === equipment.parentEquipmentId) : null;
+  const parentLabel = parent?.name || equipment.customParentName || null;
   const EquipIcon = EQUIP_TYPE_ICON_MAP[equipment.type] ?? TractorIcon;
   const accent = isAttachment
     ? { iconBg: "from-orange-900/60 to-surface-3", iconBorder: "border-orange-800/30", iconColor: "text-orange-400" }
@@ -54,7 +56,7 @@ const EquipmentDetailPage = () => {
       jobs,
       maintenance,
       fuelPrice,
-      driverName: driver?.name,
+      driverName: driverLabel,
     });
   };
 
@@ -79,7 +81,7 @@ const EquipmentDetailPage = () => {
           </div>
           <p className="text-sm text-gray-500">
             {equipment.type}
-            {driver && ` · السائق: ${driver.name}`}
+            {driverLabel && ` · السائق: ${driverLabel}`}
             {!isAttachment && equipment.fuelRate > 0 && ` · ${equipment.fuelRate} لتر/ساعة`}
           </p>
         </div>
@@ -97,7 +99,7 @@ const EquipmentDetailPage = () => {
             <div className="flex items-center gap-2 bg-orange-900/20 border border-orange-800/40 rounded-xl px-4 py-2.5 text-sm">
               <LinkIcon size={15} className="text-orange-400"/>
               <span className="text-gray-400">متعلقة على:</span>
-              <span className="font-bold text-orange-300">{parent ? parent.name : "غير محددة"}</span>
+              <span className="font-bold text-orange-300">{parentLabel || "غير محددة"}</span>
             </div>
             <div className="flex items-center gap-2 bg-surface border border-white/8 rounded-xl px-4 py-2.5 text-sm">
               <CalendarIcon size={15} className="text-gray-400"/>

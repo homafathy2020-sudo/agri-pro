@@ -9,11 +9,48 @@ import {
   EQUIPMENT_STATUS_LABELS,
 } from "../../config/constants";
 
+const OTHER_VALUE = "__other__";
+
+const buildDefaultValues = (initial) => {
+  if (!initial) {
+    return {
+      category:            EQUIPMENT_CATEGORY.BASE,
+      name:                "",
+      type:                "جرار",
+      customType:          "",
+      fuelRate:            "",
+      driverId:            "",
+      customDriverName:    "",
+      parentEquipmentId:   "",
+      customParentName:    "",
+      lastOilChangeMeter:  "",
+      lastGreaseDate:      "",
+      status:              "active",
+    };
+  }
+  const driverIsOther = !initial.driverId && !!initial.customDriverName;
+  const parentIsOther = !initial.parentEquipmentId && !!initial.customParentName;
+  return {
+    category:          EQUIPMENT_CATEGORY.BASE,
+    customType:        "",
+    customDriverName:  "",
+    customParentName:  "",
+    ...initial,
+    driverId:          driverIsOther ? OTHER_VALUE : (initial.driverId || ""),
+    parentEquipmentId: parentIsOther ? OTHER_VALUE : (initial.parentEquipmentId || ""),
+  };
+};
+
 const EquipmentForm = ({ initial, drivers, baseEquipment = [], onSave, onClose }) => {
   const initialCategory = initial?.category || EQUIPMENT_CATEGORY.BASE;
   const typeListInitial = initialCategory === EQUIPMENT_CATEGORY.ATTACHMENT ? ATTACHMENT_TYPES : BASE_EQUIPMENT_TYPES;
-  const isOtherInitially = initial ? !typeListInitial.includes(initial?.type) : false;
-  const [showCustomType, setShowCustomType] = useState(isOtherInitially);
+  const isOtherTypeInitially   = initial ? !typeListInitial.includes(initial?.type) : false;
+  const isOtherDriverInitially = !!(initial && !initial.driverId && initial.customDriverName);
+  const isOtherParentInitially = !!(initial && !initial.parentEquipmentId && initial.customParentName);
+
+  const [showCustomType,   setShowCustomType]   = useState(isOtherTypeInitially);
+  const [showCustomDriver, setShowCustomDriver] = useState(isOtherDriverInitially);
+  const [showCustomParent, setShowCustomParent] = useState(isOtherParentInitially);
 
   const {
     register,
@@ -22,18 +59,7 @@ const EquipmentForm = ({ initial, drivers, baseEquipment = [], onSave, onClose }
     setValue,
     formState: { errors, isSubmitting },
   } = useForm({
-    defaultValues: initial ? { category: EQUIPMENT_CATEGORY.BASE, ...initial } : {
-      category:            EQUIPMENT_CATEGORY.BASE,
-      name:                "",
-      type:                "جرار",
-      customType:          "",
-      fuelRate:            "",
-      driverId:            "",
-      parentEquipmentId:   "",
-      lastOilChangeMeter:  "",
-      lastGreaseDate:      "",
-      status:              "active",
-    },
+    defaultValues: buildDefaultValues(initial),
   });
 
   const category = useWatch({ control, name: "category" }) || EQUIPMENT_CATEGORY.BASE;
@@ -54,21 +80,38 @@ const EquipmentForm = ({ initial, drivers, baseEquipment = [], onSave, onClose }
     if (val !== "أخرى") setValue("customType", "");
   };
 
+  const handleDriverChange = (e) => {
+    const val = e.target.value;
+    setShowCustomDriver(val === OTHER_VALUE);
+    if (val !== OTHER_VALUE) setValue("customDriverName", "");
+  };
+
+  const handleParentChange = (e) => {
+    const val = e.target.value;
+    setShowCustomParent(val === OTHER_VALUE);
+    if (val !== OTHER_VALUE) setValue("customParentName", "");
+  };
+
   const onSubmit = async (data) => {
     const finalType = data.type === "أخرى" && data.customType?.trim()
       ? data.customType.trim()
       : data.type;
 
+    const driverIsOther = data.driverId === OTHER_VALUE;
+
     const payload = {
-      category: data.category,
-      name:     data.name,
-      type:     finalType,
-      driverId: data.driverId,
-      status:   data.status,
+      category:         data.category,
+      name:             data.name,
+      type:             finalType,
+      driverId:         driverIsOther ? "" : data.driverId,
+      customDriverName: driverIsOther ? (data.customDriverName?.trim() || "") : "",
+      status:           data.status,
     };
 
     if (data.category === EQUIPMENT_CATEGORY.ATTACHMENT) {
-      payload.parentEquipmentId  = data.parentEquipmentId || "";
+      const parentIsOther = data.parentEquipmentId === OTHER_VALUE;
+      payload.parentEquipmentId  = parentIsOther ? "" : (data.parentEquipmentId || "");
+      payload.customParentName   = parentIsOther ? (data.customParentName?.trim() || "") : "";
       payload.lastGreaseDate     = data.lastGreaseDate || "";
       payload.fuelRate           = 0;
       payload.lastOilChangeMeter = "";
@@ -76,6 +119,7 @@ const EquipmentForm = ({ initial, drivers, baseEquipment = [], onSave, onClose }
       payload.fuelRate           = Number(data.fuelRate) || 0;
       payload.lastOilChangeMeter = data.lastOilChangeMeter === "" ? "" : Number(data.lastOilChangeMeter) || 0;
       payload.parentEquipmentId  = "";
+      payload.customParentName   = "";
       payload.lastGreaseDate     = "";
     }
 
@@ -131,6 +175,7 @@ const EquipmentForm = ({ initial, drivers, baseEquipment = [], onSave, onClose }
           />
         </div>
 
+        {/* Type — with "أخرى" free-text */}
         <Select
           label="النوع *"
           {...register("type")}
@@ -155,22 +200,60 @@ const EquipmentForm = ({ initial, drivers, baseEquipment = [], onSave, onClose }
           <div /> // keeps grid balanced
         )}
 
-        {/* Attachment-only: which base equipment it's mounted on */}
+        {/* Attachment-only: which base equipment it's mounted on — with "أخرى" free-text */}
         {isAttachment && (
           <Select
             label="متعلقة على معدة *"
             error={errors.parentEquipmentId?.message}
-            {...register("parentEquipmentId", { required: isAttachment ? "اختر المعدة المتعلق عليها الملحق" : false })}
+            {...register("parentEquipmentId", { required: isAttachment ? "اختر المعدة أو اكتب اسمها" : false })}
+            onChange={(e) => { register("parentEquipmentId").onChange(e); handleParentChange(e); }}
           >
             <option value="">— اختر معدة أساسية —</option>
             {baseEquipment.map((eq) => <option key={eq.id} value={eq.id}>{eq.name}</option>)}
+            <option value={OTHER_VALUE}>أخرى (اكتب اسم)</option>
           </Select>
         )}
 
-        <Select label="السائق المسؤول" {...register("driverId")}>
+        {isAttachment && showCustomParent && (
+          <Input
+            label="اكتب اسم المعدة المتعلق عليها *"
+            placeholder="مثال: جرار كمبين المزرعة"
+            error={errors.customParentName?.message}
+            {...register("customParentName", {
+              validate: (val) =>
+                !showCustomParent || (val && val.trim().length > 0)
+                  ? true
+                  : "اكتب اسم المعدة",
+            })}
+          />
+        )}
+
+        {/* Driver — with "أخرى" free-text */}
+        <Select
+          label="السائق المسؤول"
+          {...register("driverId")}
+          onChange={(e) => { register("driverId").onChange(e); handleDriverChange(e); }}
+        >
           <option value="">— اختر سائقاً —</option>
           {drivers.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+          <option value={OTHER_VALUE}>أخرى (اكتب اسم)</option>
         </Select>
+
+        {showCustomDriver ? (
+          <Input
+            label="اكتب اسم السائق *"
+            placeholder="مثال: محمد علي"
+            error={errors.customDriverName?.message}
+            {...register("customDriverName", {
+              validate: (val) =>
+                !showCustomDriver || (val && val.trim().length > 0)
+                  ? true
+                  : "اكتب اسم السائق",
+            })}
+          />
+        ) : (
+          !isAttachment && <div /> // keeps grid balanced next to fuel-rate row on base equipment
+        )}
 
         {/* Base-only: fuel rate + last oil change meter */}
         {!isAttachment && (

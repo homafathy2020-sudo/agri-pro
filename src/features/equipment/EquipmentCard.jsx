@@ -18,7 +18,11 @@ const EquipmentCard = ({ equipment, driver, parent, onEdit, onDelete, onQuickJob
     id, name, type, status = "active", category = EQUIPMENT_CATEGORY.BASE,
     totalRevenue = 0, totalAcres = 0, ops = 0,
     lastOilChangeMeter, lastGreaseDate,
+    customDriverName, customParentName,
   } = equipment;
+
+  const driverLabel = driver?.name || customDriverName || null;
+  const parentLabel = parent?.name || customParentName || null;
 
   const isAttachment = category === EQUIPMENT_CATEGORY.ATTACHMENT;
   const EquipIcon = EQUIP_TYPE_ICON_MAP[type] ?? TractorIcon;
@@ -65,13 +69,13 @@ const EquipmentCard = ({ equipment, driver, parent, onEdit, onDelete, onQuickJob
               {isAttachment && (
                 <div className="flex items-center gap-1.5 text-xs text-orange-300/90">
                   <LinkIcon size={12}/>
-                  <span>متعلقة على: {parent ? parent.name : "—"}</span>
+                  <span>متعلقة على: {parentLabel || "—"}</span>
                 </div>
               )}
-              {driver && (
+              {driverLabel && (
                 <div className="flex items-center gap-1.5 text-xs text-gray-400">
                   <DriverIcon size={12}/>
-                  <span>السائق: {driver.name}</span>
+                  <span>السائق: {driverLabel}</span>
                 </div>
               )}
               {!isAttachment && (

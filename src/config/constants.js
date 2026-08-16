@@ -36,6 +36,9 @@ export const EQUIPMENT_CATEGORY_LABELS = {
 export const BASE_EQUIPMENT_TYPES = [
   "جرار",
   "عربية",
+  "شاحنة",
+  "لودر",
+  "بيلة",
   "أخرى",
 ];
 
