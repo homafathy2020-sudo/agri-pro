@@ -4,6 +4,8 @@
 
 import { formatCurrency, formatNumber, formatDate, formatDateTime } from "./formatters";
 import { getJobPaidAmount } from "./calculations";
+import { sortOilHistory, sortGreaseHistory } from "./serviceHistory";
+import { EQUIPMENT_CATEGORY } from "../config/constants";
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
 const BASE_CSS = `
@@ -212,6 +214,27 @@ export const printEquipmentReport = ({ equipment, jobs, maintenance, fuelPrice, 
     </tr>
   `).join("");
 
+  // Oil-change (base equipment) / grease (attachments) full history —
+  // shown as the sequence it happened in, not just the latest value.
+  const isAttachment = equipment.category === EQUIPMENT_CATEGORY.ATTACHMENT;
+  const oilHistory    = sortOilHistory(equipment.oilChangeHistory || []);
+  const greaseHistory = sortGreaseHistory(equipment.greaseHistory || []);
+
+  const oilHistoryRows = oilHistory.map((entry, idx) => `
+    <tr>
+      <td>${idx + 1}</td>
+      <td>${formatNumber(entry.meter)}</td>
+      <td>${entry.date ? formatDate(entry.date) : "—"}</td>
+    </tr>
+  `).join("");
+
+  const greaseHistoryRows = greaseHistory.map((entry, idx) => `
+    <tr>
+      <td>${idx + 1}</td>
+      <td>${formatDate(entry.date)}</td>
+    </tr>
+  `).join("");
+
   const html = `
     <div class="page">
       <div class="header">
@@ -258,6 +281,24 @@ export const printEquipmentReport = ({ equipment, jobs, maintenance, fuelPrice, 
         <table>
           <thead><tr><th>التاريخ</th><th>النوع</th><th>ملاحظات</th><th>التكلفة</th></tr></thead>
           <tbody>${maintRows}</tbody>
+        </table>
+      </div>` : ""}
+
+      ${!isAttachment && oilHistoryRows ? `
+      <div class="section">
+        <h2>سجل غيار الزيت (${oilHistory.length})</h2>
+        <table>
+          <thead><tr><th>#</th><th>عداد الغيار</th><th>التاريخ</th></tr></thead>
+          <tbody>${oilHistoryRows}</tbody>
+        </table>
+      </div>` : ""}
+
+      ${isAttachment && greaseHistoryRows ? `
+      <div class="section">
+        <h2>سجل التشحيم (${greaseHistory.length})</h2>
+        <table>
+          <thead><tr><th>#</th><th>التاريخ</th></tr></thead>
+          <tbody>${greaseHistoryRows}</tbody>
         </table>
       </div>` : ""}
 

@@ -23,8 +23,6 @@ const buildDefaultValues = (initial) => {
       customDriverName:    "",
       parentEquipmentId:   "",
       customParentName:    "",
-      lastOilChangeMeter:  "",
-      lastGreaseDate:      "",
       status:              "active",
     };
   }
@@ -112,15 +110,24 @@ const EquipmentForm = ({ initial, drivers, baseEquipment = [], onSave, onClose }
       const parentIsOther = data.parentEquipmentId === OTHER_VALUE;
       payload.parentEquipmentId  = parentIsOther ? "" : (data.parentEquipmentId || "");
       payload.customParentName   = parentIsOther ? (data.customParentName?.trim() || "") : "";
-      payload.lastGreaseDate     = data.lastGreaseDate || "";
       payload.fuelRate           = 0;
       payload.lastOilChangeMeter = "";
+      payload.oilChangeHistory   = [];
+      // Grease history is managed on the equipment detail page (add/remove
+      // entries there), not on this form — carry the existing log through
+      // unchanged so a basic-info edit here never wipes it out.
+      payload.lastGreaseDate = initial?.lastGreaseDate || "";
+      payload.greaseHistory  = initial?.greaseHistory || [];
     } else {
       payload.fuelRate           = Number(data.fuelRate) || 0;
-      payload.lastOilChangeMeter = data.lastOilChangeMeter === "" ? "" : Number(data.lastOilChangeMeter) || 0;
       payload.parentEquipmentId  = "";
       payload.customParentName   = "";
       payload.lastGreaseDate     = "";
+      payload.greaseHistory      = [];
+      // Oil-change history is managed on the equipment detail page — carry
+      // the existing log through unchanged.
+      payload.lastOilChangeMeter = initial?.lastOilChangeMeter ?? "";
+      payload.oilChangeHistory   = initial?.oilChangeHistory || [];
     }
 
     await onSave(payload);
@@ -255,39 +262,23 @@ const EquipmentForm = ({ initial, drivers, baseEquipment = [], onSave, onClose }
           !isAttachment && <div /> // keeps grid balanced next to fuel-rate row on base equipment
         )}
 
-        {/* Base-only: fuel rate + last oil change meter */}
+        {/* Base-only: fuel rate. Oil-change history is tracked separately
+            on the equipment detail page as a full log, not a single field. */}
         {!isAttachment && (
-          <>
-            <Controller
-              name="fuelRate"
-              control={control}
-              render={({ field }) => (
-                <NumberInput
-                  label="معدل استهلاك الوقود (لتر/ساعة)"
-                  placeholder="0"
-                  {...field}
-                />
-              )}
-            />
-
-            <Controller
-              name="lastOilChangeMeter"
-              control={control}
-              render={({ field }) => (
-                <NumberInput
-                  label="عداد آخر غيار زيت"
-                  placeholder="0"
-                  {...field}
-                />
-              )}
-            />
-          </>
+          <Controller
+            name="fuelRate"
+            control={control}
+            render={({ field }) => (
+              <NumberInput
+                label="معدل استهلاك الوقود (لتر/ساعة)"
+                placeholder="0"
+                {...field}
+              />
+            )}
+          />
         )}
-
-        {/* Attachment-only: last grease date */}
-        {isAttachment && (
-          <Input label="تاريخ آخر تشحيم" type="date" {...register("lastGreaseDate")} />
-        )}
+        {/* Grease history is tracked separately on the equipment detail
+            page as a full log, not a single date field. */}
 
         <Select label="الحالة" {...register("status")}>
           {Object.entries(EQUIPMENT_STATUS_LABELS).map(([val, label]) => (

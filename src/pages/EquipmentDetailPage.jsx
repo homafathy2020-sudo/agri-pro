@@ -4,10 +4,12 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useEquipmentDetail } from "../hooks/useEquipmentDetail";
 import { useData }            from "../contexts/DataContext";
 import PaymentBadge           from "../features/clients/PaymentBadge";
+import ServiceHistoryCard     from "../features/equipment/ServiceHistoryCard";
 import { Card, CardHeader, CardBody, StatCard, SummaryRow, EmptyState, ProgressBar, Badge } from "../components/ui/Card";
 import Button                 from "../components/ui/Button";
 import LoadingScreen          from "../components/ui/LoadingScreen";
 import { formatCurrency, formatNumber, formatDateShort, formatPercent } from "../utils/formatters";
+import { getLastOilChange, getLastGreaseDate } from "../utils/serviceHistory";
 import {
   TractorIcon, FuelIcon, AcreIcon, WrenchIcon, RevenueIcon, ProfitIcon, CalendarIcon, DriverIcon,
   EQUIP_TYPE_ICON_MAP, LinkIcon, OilCanIcon,
@@ -28,7 +30,7 @@ const PrintSVG = () => (
 const EquipmentDetailPage = () => {
   const { equipmentId } = useParams();
   const navigate        = useNavigate();
-  const { drivers, equipment: allEquipment } = useData();
+  const { drivers, equipment: allEquipment, updateEquipment } = useData();
   const {
     equipment, jobs, maintenance,
     stats, maintCost, netProfit, margin,
@@ -45,6 +47,41 @@ const EquipmentDetailPage = () => {
   const isAttachment = equipment.category === EQUIPMENT_CATEGORY.ATTACHMENT;
   const parent = isAttachment ? allEquipment.find((e) => e.id === equipment.parentEquipmentId) : null;
   const parentLabel = parent?.name || equipment.customParentName || null;
+  const lastOilChange = !isAttachment ? getLastOilChange(equipment) : null;
+  const lastGreaseDate = isAttachment ? getLastGreaseDate(equipment) : null;
+
+  // Append/remove an entry to the equipment's oil-change or grease log.
+  // Always spread the full raw equipment doc — the local reducer replaces
+  // the whole cached record with whatever's passed here, so a partial
+  // object would silently drop every other field until the next refetch.
+  const handleAddOilChange = async (entry) => {
+    const oilChangeHistory = [...(equipment.oilChangeHistory || []), entry];
+    const last = getLastOilChange({ oilChangeHistory });
+    await updateEquipment(equipment.id, {
+      ...equipment, oilChangeHistory, lastOilChangeMeter: last?.meter ?? "",
+    });
+  };
+  const handleRemoveOilChange = async (entryId) => {
+    const oilChangeHistory = (equipment.oilChangeHistory || []).filter((e) => e.id !== entryId);
+    const last = getLastOilChange({ oilChangeHistory });
+    await updateEquipment(equipment.id, {
+      ...equipment, oilChangeHistory, lastOilChangeMeter: last?.meter ?? "",
+    });
+  };
+  const handleAddGrease = async (entry) => {
+    const greaseHistory = [...(equipment.greaseHistory || []), entry];
+    const last = getLastGreaseDate({ greaseHistory });
+    await updateEquipment(equipment.id, {
+      ...equipment, greaseHistory, lastGreaseDate: last || "",
+    });
+  };
+  const handleRemoveGrease = async (entryId) => {
+    const greaseHistory = (equipment.greaseHistory || []).filter((e) => e.id !== entryId);
+    const last = getLastGreaseDate({ greaseHistory });
+    await updateEquipment(equipment.id, {
+      ...equipment, greaseHistory, lastGreaseDate: last || "",
+    });
+  };
   const EquipIcon = EQUIP_TYPE_ICON_MAP[equipment.type] ?? TractorIcon;
   const accent = isAttachment
     ? { iconBg: "from-orange-900/60 to-surface-3", iconBorder: "border-orange-800/30", iconColor: "text-orange-400" }
@@ -104,7 +141,7 @@ const EquipmentDetailPage = () => {
             <div className="flex items-center gap-2 bg-surface border border-white/8 rounded-xl px-4 py-2.5 text-sm">
               <CalendarIcon size={15} className="text-gray-400"/>
               <span className="text-gray-400">آخر تشحيم:</span>
-              <span className="font-bold text-gray-200">{equipment.lastGreaseDate ? formatDateShort(equipment.lastGreaseDate) : "—"}</span>
+              <span className="font-bold text-gray-200">{lastGreaseDate ? formatDateShort(lastGreaseDate) : "—"}</span>
             </div>
           </>
         ) : (
@@ -112,11 +149,19 @@ const EquipmentDetailPage = () => {
             <OilCanIcon size={15} className="text-gray-400"/>
             <span className="text-gray-400">عداد آخر غيار زيت:</span>
             <span className="font-bold text-gray-200">
-              {equipment.lastOilChangeMeter || equipment.lastOilChangeMeter === 0 ? formatNumber(equipment.lastOilChangeMeter) : "—"}
+              {lastOilChange ? formatNumber(lastOilChange.meter) : "—"}
             </span>
           </div>
         )}
       </div>
+
+      {/* Oil-change / grease log — full sequence, not just the last value */}
+      <ServiceHistoryCard
+        kind={isAttachment ? "grease" : "oil"}
+        entries={isAttachment ? (equipment.greaseHistory || []) : (equipment.oilChangeHistory || [])}
+        onAdd={isAttachment ? handleAddGrease : handleAddOilChange}
+        onRemove={isAttachment ? handleRemoveGrease : handleRemoveOilChange}
+      />
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">

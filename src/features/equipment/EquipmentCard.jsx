@@ -8,6 +8,7 @@ import {
   DriverIcon, LinkIcon, OilCanIcon, CalendarIcon,
 } from "../../components/ui/Icons";
 import { formatCurrency, formatNumber, formatDateShort } from "../../utils/formatters";
+import { getLastOilChange, getLastGreaseDate } from "../../utils/serviceHistory";
 import { EQUIPMENT_STATUS_LABELS, EQUIPMENT_CATEGORY } from "../../config/constants";
 
 const STATUS_VARIANT = { active: "green", maintenance: "amber", inactive: "gray" };
@@ -17,7 +18,6 @@ const EquipmentCard = ({ equipment, driver, parent, onEdit, onDelete, onQuickJob
   const {
     id, name, type, status = "active", category = EQUIPMENT_CATEGORY.BASE,
     totalRevenue = 0, totalAcres = 0, ops = 0,
-    lastOilChangeMeter, lastGreaseDate,
     customDriverName, customParentName,
   } = equipment;
 
@@ -25,6 +25,8 @@ const EquipmentCard = ({ equipment, driver, parent, onEdit, onDelete, onQuickJob
   const parentLabel = parent?.name || customParentName || null;
 
   const isAttachment = category === EQUIPMENT_CATEGORY.ATTACHMENT;
+  const lastOilChange = !isAttachment ? getLastOilChange(equipment) : null;
+  const lastGreaseDate = isAttachment ? getLastGreaseDate(equipment) : null;
   const EquipIcon = EQUIP_TYPE_ICON_MAP[type] ?? TractorIcon;
 
   const accent = isAttachment
@@ -81,7 +83,7 @@ const EquipmentCard = ({ equipment, driver, parent, onEdit, onDelete, onQuickJob
               {!isAttachment && (
                 <div className="flex items-center gap-1.5 text-xs text-gray-500">
                   <OilCanIcon size={12}/>
-                  <span>آخر غيار زيت: {lastOilChangeMeter || lastOilChangeMeter === 0 ? formatNumber(lastOilChangeMeter) : "—"}</span>
+                  <span>آخر غيار زيت: {lastOilChange ? formatNumber(lastOilChange.meter) : "—"}</span>
                 </div>
               )}
               {isAttachment && (
