@@ -107,8 +107,8 @@ const DashboardPage = () => {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 lg:gap-4">
         <StatCard icon={<RevenueIcon size={26}/>} label="إجمالي الإيرادات" value={formatCurrency(totalRevenue)} color="amber" sensitive/>
         <StatCard icon={<RevenueIcon size={26}/>} label="تم تحصيله" value={formatCurrency(totalCollected)} color="green" sensitive/>
-        <StatCard icon={<AcreIcon size={26}/>} label="إجمالي الأفدنة" value={formatNumber(totalAcres)} color="blue"/>
-        <StatCard icon={<FuelIcon size={26}/>} label="إجمالي الوقود" value={`${formatNumber(totalFuel)} ل`} color="orange"/>
+        <StatCard icon={<AcreIcon size={26}/>} label="إجمالي الأفدنة" value={formatNumber(totalAcres)} color="blue" sensitive/>
+        <StatCard icon={<FuelIcon size={26}/>} label="إجمالي الوقود" value={`${formatNumber(totalFuel)} ل`} color="orange" sensitive/>
         <StatCard icon={<ProfitIcon size={26}/>} label="صافي الربح" value={formatCurrency(netProfit)} color={netProfit>=0?"purple":"red"} sensitive/>
       </div>
 

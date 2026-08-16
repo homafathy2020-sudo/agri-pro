@@ -10,6 +10,7 @@ import ConfirmDialog      from "../components/ui/ConfirmDialog";
 import Button             from "../components/ui/Button";
 import { StatCard, EmptyState } from "../components/ui/Card";
 import LoadingScreen      from "../components/ui/LoadingScreen";
+import PrivacyToggle      from "../components/ui/PrivacyToggle";
 import {
   PlusIcon, DriverIcon, RevenueIcon, ClearIcon, CheckCircleIcon,
 } from "../components/ui/Icons";
@@ -142,6 +143,10 @@ const DriversPage = () => {
         <Button onClick={() => setModal({ mode:"add" })} icon={<PlusIcon size={16}/>}>
           إضافة سائق
         </Button>
+      </div>
+
+      <div className="mb-4">
+        <PrivacyToggle />
       </div>
 
       {/* KPIs — driver SALARIES this month (not machine/job revenue) */}
