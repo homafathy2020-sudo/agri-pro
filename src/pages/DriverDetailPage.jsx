@@ -9,6 +9,7 @@ import AttendanceForm      from "../features/attendance/AttendanceForm";
 import Modal               from "../components/ui/Modal";
 import ConfirmDialog       from "../components/ui/ConfirmDialog";
 import Button              from "../components/ui/Button";
+import DownloadReportButton from "../components/ui/DownloadReportButton";
 import { Card, CardHeader, CardBody, SummaryRow, StatCard, EmptyState, Badge } from "../components/ui/Card";
 import LoadingScreen       from "../components/ui/LoadingScreen";
 import {
@@ -22,7 +23,7 @@ import {
   SALARY_ENTRY_LABELS, SALARY_ENTRY_COLORS,
   SALARY_ENTRY_TYPES, ATTENDANCE_LABELS,
 } from "../config/constants";
-import { printDriverPayslip } from "../utils/pdfGenerator";
+import { printDriverPayslip, downloadDriverPayslipPdf } from "../utils/pdfGenerator";
 
 // ── Month selector ────────────────────────────────────────────────────────────
 const buildMonthOptions = () => {
@@ -109,6 +110,14 @@ const DriverDetailPage = () => {
     });
   };
 
+  const handleDownloadPayslip = () => downloadDriverPayslipPdf({
+    driver,
+    month: selectedMonth,
+    summary: monthlySummary,
+    entries: monthEntries,
+    attendance: monthAttend,
+  });
+
   return (
     <div className="p-4 lg:p-6 max-w-4xl mx-auto" dir="rtl">
 
@@ -129,9 +138,12 @@ const DriverDetailPage = () => {
             {driver.ops} عملية · {formatNumber(driver.totalAcres)} فدان
           </p>
         </div>
-        <Button variant="ghost" size="sm" onClick={handlePrintPayslip}>
-          طباعة كشف
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={handlePrintPayslip}>
+            طباعة كشف
+          </Button>
+          <DownloadReportButton onDownload={handleDownloadPayslip} title="تحميل كشف الراتب PDF" />
+        </div>
       </div>
 
       {/* KPI cards — كل القيم دي جايه من نفس ملخص الشهر تحت، فهي دايمًا متطابقة */}

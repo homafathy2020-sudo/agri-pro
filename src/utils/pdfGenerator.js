@@ -70,8 +70,67 @@ const printWindow = (htmlContent, title) => {
   win.document.close();
 };
 
+// ── Download as an actual PDF file ──────────────────────────────────────────
+// Printing above needs zero dependencies (it's just the browser's own print
+// dialog). Downloading a real .pdf file straight to disk needs a rendering
+// library though, so instead of adding one as a permanent npm dependency
+// (which would mean everyone re-runs `npm install` and the app carries the
+// extra weight even for people who never use this button), it's loaded
+// on-demand from a CDN the first time someone actually taps "download".
+// That does mean this button needs an internet connection the first time
+// it's used per browser session — the print button above still works
+// completely offline regardless.
+let html2pdfLoadPromise = null;
+const loadHtml2Pdf = () => {
+  if (window.html2pdf) return Promise.resolve(window.html2pdf);
+  if (html2pdfLoadPromise) return html2pdfLoadPromise;
+  html2pdfLoadPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js";
+    script.onload = () => resolve(window.html2pdf);
+    script.onerror = () => {
+      html2pdfLoadPromise = null; // let a later retry (e.g. once online) try again
+      reject(new Error("تعذر تحميل أداة إنشاء ملف PDF — تأكد من اتصالك بالإنترنت وحاول تاني"));
+    };
+    document.head.appendChild(script);
+  });
+  return html2pdfLoadPromise;
+};
+
+/**
+ * Downloads the given report HTML (the exact same markup printXReport()
+ * would print) as a .pdf file. Renders it off-screen first — not
+ * display:none, since the rendering library can't measure a hidden
+ * element's layout — so nothing flashes on screen while the file's built.
+ */
+export const downloadReportPdf = async (htmlContent, filename) => {
+  const html2pdf = await loadHtml2Pdf();
+
+  const container = document.createElement("div");
+  container.style.position = "fixed";
+  container.style.left = "-99999px";
+  container.style.top = "0";
+  container.style.width = "780px";
+  container.innerHTML = `<style>${BASE_CSS}</style>${htmlContent}`;
+  document.body.appendChild(container);
+
+  try {
+    await html2pdf()
+      .set({
+        margin: 0,
+        filename: `${filename}.pdf`,
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: "pt", format: "a4", orientation: "portrait" },
+      })
+      .from(container)
+      .save();
+  } finally {
+    document.body.removeChild(container);
+  }
+};
+
 // ── 1. Client Invoice ─────────────────────────────────────────────────────────
-export const printClientInvoice = ({ job, equipmentName, driverName, fuelPrice, payments = [], maintenance = [] }) => {
+const buildClientInvoiceHtml = ({ job, equipmentName, driverName, fuelPrice, payments = [], maintenance = [] }) => {
   const revenue   = (job.acres || 0) * (job.pricePerAcre || 0);
   const fuelCost  = (job.fuelUsed || 0) * fuelPrice;
   const profit    = revenue - fuelCost;
@@ -182,11 +241,21 @@ export const printClientInvoice = ({ job, equipmentName, driverName, fuelPrice, 
     </div>
   `;
 
-  printWindow(html, `فاتورة - ${job.client}`);
+  return { html, title: `فاتورة - ${job.client}`, filename: `فاتورة-${job.client}` };
+};
+
+export const printClientInvoice = (args) => {
+  const { html, title } = buildClientInvoiceHtml(args);
+  printWindow(html, title);
+};
+
+export const downloadClientInvoicePdf = (args) => {
+  const { html, filename } = buildClientInvoiceHtml(args);
+  return downloadReportPdf(html, filename);
 };
 
 // ── 2. Equipment Report ───────────────────────────────────────────────────────
-export const printEquipmentReport = ({ equipment, jobs, maintenance, fuelPrice, driverName }) => {
+const buildEquipmentReportHtml = ({ equipment, jobs, maintenance, fuelPrice, driverName }) => {
   const today      = new Date().toLocaleDateString("ar-EG");
   const totalRevenue  = jobs.reduce((s, j) => s + (j.acres * j.pricePerAcre), 0);
   const totalAcres    = jobs.reduce((s, j) => s + (j.acres || 0), 0);
@@ -306,7 +375,17 @@ export const printEquipmentReport = ({ equipment, jobs, maintenance, fuelPrice, 
     </div>
   `;
 
-  printWindow(html, `تقرير - ${equipment.name}`);
+  return { html, title: `تقرير - ${equipment.name}`, filename: `تقرير-معدة-${equipment.name}` };
+};
+
+export const printEquipmentReport = (args) => {
+  const { html, title } = buildEquipmentReportHtml(args);
+  printWindow(html, title);
+};
+
+export const downloadEquipmentReportPdf = (args) => {
+  const { html, filename } = buildEquipmentReportHtml(args);
+  return downloadReportPdf(html, filename);
 };
 
 // ── 3. Monthly Summary ────────────────────────────────────────────────────────
@@ -381,7 +460,7 @@ export const printMonthlySummary = ({ jobs, equipment, maintenance, drivers, fue
 };
 
 // ── 4. Driver Payslip ─────────────────────────────────────────────────────────
-export const printDriverPayslip = ({ driver, month, summary, entries, attendance }) => {
+const buildDriverPayslipHtml = ({ driver, month, summary, entries, attendance }) => {
   const today      = new Date().toLocaleDateString("ar-EG");
   const monthLabel = new Date(month + "-01").toLocaleDateString("ar-EG", { month:"long", year:"numeric" });
 
@@ -458,11 +537,21 @@ export const printDriverPayslip = ({ driver, month, summary, entries, attendance
     </div>
   `;
 
-  printWindow(html, `كشف راتب - ${driver.name} - ${monthLabel}`);
+  return { html, title: `كشف راتب - ${driver.name} - ${monthLabel}`, filename: `كشف-راتب-${driver.name}-${monthLabel}` };
+};
+
+export const printDriverPayslip = (args) => {
+  const { html, title } = buildDriverPayslipHtml(args);
+  printWindow(html, title);
+};
+
+export const downloadDriverPayslipPdf = (args) => {
+  const { html, filename } = buildDriverPayslipHtml(args);
+  return downloadReportPdf(html, filename);
 };
 
 // ── 5. Custody Report (العهدة) ────────────────────────────────────────────────
-export const printCustodyReport = ({ transactions, totalDeposits, totalExpenses, balance, expensesByCategory, getLinkedName }) => {
+const buildCustodyReportHtml = ({ transactions, totalDeposits, totalExpenses, balance, expensesByCategory, getLinkedName }) => {
   const today = new Date().toLocaleDateString("ar-EG");
 
   const categoryLabels = { equipment: "ميكنة", driver: "سائقين", other: "أخرى" };
@@ -543,5 +632,15 @@ export const printCustodyReport = ({ transactions, totalDeposits, totalExpenses,
     </div>
   `;
 
-  printWindow(html, `تقرير العهدة - ${today}`);
+  return { html, title: `تقرير العهدة - ${today}`, filename: `تقرير-العهدة-${today}` };
+};
+
+export const printCustodyReport = (args) => {
+  const { html, title } = buildCustodyReportHtml(args);
+  printWindow(html, title);
+};
+
+export const downloadCustodyReportPdf = (args) => {
+  const { html, filename } = buildCustodyReportHtml(args);
+  return downloadReportPdf(html, filename);
 };

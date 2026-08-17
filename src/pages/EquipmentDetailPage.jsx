@@ -5,6 +5,7 @@ import { useEquipmentDetail } from "../hooks/useEquipmentDetail";
 import { useData }            from "../contexts/DataContext";
 import PaymentBadge           from "../features/clients/PaymentBadge";
 import ServiceHistoryCard     from "../features/equipment/ServiceHistoryCard";
+import DownloadReportButton   from "../components/ui/DownloadReportButton";
 import { Card, CardHeader, CardBody, StatCard, SummaryRow, EmptyState, ProgressBar, Badge } from "../components/ui/Card";
 import Button                 from "../components/ui/Button";
 import LoadingScreen          from "../components/ui/LoadingScreen";
@@ -14,7 +15,7 @@ import {
   TractorIcon, FuelIcon, AcreIcon, WrenchIcon, RevenueIcon, ProfitIcon, CalendarIcon, DriverIcon,
   EQUIP_TYPE_ICON_MAP, LinkIcon, OilCanIcon,
 } from "../components/ui/Icons";
-import { printEquipmentReport } from "../utils/pdfGenerator";
+import { printEquipmentReport, downloadEquipmentReportPdf } from "../utils/pdfGenerator";
 import { EQUIPMENT_CATEGORY } from "../config/constants";
 
 // Inline print SVG
@@ -97,6 +98,14 @@ const EquipmentDetailPage = () => {
     });
   };
 
+  const handleDownload = () => downloadEquipmentReportPdf({
+    equipment,
+    jobs,
+    maintenance,
+    fuelPrice,
+    driverName: driverLabel,
+  });
+
   return (
     <div className="p-4 lg:p-6 max-w-4xl mx-auto" dir="rtl">
 
@@ -122,11 +131,14 @@ const EquipmentDetailPage = () => {
             {!isAttachment && equipment.fuelRate > 0 && ` · ${equipment.fuelRate} لتر/ساعة`}
           </p>
         </div>
-        {/* Print button */}
-        <Button variant="secondary" size="sm" onClick={handlePrint}>
-          <PrintSVG/>
-          <span className="mr-1.5">طباعة تقرير</span>
-        </Button>
+        {/* Print / download buttons */}
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={handlePrint}>
+            <PrintSVG/>
+            <span className="mr-1.5">طباعة تقرير</span>
+          </Button>
+          <DownloadReportButton onDownload={handleDownload} title="تحميل تقرير المعدة PDF" />
+        </div>
       </div>
 
       {/* Category-specific info strip */}

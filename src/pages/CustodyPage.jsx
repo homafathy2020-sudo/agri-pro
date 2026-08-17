@@ -7,6 +7,7 @@ import CustodyTransactionForm from "../features/custody/CustodyTransactionForm";
 import Modal          from "../components/ui/Modal";
 import ConfirmDialog   from "../components/ui/ConfirmDialog";
 import Button          from "../components/ui/Button";
+import DownloadReportButton from "../components/ui/DownloadReportButton";
 import { Card, StatCard, EmptyState, SummaryRow } from "../components/ui/Card";
 import LoadingScreen   from "../components/ui/LoadingScreen";
 import {
@@ -17,7 +18,7 @@ import { formatCurrency, formatDateShort, todayISO } from "../utils/formatters";
 import {
   CUSTODY_TYPES, CUSTODY_EXPENSE_CATEGORY_LABELS,
 } from "../config/constants";
-import { printCustodyReport } from "../utils/pdfGenerator";
+import { printCustodyReport, downloadCustodyReportPdf } from "../utils/pdfGenerator";
 
 const CATEGORY_ICONS = {
   equipment: TractorIcon,
@@ -56,6 +57,15 @@ const CustodyPage = () => {
     });
   };
 
+  const handleDownload = () => downloadCustodyReportPdf({
+    transactions: transactions,
+    totalDeposits,
+    totalExpenses,
+    balance,
+    expensesByCategory,
+    getLinkedName,
+  });
+
   if (loading) return <LoadingScreen />;
 
   return (
@@ -73,6 +83,7 @@ const CustodyPage = () => {
           <Button variant="ghost" onClick={handlePrint} icon={<PrintIcon size={16} />} title="طباعة تقرير شامل بالعهدة">
             طباعة تقرير
           </Button>
+          <DownloadReportButton onDownload={handleDownload} title="تحميل تقرير العهدة PDF" />
           <Button variant="info" onClick={() => setModal({ mode: "add", type: CUSTODY_TYPES.DEPOSIT })}
             icon={<ArrowUpCircleIcon size={16} />}>
             إضافة فلوس

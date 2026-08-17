@@ -9,8 +9,9 @@ import {
   WORK_TYPE_ICON_MAP, WrenchIcon,
 } from "../../components/ui/Icons";
 import { formatCurrency, formatNumber, formatDateShort } from "../../utils/formatters";
-import { printClientInvoice } from "../../utils/pdfGenerator";
+import { printClientInvoice, downloadClientInvoicePdf } from "../../utils/pdfGenerator";
 import { useData } from "../../contexts/DataContext";
+import DownloadReportButton from "../../components/ui/DownloadReportButton";
 
 // Print icon inline (avoids import issues)
 const PrintSVG = () => (
@@ -62,6 +63,15 @@ const JobCard = ({
     });
   };
 
+  const handleDownload = () => downloadClientInvoicePdf({
+    job,
+    equipmentName,
+    driverName,
+    fuelPrice:   settings.fuelPrice,
+    payments:    jobPayments,
+    maintenance: jobMaintenance,
+  });
+
   return (
     <div className={`bg-surface border rounded-2xl p-4 transition-colors ${
       isUnpaid ? "border-amber-800/40 hover:border-amber-700/60" : "border-white/8 hover:border-white/15"
@@ -87,6 +97,9 @@ const JobCard = ({
             >
               <PrintSVG/>
             </button>
+          )}
+          {showPrint && (
+            <DownloadReportButton onDownload={handleDownload} title="تحميل فاتورة PDF" size="xs" className="px-2" />
           )}
           {onEdit   && <Button variant="ghost" size="xs" onClick={onEdit}   icon={<EditIcon  size={13}/>} className="px-2"/>}
           {onDelete && <Button variant="ghost" size="xs" onClick={onDelete} icon={<TrashIcon size={13}/>} className="px-2"/>}
