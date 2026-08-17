@@ -106,31 +106,49 @@ const loadHtml2Pdf = () => {
 export const downloadReportPdf = async (htmlContent, filename) => {
   const html2pdf = await loadHtml2Pdf();
 
-  // NOTE: must be "absolute", not "fixed". html2canvas clones the whole
-  // document into a hidden iframe to render it, and it doesn't compute
-  // fixed-position elements' coordinates correctly inside that clone —
-  // this was producing a completely blank PDF even though the HTML/CSS
-  // itself was fine.
+  // NOTE: the element passed to html2pdf() must be completely unpositioned
+  // (no position:fixed/absolute, no opacity trick) — confirmed by testing
+  // directly against html2pdf.js's source. html2pdf clones exactly the
+  // element it's given (inline styles included) into its OWN internal
+  // off-screen wrapper before rendering. Any position or opacity we set on
+  // OUR element gets cloned along with it and either compounds with
+  // html2pdf's own offset (position:fixed/absolute → the clone ends up at
+  // an unreachable coordinate, so html2pdf measures its height as 0) or
+  // gets rendered as invisible (opacity:0 → captured as blank/white). In
+  // both cases the resulting PDF comes out empty.
+  //
+  // The fix: keep the actual report container fully static (default
+  // positioning, exactly as html2pdf expects), and hide it from view by
+  // nesting it inside a *separate* wrapper that's clipped to 0×0. That
+  // wrapper is never handed to html2pdf, so its clipping has no effect on
+  // what gets captured — but it keeps the report from ever painting on
+  // screen, so nothing flashes.
+  const wrapper = document.createElement("div");
+  wrapper.style.position = "absolute";
+  wrapper.style.top = "0";
+  wrapper.style.left = "0";
+  wrapper.style.width = "0";
+  wrapper.style.height = "0";
+  wrapper.style.overflow = "hidden";
+
   const container = document.createElement("div");
-  container.style.position = "absolute";
-  container.style.left = "-99999px";
-  container.style.top = "0";
   container.style.width = "780px";
   container.innerHTML = `<style>${BASE_CSS}</style>${htmlContent}`;
-  document.body.appendChild(container);
+  wrapper.appendChild(container);
+  document.body.appendChild(wrapper);
 
   try {
     await html2pdf()
       .set({
         margin: 0,
         filename: `${filename}.pdf`,
-        html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: 0 },
+        html2canvas: { scale: 2, useCORS: true },
         jsPDF: { unit: "pt", format: "a4", orientation: "portrait" },
       })
       .from(container)
       .save();
   } finally {
-    document.body.removeChild(container);
+    document.body.removeChild(wrapper);
   }
 };
 
