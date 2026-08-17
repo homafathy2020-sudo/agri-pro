@@ -1,7 +1,7 @@
 // src/services/custodyService.js
 import {
   collection, doc,
-  addDoc, updateDoc, deleteDoc,
+  setDoc, updateDoc, deleteDoc,
   getDocs, query, where,
   serverTimestamp,
 } from "firebase/firestore";
@@ -21,16 +21,18 @@ export const custodyService = {
       .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
   },
 
-  async add(userId, data) {
-    const ref = await addDoc(col(), { ...data, userId, createdAt: serverTimestamp() });
-    return ref.id;
+  // Returns { id, promise } — see equipmentService.js for why.
+  add(userId, data) {
+    const ref = doc(col());
+    const promise = setDoc(ref, { ...data, userId, createdAt: serverTimestamp() });
+    return { id: ref.id, promise };
   },
 
-  async update(id, data) {
-    await updateDoc(doc(db, COLL, id), { ...data, updatedAt: serverTimestamp() });
+  update(id, data) {
+    return updateDoc(doc(db, COLL, id), { ...data, updatedAt: serverTimestamp() });
   },
 
-  async remove(id) {
-    await deleteDoc(doc(db, COLL, id));
+  remove(id) {
+    return deleteDoc(doc(db, COLL, id));
   },
 };

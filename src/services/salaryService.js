@@ -2,7 +2,7 @@
 // Handles salary entries: base pay, bonuses, deductions, advances
 import {
   collection, doc,
-  addDoc, updateDoc, deleteDoc,
+  setDoc, updateDoc, deleteDoc,
   getDocs, query, where,
   serverTimestamp,
 } from "firebase/firestore";
@@ -20,23 +20,25 @@ export const salaryService = {
       .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
   },
 
-  async add(userId, data) {
-    const ref = await addDoc(col(), {
+  // Returns { id, promise } — see equipmentService.js for why.
+  add(userId, data) {
+    const ref = doc(col());
+    const promise = setDoc(ref, {
       ...data,
       userId,
       createdAt: serverTimestamp(),
     });
-    return ref.id;
+    return { id: ref.id, promise };
   },
 
-  async update(id, data) {
-    await updateDoc(doc(db, COLL, id), {
+  update(id, data) {
+    return updateDoc(doc(db, COLL, id), {
       ...data,
       updatedAt: serverTimestamp(),
     });
   },
 
-  async remove(id) {
-    await deleteDoc(doc(db, COLL, id));
+  remove(id) {
+    return deleteDoc(doc(db, COLL, id));
   },
 };

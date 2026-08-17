@@ -1,7 +1,7 @@
 // src/services/jobService.js
 import {
   collection, doc,
-  addDoc, updateDoc, deleteDoc,
+  setDoc, updateDoc, deleteDoc,
   getDocs, query, where, orderBy,
   serverTimestamp,
 } from "firebase/firestore";
@@ -17,8 +17,11 @@ export const jobService = {
     return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   },
 
-  async add(userId, data) {
-    const ref = await addDoc(col(), {
+  // Returns { id, promise } — see equipmentService.js for why (offline-safe
+  // id generation with doc()/setDoc() instead of addDoc()).
+  add(userId, data) {
+    const ref = doc(col());
+    const promise = setDoc(ref, {
       ...data,
       userId,
       // ISO string (not serverTimestamp) so the exact creation moment is
@@ -27,16 +30,16 @@ export const jobService = {
       createdAt: new Date().toISOString(),
       updatedAt: serverTimestamp(),
     });
-    return ref.id;
+    return { id: ref.id, promise };
   },
 
-  async update(id, data) {
+  update(id, data) {
     const ref = doc(db, COLLECTIONS.JOBS, id);
-    await updateDoc(ref, { ...data, updatedAt: serverTimestamp() });
+    return updateDoc(ref, { ...data, updatedAt: serverTimestamp() });
   },
 
-  async remove(id) {
+  remove(id) {
     const ref = doc(db, COLLECTIONS.JOBS, id);
-    await deleteDoc(ref);
+    return deleteDoc(ref);
   },
 };

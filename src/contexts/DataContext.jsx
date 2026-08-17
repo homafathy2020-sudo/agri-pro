@@ -183,70 +183,177 @@ export const DataProvider = ({ children }) => {
     })();
   }, [user]);
 
-  const addEquipment    = useCallback(async (d) => { const id = await trackWrite(equipmentService.add(user.uid, d));   dispatch({ type:"ADD_EQUIPMENT",    payload:{id,...d} }); toast.success("تم إضافة المعدة");       }, [user, trackWrite]);
-  const updateEquipment = useCallback(async (id,d) => { await trackWrite(equipmentService.update(id,d));               dispatch({ type:"UPDATE_EQUIPMENT", payload:{id,...d} }); toast.success("تم تحديث المعدة");       }, [trackWrite]);
-  const deleteEquipment = useCallback(async (id) => { await trackWrite(equipmentService.remove(id));                   dispatch({ type:"DELETE_EQUIPMENT", payload:id });        toast.success("تم حذف المعدة");         }, [trackWrite]);
+  // ── Mutations ─────────────────────────────────────────────────────────
+  // IMPORTANT: none of these `await` the Firestore write before updating
+  // local state. Firestore's write promises (from setDoc/updateDoc/
+  // deleteDoc) don't resolve until the server acknowledges them — and
+  // while offline, that simply never happens until connectivity returns,
+  // even though the write itself is already queued and safely cached
+  // locally. Blocking the UI on that promise is what used to make "أضف"
+  // hang for a long time (or seem to do nothing) while offline. Instead:
+  // dispatch to local state + show the success toast immediately (the
+  // data's already safe in Firestore's local queue), and let trackWrite()
+  // follow the real write in the background purely for the sync-status
+  // indicator (OfflineBanner / pendingWrites).
+  const addEquipment = useCallback(async (d) => {
+    const { id, promise } = equipmentService.add(user.uid, d);
+    trackWrite(promise);
+    dispatch({ type: "ADD_EQUIPMENT", payload: { id, ...d } });
+    toast.success("تم إضافة المعدة");
+    return id;
+  }, [user, trackWrite]);
+  const updateEquipment = useCallback(async (id, d) => {
+    trackWrite(equipmentService.update(id, d));
+    dispatch({ type: "UPDATE_EQUIPMENT", payload: { id, ...d } });
+    toast.success("تم تحديث المعدة");
+  }, [trackWrite]);
+  const deleteEquipment = useCallback(async (id) => {
+    trackWrite(equipmentService.remove(id));
+    dispatch({ type: "DELETE_EQUIPMENT", payload: id });
+    toast.success("تم حذف المعدة");
+  }, [trackWrite]);
 
-  const addJob    = useCallback(async (d) => { const id = await trackWrite(jobService.add(user.uid, d));               dispatch({ type:"ADD_JOB",    payload:{id,...d} }); toast.success("تم تسجيل العملية");     return id; }, [user, trackWrite]);
-  const updateJob = useCallback(async (id,d) => { await trackWrite(jobService.update(id,d));                           dispatch({ type:"UPDATE_JOB", payload:{id,...d} }); toast.success("تم تحديث العملية");     }, [trackWrite]);
-  const deleteJob = useCallback(async (id) => { await trackWrite(jobService.remove(id));                               dispatch({ type:"DELETE_JOB", payload:id });        toast.success("تم حذف العملية");       }, [trackWrite]);
+  const addJob = useCallback(async (d) => {
+    const { id, promise } = jobService.add(user.uid, d);
+    trackWrite(promise);
+    dispatch({ type: "ADD_JOB", payload: { id, ...d } });
+    toast.success("تم تسجيل العملية");
+    return id;
+  }, [user, trackWrite]);
+  const updateJob = useCallback(async (id, d) => {
+    trackWrite(jobService.update(id, d));
+    dispatch({ type: "UPDATE_JOB", payload: { id, ...d } });
+    toast.success("تم تحديث العملية");
+  }, [trackWrite]);
+  const deleteJob = useCallback(async (id) => {
+    trackWrite(jobService.remove(id));
+    dispatch({ type: "DELETE_JOB", payload: id });
+    toast.success("تم حذف العملية");
+  }, [trackWrite]);
 
-  const addDriver    = useCallback(async (d) => { const id = await trackWrite(driverService.add(user.uid, d));         dispatch({ type:"ADD_DRIVER",    payload:{id,...d} }); toast.success("تم إضافة السائق");      }, [user, trackWrite]);
-  const updateDriver = useCallback(async (id,d) => { await trackWrite(driverService.update(id,d));                     dispatch({ type:"UPDATE_DRIVER", payload:{id,...d} }); toast.success("تم تحديث السائق");      }, [trackWrite]);
-  const deleteDriver = useCallback(async (id) => { await trackWrite(driverService.remove(id));                         dispatch({ type:"DELETE_DRIVER", payload:id });        toast.success("تم حذف السائق");        }, [trackWrite]);
+  const addDriver = useCallback(async (d) => {
+    const { id, promise } = driverService.add(user.uid, d);
+    trackWrite(promise);
+    dispatch({ type: "ADD_DRIVER", payload: { id, ...d } });
+    toast.success("تم إضافة السائق");
+    return id;
+  }, [user, trackWrite]);
+  const updateDriver = useCallback(async (id, d) => {
+    trackWrite(driverService.update(id, d));
+    dispatch({ type: "UPDATE_DRIVER", payload: { id, ...d } });
+    toast.success("تم تحديث السائق");
+  }, [trackWrite]);
+  const deleteDriver = useCallback(async (id) => {
+    trackWrite(driverService.remove(id));
+    dispatch({ type: "DELETE_DRIVER", payload: id });
+    toast.success("تم حذف السائق");
+  }, [trackWrite]);
 
-  const addMaintenance    = useCallback(async (d) => { const id = await trackWrite(maintenanceService.add(user.uid, d)); dispatch({ type:"ADD_MAINTENANCE",    payload:{id,...d} }); toast.success("تم تسجيل الصيانة");  }, [user, trackWrite]);
-  const updateMaintenance = useCallback(async (id,d) => { await trackWrite(maintenanceService.update(id,d));             dispatch({ type:"UPDATE_MAINTENANCE", payload:{id,...d} }); toast.success("تم تحديث الصيانة");  }, [trackWrite]);
-  const deleteMaintenance = useCallback(async (id) => { await trackWrite(maintenanceService.remove(id));                 dispatch({ type:"DELETE_MAINTENANCE", payload:id });        toast.success("تم حذف الصيانة");    }, [trackWrite]);
+  const addMaintenance = useCallback(async (d) => {
+    const { id, promise } = maintenanceService.add(user.uid, d);
+    trackWrite(promise);
+    dispatch({ type: "ADD_MAINTENANCE", payload: { id, ...d } });
+    toast.success("تم تسجيل الصيانة");
+    return id;
+  }, [user, trackWrite]);
+  const updateMaintenance = useCallback(async (id, d) => {
+    trackWrite(maintenanceService.update(id, d));
+    dispatch({ type: "UPDATE_MAINTENANCE", payload: { id, ...d } });
+    toast.success("تم تحديث الصيانة");
+  }, [trackWrite]);
+  const deleteMaintenance = useCallback(async (id) => {
+    trackWrite(maintenanceService.remove(id));
+    dispatch({ type: "DELETE_MAINTENANCE", payload: id });
+    toast.success("تم حذف الصيانة");
+  }, [trackWrite]);
 
-  const addPayment    = useCallback(async (d) => { const id = await trackWrite(paymentService.add(user.uid, d));       dispatch({ type:"ADD_PAYMENT",    payload:{id,...d} }); toast.success("تم تسجيل الدفعة");     }, [user, trackWrite]);
-  const updatePayment = useCallback(async (id,d) => { await trackWrite(paymentService.update(id,d));                   dispatch({ type:"UPDATE_PAYMENT", payload:{id,...d} }); toast.success("تم تحديث الدفعة");     }, [trackWrite]);
-  const deletePayment = useCallback(async (id) => { await trackWrite(paymentService.remove(id));                       dispatch({ type:"DELETE_PAYMENT", payload:id });        toast.success("تم حذف الدفعة");       }, [trackWrite]);
+  const addPayment = useCallback(async (d) => {
+    const { id, promise } = paymentService.add(user.uid, d);
+    trackWrite(promise);
+    dispatch({ type: "ADD_PAYMENT", payload: { id, ...d } });
+    toast.success("تم تسجيل الدفعة");
+    return id;
+  }, [user, trackWrite]);
+  const updatePayment = useCallback(async (id, d) => {
+    trackWrite(paymentService.update(id, d));
+    dispatch({ type: "UPDATE_PAYMENT", payload: { id, ...d } });
+    toast.success("تم تحديث الدفعة");
+  }, [trackWrite]);
+  const deletePayment = useCallback(async (id) => {
+    trackWrite(paymentService.remove(id));
+    dispatch({ type: "DELETE_PAYMENT", payload: id });
+    toast.success("تم حذف الدفعة");
+  }, [trackWrite]);
 
-  const addSalaryEntry    = useCallback(async (d) => { const id = await trackWrite(salaryService.add(user.uid, d));    dispatch({ type:"ADD_SALARY",    payload:{id,...d} }); toast.success("تم التسجيل");           }, [user, trackWrite]);
-  const updateSalaryEntry = useCallback(async (id,d) => { await trackWrite(salaryService.update(id,d));                dispatch({ type:"UPDATE_SALARY", payload:{id,...d} }); toast.success("تم التحديث");           }, [trackWrite]);
-  const deleteSalaryEntry = useCallback(async (id) => { await trackWrite(salaryService.remove(id));                    dispatch({ type:"DELETE_SALARY", payload:id });        toast.success("تم الحذف");             }, [trackWrite]);
+  const addSalaryEntry = useCallback(async (d) => {
+    const { id, promise } = salaryService.add(user.uid, d);
+    trackWrite(promise);
+    dispatch({ type: "ADD_SALARY", payload: { id, ...d } });
+    toast.success("تم التسجيل");
+    return id;
+  }, [user, trackWrite]);
+  const updateSalaryEntry = useCallback(async (id, d) => {
+    trackWrite(salaryService.update(id, d));
+    dispatch({ type: "UPDATE_SALARY", payload: { id, ...d } });
+    toast.success("تم التحديث");
+  }, [trackWrite]);
+  const deleteSalaryEntry = useCallback(async (id) => {
+    trackWrite(salaryService.remove(id));
+    dispatch({ type: "DELETE_SALARY", payload: id });
+    toast.success("تم الحذف");
+  }, [trackWrite]);
 
-  const addAttendance    = useCallback(async (d) => { const id = await trackWrite(attendanceService.add(user.uid, d)); dispatch({ type:"ADD_ATTENDANCE",    payload:{id,...d} }); toast.success("تم تسجيل الحضور");   }, [user, trackWrite]);
-  const updateAttendance = useCallback(async (id,d) => { await trackWrite(attendanceService.update(id,d));             dispatch({ type:"UPDATE_ATTENDANCE", payload:{id,...d} }); toast.success("تم تحديث الحضور");   }, [trackWrite]);
-  const deleteAttendance = useCallback(async (id) => { await trackWrite(attendanceService.remove(id));                 dispatch({ type:"DELETE_ATTENDANCE", payload:id });        toast.success("تم حذف السجل");      }, [trackWrite]);
+  const addAttendance = useCallback(async (d) => {
+    const { id, promise } = attendanceService.add(user.uid, d);
+    trackWrite(promise);
+    dispatch({ type: "ADD_ATTENDANCE", payload: { id, ...d } });
+    toast.success("تم تسجيل الحضور");
+    return id;
+  }, [user, trackWrite]);
+  const updateAttendance = useCallback(async (id, d) => {
+    trackWrite(attendanceService.update(id, d));
+    dispatch({ type: "UPDATE_ATTENDANCE", payload: { id, ...d } });
+    toast.success("تم تحديث الحضور");
+  }, [trackWrite]);
+  const deleteAttendance = useCallback(async (id) => {
+    trackWrite(attendanceService.remove(id));
+    dispatch({ type: "DELETE_ATTENDANCE", payload: id });
+    toast.success("تم حذف السجل");
+  }, [trackWrite]);
 
-  const addCustody    = useCallback(async (d) => {
-    try {
-      const id = await trackWrite(custodyService.add(user.uid, d));
-      dispatch({ type:"ADD_CUSTODY", payload:{id,...d} });
-      toast.success(d.type === "expense" ? "تم تسجيل الصرف" : "تم تسجيل الإضافة");
-    } catch (err) {
+  // Custody keeps its extra error-toast handling (e.g. permission-denied)
+  // — attached to the write promise itself now (fired in the background)
+  // instead of via try/catch around an awaited call, since the promise no
+  // longer blocks the optimistic UI update below.
+  const addCustody = useCallback(async (d) => {
+    const { id, promise } = custodyService.add(user.uid, d);
+    trackWrite(promise).catch((err) => {
       toast.error(err?.code === "permission-denied"
         ? "لا يوجد صلاحية للكتابة — تأكد من نشر قواعد Firestore"
-        : "حدث خطأ أثناء الحفظ");
-      throw err;
-    }
+        : "حدث خطأ أثناء الحفظ (هيتزامن لما الاتصال يرجع لو كانت المشكلة إنك أوف لاين)");
+    });
+    dispatch({ type: "ADD_CUSTODY", payload: { id, ...d } });
+    toast.success(d.type === "expense" ? "تم تسجيل الصرف" : "تم تسجيل الإضافة");
+    return id;
   }, [user, trackWrite]);
-  const updateCustody = useCallback(async (id,d) => {
-    try {
-      await trackWrite(custodyService.update(id,d));
-      dispatch({ type:"UPDATE_CUSTODY", payload:{id,...d} });
-      toast.success("تم تحديث السجل");
-    } catch (err) {
-      toast.error("حدث خطأ أثناء التحديث");
-      throw err;
-    }
+  const updateCustody = useCallback(async (id, d) => {
+    trackWrite(custodyService.update(id, d)).catch(() => {
+      toast.error("حدث خطأ أثناء التحديث (هيتزامن لما الاتصال يرجع لو كانت المشكلة إنك أوف لاين)");
+    });
+    dispatch({ type: "UPDATE_CUSTODY", payload: { id, ...d } });
+    toast.success("تم تحديث السجل");
   }, [trackWrite]);
   const deleteCustody = useCallback(async (id) => {
-    try {
-      await trackWrite(custodyService.remove(id));
-      dispatch({ type:"DELETE_CUSTODY", payload:id });
-      toast.success("تم حذف السجل");
-    } catch (err) {
-      toast.error("حدث خطأ أثناء الحذف");
-      throw err;
-    }
+    trackWrite(custodyService.remove(id)).catch(() => {
+      toast.error("حدث خطأ أثناء الحذف (هيتزامن لما الاتصال يرجع لو كانت المشكلة إنك أوف لاين)");
+    });
+    dispatch({ type: "DELETE_CUSTODY", payload: id });
+    toast.success("تم حذف السجل");
   }, [trackWrite]);
 
   const saveSettings = useCallback(async (d) => {
-    await trackWrite(settingsService.save(user.uid, d));
-    dispatch({ type:"UPDATE_SETTINGS", payload:d });
+    trackWrite(settingsService.save(user.uid, d));
+    dispatch({ type: "UPDATE_SETTINGS", payload: d });
     toast.success("تم حفظ الإعدادات");
   }, [user, trackWrite]);
 

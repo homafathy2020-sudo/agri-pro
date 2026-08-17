@@ -1,7 +1,7 @@
 // src/services/paymentService.js
 import {
   collection, doc,
-  addDoc, updateDoc, deleteDoc,
+  setDoc, updateDoc, deleteDoc,
   getDocs, query, where,
   serverTimestamp,
 } from "firebase/firestore";
@@ -28,18 +28,20 @@ export const paymentService = {
       .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
   },
 
-  async add(userId, data) {
+  // Returns { id, promise } — see equipmentService.js for why.
+  add(userId, data) {
+    const ref = doc(col());
     // ISO string (not serverTimestamp) so the exact moment the payment was
     // recorded is available immediately in local state — see jobService.js.
-    const ref = await addDoc(col(), { ...data, userId, createdAt: new Date().toISOString() });
-    return ref.id;
+    const promise = setDoc(ref, { ...data, userId, createdAt: new Date().toISOString() });
+    return { id: ref.id, promise };
   },
 
-  async update(id, data) {
-    await updateDoc(doc(db, COLLECTIONS.PAYMENTS, id), { ...data, updatedAt: serverTimestamp() });
+  update(id, data) {
+    return updateDoc(doc(db, COLLECTIONS.PAYMENTS, id), { ...data, updatedAt: serverTimestamp() });
   },
 
-  async remove(id) {
-    await deleteDoc(doc(db, COLLECTIONS.PAYMENTS, id));
+  remove(id) {
+    return deleteDoc(doc(db, COLLECTIONS.PAYMENTS, id));
   },
 };

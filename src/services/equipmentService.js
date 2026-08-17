@@ -1,7 +1,7 @@
 // src/services/equipmentService.js
 import {
   collection, doc,
-  addDoc, updateDoc, deleteDoc,
+  setDoc, updateDoc, deleteDoc,
   getDocs, query, where, orderBy,
   serverTimestamp,
 } from "firebase/firestore";
@@ -22,30 +22,42 @@ export const equipmentService = {
 
   /**
    * Add new equipment document.
+   *
+   * Returns `{ id, promise }` — NOT a promise of the id. `doc(col())`
+   * generates the new document's id locally, with no network round-trip,
+   * so callers can update the UI immediately. `promise` resolves once
+   * Firestore acknowledges the write on the server, which — important
+   * while offline — can take a while (it won't resolve at all until
+   * connectivity returns), so callers should only use it for background
+   * sync tracking, never await it before showing the change to the user.
    */
-  async add(userId, data) {
-    const ref = await addDoc(col(), {
+  add(userId, data) {
+    const ref = doc(col());
+    const promise = setDoc(ref, {
       ...data,
       userId,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
-    return ref.id;
+    return { id: ref.id, promise };
   },
 
   /**
-   * Update an existing equipment document.
+   * Update an existing equipment document. Returns the write promise —
+   * same offline caveat as add() above.
    */
-  async update(id, data) {
+  update(id, data) {
     const ref = doc(db, COLLECTIONS.EQUIPMENT, id);
-    await updateDoc(ref, { ...data, updatedAt: serverTimestamp() });
+    return updateDoc(ref, { ...data, updatedAt: serverTimestamp() });
   },
 
   /**
-   * Delete an equipment document.
+   * Delete an equipment document. Returns the write promise — same
+   * offline caveat as add() above.
    */
-  async remove(id) {
+  remove(id) {
     const ref = doc(db, COLLECTIONS.EQUIPMENT, id);
-    await deleteDoc(ref);
+    return deleteDoc(ref);
   },
 };
+
