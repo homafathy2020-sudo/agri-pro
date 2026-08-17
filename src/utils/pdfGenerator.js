@@ -106,8 +106,13 @@ const loadHtml2Pdf = () => {
 export const downloadReportPdf = async (htmlContent, filename) => {
   const html2pdf = await loadHtml2Pdf();
 
+  // NOTE: must be "absolute", not "fixed". html2canvas clones the whole
+  // document into a hidden iframe to render it, and it doesn't compute
+  // fixed-position elements' coordinates correctly inside that clone —
+  // this was producing a completely blank PDF even though the HTML/CSS
+  // itself was fine.
   const container = document.createElement("div");
-  container.style.position = "fixed";
+  container.style.position = "absolute";
   container.style.left = "-99999px";
   container.style.top = "0";
   container.style.width = "780px";
@@ -119,7 +124,7 @@ export const downloadReportPdf = async (htmlContent, filename) => {
       .set({
         margin: 0,
         filename: `${filename}.pdf`,
-        html2canvas: { scale: 2, useCORS: true },
+        html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: 0 },
         jsPDF: { unit: "pt", format: "a4", orientation: "portrait" },
       })
       .from(container)
