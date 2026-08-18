@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, Badge } from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import {
-  EditIcon, TrashIcon, PhoneIcon, AlertIcon, WalletIcon, TractorIcon, CheckCircleIcon,
+  EditIcon, TrashIcon, PhoneIcon, AlertIcon, TractorIcon, CheckCircleIcon,
 } from "../../components/ui/Icons";
 import { formatCurrency, formatNumber, getInitial } from "../../utils/formatters";
 import { DRIVER_STATUS } from "../../config/constants";
@@ -20,7 +20,7 @@ const DriverCard = ({ driver, onEdit, onDelete, onPaySalary }) => {
   const navigate = useNavigate();
   const {
     id, name, phone, totalAcres = 0, ops = 0, salary = 0,
-    status, outstandingAdvance = 0, unpaidThisMonth, assignedEquipment = [],
+    status, unpaidThisMonth, assignedEquipment = [],
   } = driver;
 
   const isInactive = status === DRIVER_STATUS.INACTIVE;
@@ -53,16 +53,11 @@ const DriverCard = ({ driver, onEdit, onDelete, onPaySalary }) => {
             </div>
 
             {/* Alerts / status badges */}
-            {(unpaidThisMonth || outstandingAdvance > 0 || assignedEquipment.length > 0) && (
+            {(unpaidThisMonth || assignedEquipment.length > 0) && (
               <div className="flex items-center gap-2 flex-wrap mt-3">
                 {unpaidThisMonth && (
                   <Badge variant="amber">
                     <AlertIcon size={11} /> لسه ما اتصرفش راتب الشهر ده
-                  </Badge>
-                )}
-                {outstandingAdvance > 0 && (
-                  <Badge variant="red">
-                    <WalletIcon size={11} /> سلفة متبقية {formatCurrency(outstandingAdvance)}
                   </Badge>
                 )}
                 {assignedEquipment.map((eqName) => (

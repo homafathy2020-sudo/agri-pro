@@ -65,9 +65,9 @@ const DriversPage = () => {
 
     const remaining = Math.max(0, due - paid);
 
-    // إجمالي السلف اللي اتسلّمت للسائقين الشهر ده — بيتحسب من قيود "سلفة"
-    // مباشرة (مش محتاج "صرف راتب" رسمي عشان يظهر)، وبيرجع صفر أول كل شهر
-    // زي باقي المربعات.
+    // إجمالي الحوافز والسلف اللي اتصرفت للسائقين الشهر ده — بيتحسب من قيود
+    // "حافز" و"سلفة" مباشرة (مش محتاج "صرف راتب" رسمي عشان يظهر)، وبيرجع
+    // صفر أول كل شهر زي باقي المربعات.
     const advancesThisMonth = salaryEntries
       .filter((e) =>
         e.type === SALARY_ENTRY_TYPES.ADVANCE &&
@@ -75,7 +75,9 @@ const DriversPage = () => {
       )
       .reduce((s, e) => s + (Number(e.amount) || 0), 0);
 
-    return { due, paid, remaining, advancesThisMonth };
+    const incentivesAndAdvancesThisMonth = bonusesThisMonth + advancesThisMonth;
+
+    return { due, paid, remaining, incentivesAndAdvancesThisMonth };
   }, [report, salaryEntries, currentMonth]);
 
   const visibleDrivers = useMemo(() => {
@@ -164,7 +166,7 @@ const DriversPage = () => {
         <StatCard icon={<RevenueIcon size={24}/>} label="إجمالي رواتب الشهر المستحقة"  value={formatCurrency(salaryTotals.due)}       color="amber" sensitive/>
         <StatCard icon={<RevenueIcon size={24}/>} label="إجمالي الرواتب المصروفة"       value={formatCurrency(salaryTotals.paid)}      color="green" sensitive/>
         <StatCard icon={<RevenueIcon size={24}/>} label="إجمالي المتبقي"                value={formatCurrency(salaryTotals.remaining)} color={salaryTotals.remaining > 0 ? "amber" : "green"} sensitive/>
-        <StatCard icon={<WalletIcon size={24}/>}  label="إجمالي السلف المصروفة"         value={formatCurrency(salaryTotals.advancesThisMonth)} color="orange" sensitive/>
+        <StatCard icon={<WalletIcon size={24}/>}  label="إجمالي الحوافز والسلف المنصرفة" value={formatCurrency(salaryTotals.incentivesAndAdvancesThisMonth)} color="orange" sensitive/>
       </div>
 
       {/* Search + inactive toggle */}

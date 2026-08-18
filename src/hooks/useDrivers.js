@@ -2,7 +2,7 @@
 import { useMemo, useCallback } from "react";
 import { useData } from "../contexts/DataContext";
 import { buildDriverReport } from "../utils/calculations";
-import { calcOutstandingAdvances, getMonthEntries } from "../utils/salaryCalculations";
+import { getMonthEntries } from "../utils/salaryCalculations";
 import { SALARY_ENTRY_TYPES, DRIVER_STATUS } from "../config/constants";
 
 const getCurrentMonth = () => {
@@ -25,7 +25,6 @@ export const useDrivers = () => {
     const base = buildDriverReport(drivers, jobs, settings.fuelPrice, payments);
     return base.map((drv) => {
       const status = drv.status === DRIVER_STATUS.INACTIVE ? DRIVER_STATUS.INACTIVE : DRIVER_STATUS.ACTIVE;
-      const outstandingAdvance = calcOutstandingAdvances(salaryEntries, drv.id);
 
       const monthEntries = getMonthEntries(salaryEntries, drv.id, currentMonth);
       const baseEntriesThisMonth = monthEntries.filter((e) => e.type === SALARY_ENTRY_TYPES.BASE);
@@ -36,7 +35,7 @@ export const useDrivers = () => {
         .filter((eq) => eq.driverId === drv.id)
         .map((eq) => eq.name);
 
-      return { ...drv, status, outstandingAdvance, unpaidThisMonth, assignedEquipment };
+      return { ...drv, status, unpaidThisMonth, assignedEquipment };
     });
   }, [drivers, jobs, settings.fuelPrice, payments, salaryEntries, equipment, currentMonth]);
 
