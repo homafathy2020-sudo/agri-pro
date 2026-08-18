@@ -6,10 +6,12 @@ import Button from "../../components/ui/Button";
 import { SALARY_ENTRY_TYPES, SALARY_ENTRY_LABELS } from "../../config/constants";
 import { todayISO } from "../../utils/formatters";
 
-// القيد بيبقى إما خصم أو حافز بس — نوع الخصم/الحافز بيتكتب حر جنبه
+// أنواع القيد المتاحة: خصم / حافز / سلفة / سداد سلفة
 const TYPE_OPTIONS = [
-  { value: SALARY_ENTRY_TYPES.DEDUCTION, label: SALARY_ENTRY_LABELS.deduction },
-  { value: SALARY_ENTRY_TYPES.BONUS,     label: SALARY_ENTRY_LABELS.bonus },
+  { value: SALARY_ENTRY_TYPES.DEDUCTION,     label: SALARY_ENTRY_LABELS.deduction },
+  { value: SALARY_ENTRY_TYPES.BONUS,         label: SALARY_ENTRY_LABELS.bonus },
+  { value: SALARY_ENTRY_TYPES.ADVANCE,       label: SALARY_ENTRY_LABELS.advance },
+  { value: SALARY_ENTRY_TYPES.ADVANCE_REPAY, label: SALARY_ENTRY_LABELS.advance_repay },
 ];
 
 const SalaryEntryForm = ({ driverId, driverName, onSave, onClose }) => {
@@ -28,7 +30,9 @@ const SalaryEntryForm = ({ driverId, driverName, onSave, onClose }) => {
   });
 
   const type = watch("type");
-  const isBonus = type === SALARY_ENTRY_TYPES.BONUS;
+  const isBonus         = type === SALARY_ENTRY_TYPES.BONUS;
+  const isAdvance        = type === SALARY_ENTRY_TYPES.ADVANCE;
+  const isAdvanceRepay   = type === SALARY_ENTRY_TYPES.ADVANCE_REPAY;
 
   const onSubmit = async (data) => {
     await onSave({
@@ -68,13 +72,15 @@ const SalaryEntryForm = ({ driverId, driverName, onSave, onClose }) => {
           )}
         />
 
-        <div className="sm:col-span-2">
-          <Input
-            label={isBonus ? "نوع الحافز" : "نوع الخصم"}
-            placeholder={isBonus ? "مثلاً: حافز أداء، بدل وقود..." : "مثلاً: غياب، تأخير..."}
-            {...register("reason")}
-          />
-        </div>
+        {!isAdvance && !isAdvanceRepay && (
+          <div className="sm:col-span-2">
+            <Input
+              label={isBonus ? "نوع الحافز" : "نوع الخصم"}
+              placeholder={isBonus ? "مثلاً: حافز أداء، بدل وقود..." : "مثلاً: غياب، تأخير..."}
+              {...register("reason")}
+            />
+          </div>
+        )}
 
         <Input label="التاريخ" type="date" {...register("date")} />
 
