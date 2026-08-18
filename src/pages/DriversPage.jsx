@@ -12,7 +12,7 @@ import { StatCard, EmptyState } from "../components/ui/Card";
 import LoadingScreen      from "../components/ui/LoadingScreen";
 import PrivacyToggle      from "../components/ui/PrivacyToggle";
 import {
-  PlusIcon, DriverIcon, RevenueIcon, ClearIcon, CheckCircleIcon,
+  PlusIcon, DriverIcon, RevenueIcon, ClearIcon, CheckCircleIcon, WalletIcon,
 } from "../components/ui/Icons";
 import { formatCurrency, todayISO } from "../utils/formatters";
 import { DRIVER_STATUS, SALARY_ENTRY_TYPES } from "../config/constants";
@@ -65,7 +65,17 @@ const DriversPage = () => {
 
     const remaining = Math.max(0, due - paid);
 
-    return { due, paid, remaining };
+    // إجمالي السلف اللي اتسلّمت للسائقين الشهر ده — بيتحسب من قيود "سلفة"
+    // مباشرة (مش محتاج "صرف راتب" رسمي عشان يظهر)، وبيرجع صفر أول كل شهر
+    // زي باقي المربعات.
+    const advancesThisMonth = salaryEntries
+      .filter((e) =>
+        e.type === SALARY_ENTRY_TYPES.ADVANCE &&
+        (e.date || "").startsWith(currentMonth)
+      )
+      .reduce((s, e) => s + (Number(e.amount) || 0), 0);
+
+    return { due, paid, remaining, advancesThisMonth };
   }, [report, salaryEntries, currentMonth]);
 
   const visibleDrivers = useMemo(() => {
@@ -150,10 +160,11 @@ const DriversPage = () => {
       </div>
 
       {/* KPIs — driver SALARIES this month (not machine/job revenue) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <StatCard icon={<RevenueIcon size={24}/>} label="إجمالي رواتب الشهر المستحقة"  value={formatCurrency(salaryTotals.due)}       color="amber" sensitive/>
         <StatCard icon={<RevenueIcon size={24}/>} label="إجمالي الرواتب المصروفة"       value={formatCurrency(salaryTotals.paid)}      color="green" sensitive/>
         <StatCard icon={<RevenueIcon size={24}/>} label="إجمالي المتبقي"                value={formatCurrency(salaryTotals.remaining)} color={salaryTotals.remaining > 0 ? "amber" : "green"} sensitive/>
+        <StatCard icon={<WalletIcon size={24}/>}  label="إجمالي السلف المصروفة"         value={formatCurrency(salaryTotals.advancesThisMonth)} color="orange" sensitive/>
       </div>
 
       {/* Search + inactive toggle */}
