@@ -22,13 +22,15 @@ const DriversPage = () => {
     report, loading, addDriver, updateDriver, deleteDriver,
     getDriverDependencyCounts,
   } = useDrivers();
-  const { addSalaryEntry, salaryEntries, currentMonth } = useSalary();
+  const { addSalaryEntry, deleteSalaryEntry, salaryEntries, currentMonth } = useSalary();
   const { confirm, confirmState } = useConfirm();
   const [modal, setModal]         = useState(null);
   const [search, setSearch]       = useState("");
   const [showInactive, setShowInactive] = useState(false);
-  const [payTarget, setPayTarget] = useState(null); // driver currently being paid via quick-pay
-  const [paying, setPaying]       = useState(false);
+  const [payTarget, setPayTarget]     = useState(null); // driver currently being paid via quick-pay
+  const [paying, setPaying]           = useState(false);
+  const [cancelTarget, setCancelTarget] = useState(null); // driver currently having their payment cancelled
+  const [cancelling, setCancelling]     = useState(false);
 
   // Salary-wide totals for THIS MONTH — across all drivers (not machine/job revenue).
   const salaryTotals = useMemo(() => {
@@ -139,6 +141,17 @@ const DriversPage = () => {
     }
   };
 
+  const handleConfirmCancelPaySalary = async () => {
+    if (!cancelTarget?.lastPaidBaseEntry) return;
+    setCancelling(true);
+    try {
+      await deleteSalaryEntry(cancelTarget.lastPaidBaseEntry.id);
+      setCancelTarget(null);
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   if (loading) return <LoadingScreen />;
 
   return (
@@ -223,6 +236,7 @@ const DriversPage = () => {
               onEdit={() => setModal({ mode:"edit", data:drv })}
               onDelete={() => handleDeleteDriver(drv)}
               onPaySalary={(d) => setPayTarget(d)}
+              onCancelPaySalary={(d) => setCancelTarget(d)}
             />
           ))}
         </div>
@@ -258,6 +272,33 @@ const DriversPage = () => {
                 icon={<CheckCircleIcon size={14} />}
                 onClick={handleConfirmPaySalary}>
                 تأكيد الصرف
+              </Button>
+            </div>
+          </>
+        )}
+      </Modal>
+
+      {/* Quick "cancel pay salary" confirmation */}
+      <Modal open={!!cancelTarget} onClose={() => !cancelling && setCancelTarget(null)} title="إلغاء صرف الراتب" size="sm">
+        {cancelTarget && (
+          <>
+            <p className="text-sm text-gray-400 mb-6 leading-relaxed">
+              هل تريد إلغاء صرف الراتب الأساسي للسائق{" "}
+              <span className="font-bold text-gray-200">{cancelTarget.name}</span>{" "}
+              بمبلغ{" "}
+              <span className="font-bold text-red-400">
+                {formatCurrency(cancelTarget.lastPaidBaseEntry?.amount || 0)}
+              </span>{" "}
+              عن شهر {new Date().toLocaleDateString("ar-EG", { month: "long", year: "numeric" })}؟
+              <br />
+              هيترجع الراتب "لسه ما اتصرفش" تاني.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <Button variant="ghost" size="sm" disabled={cancelling} onClick={() => setCancelTarget(null)}>تراجع</Button>
+              <Button variant="danger" size="sm" loading={cancelling}
+                icon={<ClearIcon size={14} />}
+                onClick={handleConfirmCancelPaySalary}>
+                تأكيد الإلغاء
               </Button>
             </div>
           </>

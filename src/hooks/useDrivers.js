@@ -31,11 +31,18 @@ export const useDrivers = () => {
       const unpaidThisMonth = (drv.salary > 0)
         && (baseEntriesThisMonth.length === 0 || baseEntriesThisMonth.some((e) => !e.paid));
 
+      // آخر قيد "صرف راتب أساسي" مدفوع الشهر ده — لو موجود، بيسمح بزرار
+      // "إلغاء صرف الراتب" اللي بيمسحه بدل ما نضطر ندخل تفاصيل السائق.
+      const paidBaseEntriesThisMonth = baseEntriesThisMonth.filter((e) => e.paid);
+      const lastPaidBaseEntry = paidBaseEntriesThisMonth.length
+        ? paidBaseEntriesThisMonth.reduce((a, b) => ((a.date || "") >= (b.date || "") ? a : b))
+        : null;
+
       const assignedEquipment = equipment
         .filter((eq) => eq.driverId === drv.id)
         .map((eq) => eq.name);
 
-      return { ...drv, status, unpaidThisMonth, assignedEquipment };
+      return { ...drv, status, unpaidThisMonth, lastPaidBaseEntry, assignedEquipment };
     });
   }, [drivers, jobs, settings.fuelPrice, payments, salaryEntries, equipment, currentMonth]);
 

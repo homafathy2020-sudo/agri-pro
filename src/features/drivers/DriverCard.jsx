@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, Badge } from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import {
-  EditIcon, TrashIcon, PhoneIcon, AlertIcon, TractorIcon, CheckCircleIcon,
+  EditIcon, TrashIcon, PhoneIcon, AlertIcon, TractorIcon, CheckCircleIcon, ClearIcon,
 } from "../../components/ui/Icons";
 import { formatCurrency, formatNumber, getInitial } from "../../utils/formatters";
 import { DRIVER_STATUS } from "../../config/constants";
@@ -16,11 +16,11 @@ const StatItem = ({ label, value, color = "text-gray-200" }) => (
   </div>
 );
 
-const DriverCard = ({ driver, onEdit, onDelete, onPaySalary }) => {
+const DriverCard = ({ driver, onEdit, onDelete, onPaySalary, onCancelPaySalary }) => {
   const navigate = useNavigate();
   const {
     id, name, phone, totalAcres = 0, ops = 0, salary = 0,
-    status, unpaidThisMonth, assignedEquipment = [],
+    status, unpaidThisMonth, lastPaidBaseEntry, assignedEquipment = [],
   } = driver;
 
   const isInactive = status === DRIVER_STATUS.INACTIVE;
@@ -79,6 +79,16 @@ const DriverCard = ({ driver, onEdit, onDelete, onPaySalary }) => {
                 onClick={() => onPaySalary(driver)}
               >
                 صرف الراتب
+              </Button>
+            )}
+            {salary > 0 && !unpaidThisMonth && lastPaidBaseEntry && (
+              <Button
+                variant="danger"
+                size="sm"
+                icon={<ClearIcon size={13} />}
+                onClick={() => onCancelPaySalary(driver)}
+              >
+                إلغاء صرف الراتب
               </Button>
             )}
             <Button variant="secondary" size="sm" onClick={() => navigate(`/drivers/${id}`)}>
