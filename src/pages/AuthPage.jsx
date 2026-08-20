@@ -64,6 +64,7 @@ const AuthPage = () => {
           </div>
           <h1 className="text-2xl font-extrabold text-gray-100">زراعي برو</h1>
           <p className="text-sm text-gray-500 mt-1">إدارة المعدات الزراعية</p>
+          <p className="text-[11px] tracking-wide text-gray-600 mt-1.5">MADE BY: ADHAM FATHY</p>
         </div>
 
         <div className="bg-surface border border-white/10 rounded-3xl p-6 shadow-2xl">
@@ -144,7 +145,6 @@ const AuthPage = () => {
         </div>
 
         <p className="text-center text-xs text-gray-600 mt-6">زراعي برو v1.0</p>
-        <p className="text-center text-[11px] tracking-wide text-gray-600 mt-2">MADE BY: ADHAM FATHY</p>
       </div>
     </div>
   );
