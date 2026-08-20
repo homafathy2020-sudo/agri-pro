@@ -65,6 +65,7 @@ const OfflineBanner = () => {
   const { isOnline, canInstall, installPrompt } = usePWA();
   const {
     pendingWrites, lastSyncedAt, firstPendingWriteAt, loadError, retryLoad,
+    backupFailCount, retryBackupNow,
     equipment, jobs, drivers, maintenance, payments, salaryEntries, attendance, settings,
   } = useData();
 
@@ -104,18 +105,24 @@ const OfflineBanner = () => {
   };
 
   const showSyncing = isOnline && pendingWrites > 0 && !isLongPending;
+  // "أكتر من مرة" — a single failed attempt is normal noise (it'll just
+  // retry next hour), so only surface this once it's failed at least twice
+  // in a row without a success in between.
+  const showBackupFailing = backupFailCount >= 2;
 
   // Each row's minimize state resets automatically the next time that row's
   // condition newly becomes true.
-  const [loadErrorMin, setLoadErrorMin]     = useAutoResetMinimize(loadError);
-  const [offlineMin, setOfflineMin]         = useAutoResetMinimize(!isOnline);
-  const [syncingMin, setSyncingMin]         = useAutoResetMinimize(showSyncing);
-  const [syncedMin, setSyncedMin]           = useAutoResetMinimize(showSyncedFlash);
-  const [longPendingMin, setLongPendingMin] = useAutoResetMinimize(isLongPending);
-  const [installMin, setInstallMin]         = useAutoResetMinimize(canInstall && isOnline);
+  const [loadErrorMin, setLoadErrorMin]         = useAutoResetMinimize(loadError);
+  const [backupFailMin, setBackupFailMin]       = useAutoResetMinimize(showBackupFailing);
+  const [offlineMin, setOfflineMin]             = useAutoResetMinimize(!isOnline);
+  const [syncingMin, setSyncingMin]             = useAutoResetMinimize(showSyncing);
+  const [syncedMin, setSyncedMin]               = useAutoResetMinimize(showSyncedFlash);
+  const [longPendingMin, setLongPendingMin]     = useAutoResetMinimize(isLongPending);
+  const [installMin, setInstallMin]             = useAutoResetMinimize(canInstall && isOnline);
 
   const showAnything =
     (loadError && !loadErrorMin) ||
+    (showBackupFailing && !backupFailMin) ||
     (!isOnline && !offlineMin) ||
     (canInstall && !installMin) ||
     (showSyncing && !syncingMin) ||
@@ -139,6 +146,33 @@ const OfflineBanner = () => {
               إعادة المحاولة
             </button>
             <MinimizeButton onClick={() => setLoadErrorMin(true)} />
+          </div>
+        </div>
+      )}
+
+      {/* Automatic daily backup has failed more than once in a row. Offers
+          both an immediate retry of the cloud backup and the same manual
+          local-file backup as a fallback safety net. */}
+      {showBackupFailing && !backupFailMin && (
+        <div className="flex items-center justify-between gap-3 bg-rose-700 text-white text-xs font-bold py-2 px-4 flex-wrap">
+          <span>
+            النسخ الاحتياطي التلقائي فشل {backupFailCount} مرات على التوالي — بياناتك مش في خطر (لسه محفوظة عادي)
+            بس النسخة الاحتياطية اليومية مش بتتاخد
+          </span>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={retryBackupNow}
+              className="bg-white text-rose-700 rounded-lg px-3 py-1 text-xs font-bold hover:bg-gray-100"
+            >
+              إعادة المحاولة الآن
+            </button>
+            <button
+              onClick={handleEmergencyBackup}
+              className="bg-white text-rose-700 rounded-lg px-3 py-1 text-xs font-bold hover:bg-gray-100"
+            >
+              نزّل نسخة على جهازك
+            </button>
+            <MinimizeButton onClick={() => setBackupFailMin(true)} />
           </div>
         </div>
       )}

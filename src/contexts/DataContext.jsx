@@ -17,7 +17,8 @@ import { driverCostService }   from "../services/driverCostService";
 import { salaryService }       from "../services/salaryService";
 import { attendanceService }   from "../services/attendanceService";
 import { custodyService }      from "../services/custodyService";
-import { DEFAULT_FUEL_PRICE }  from "../config/constants";
+import { backupService }       from "../services/backupService";
+import { DEFAULT_FUEL_PRICE, BACKUP_INTERVAL_MS } from "../config/constants";
 import { driverCostToSalaryEntry } from "../utils/migrateDriverCosts";
 
 const initialState = {
@@ -249,6 +250,91 @@ export const DataProvider = ({ children }) => {
     return () => window.removeEventListener("online", handleOnline);
   }, [loadError, retryLoad]);
 
+  // ── Automatic daily backup ───────────────────────────────────────────
+  // Takes a full snapshot of the user's data once every 24h while online.
+  // Lives here (rather than a separate hook called from AppLayout) so it
+  // keeps running for as long as the app/tab is open regardless of which
+  // page is mounted, and so its failure/success state can be surfaced by
+  // any component via useData() — same pattern as pendingWrites/loadError.
+  const backupFailKey = (uid) => `backupFailCount:${uid}`;
+  // Consecutive failures since the last success. A single failed attempt
+  // is treated as "will retry on its own" and stays quiet — only once it's
+  // failed more than once in a row (i.e. it's not just a one-off blip) do
+  // we surface it, so the person isn't alarmed over a transient hiccup.
+  const [backupFailCount, setBackupFailCount] = useState(0);
+  const [backupRetryTick, setBackupRetryTick] = useState(0);
+  const retryBackupNow = useCallback(() => setBackupRetryTick((t) => t + 1), []);
+
+  useEffect(() => {
+    if (!user || state.loading) return;
+    let cancelled = false;
+    let runningNow = false;
+
+    const runIfDue = async () => {
+      if (runningNow || cancelled || !navigator.onLine) return;
+
+      const localLast = Number(localStorage.getItem(`lastBackupAt:${user.uid}`) || 0);
+      if (Date.now() - localLast < BACKUP_INTERVAL_MS) return;
+
+      runningNow = true;
+      try {
+        // Cross-check the server in case another device already backed up
+        // recently, to avoid redundant writes.
+        const meta = await backupService.getMeta(user.uid);
+        const serverLast = meta?.lastBackupAt?.toMillis?.() || 0;
+        if (Date.now() - serverLast < BACKUP_INTERVAL_MS) {
+          localStorage.setItem(`lastBackupAt:${user.uid}`, String(serverLast));
+          if (!cancelled) {
+            setBackupFailCount(0);
+            localStorage.setItem(backupFailKey(user.uid), "0");
+          }
+          return;
+        }
+
+        await backupService.createBackup(user.uid, {
+          equipment:     state.equipment,
+          jobs:          state.jobs,
+          drivers:       state.drivers,
+          maintenance:   state.maintenance,
+          payments:      state.payments,
+          salaryEntries: state.salaryEntries,
+          attendance:    state.attendance,
+          settings:      state.settings,
+        });
+        localStorage.setItem(`lastBackupAt:${user.uid}`, String(Date.now()));
+        if (!cancelled) {
+          setBackupFailCount(0);
+          localStorage.setItem(backupFailKey(user.uid), "0");
+        }
+      } catch (err) {
+        console.warn("النسخ الاحتياطي التلقائي فشل:", err);
+        if (!cancelled) {
+          const next = Number(localStorage.getItem(backupFailKey(user.uid)) || 0) + 1;
+          localStorage.setItem(backupFailKey(user.uid), String(next));
+          setBackupFailCount(next);
+        }
+      } finally {
+        runningNow = false;
+      }
+    };
+
+    // Pick up any failure count left over from a previous session (e.g.
+    // the app was closed right after a failed attempt) so the banner still
+    // shows up if it's still relevant.
+    setBackupFailCount(Number(localStorage.getItem(backupFailKey(user.uid)) || 0));
+
+    runIfDue();
+    window.addEventListener("online", runIfDue);
+    const interval = setInterval(runIfDue, 60 * 60 * 1000); // re-check hourly
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("online", runIfDue);
+      clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, state.loading, backupRetryTick]);
+
   // ── Mutations ─────────────────────────────────────────────────────────
   // IMPORTANT: none of these `await` the Firestore write before updating
   // local state. Firestore's write promises (from setDoc/updateDoc/
@@ -427,6 +513,7 @@ export const DataProvider = ({ children }) => {
     ...state,
     pendingWrites, lastSyncedAt, firstPendingWriteAt,
     loadError, retryLoad,
+    backupFailCount, retryBackupNow,
     addEquipment, updateEquipment, deleteEquipment,
     addJob, updateJob, deleteJob,
     addDriver, updateDriver, deleteDriver,
