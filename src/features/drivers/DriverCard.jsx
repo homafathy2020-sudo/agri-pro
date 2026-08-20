@@ -6,7 +6,7 @@ import Button from "../../components/ui/Button";
 import {
   EditIcon, TrashIcon, PhoneIcon, AlertIcon, TractorIcon, CheckCircleIcon, ClearIcon,
 } from "../../components/ui/Icons";
-import { formatCurrency, formatNumber, getInitial } from "../../utils/formatters";
+import { formatNumber, getInitial } from "../../utils/formatters";
 import { DRIVER_STATUS } from "../../config/constants";
 
 const StatItem = ({ label, value, color = "text-gray-200" }) => (

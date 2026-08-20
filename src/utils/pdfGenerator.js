@@ -63,7 +63,7 @@ const printWindow = (htmlContent, title) => {
         window.onload = () => {
           setTimeout(() => { window.print(); }, 600);
         };
-      </scr` + `ipt>
+      </script>
     </body>
     </html>
   `);
@@ -156,7 +156,6 @@ export const downloadReportPdf = async (htmlContent, filename) => {
 const buildClientInvoiceHtml = ({ job, equipmentName, driverName, fuelPrice, payments = [], maintenance = [] }) => {
   const revenue   = (job.acres || 0) * (job.pricePerAcre || 0);
   const fuelCost  = (job.fuelUsed || 0) * fuelPrice;
-  const profit    = revenue - fuelCost;
   // مصدر واحد للمدفوع: مجموع سجلات payments، أو job.amountPaid كـ fallback
   // للعمليات القديمة اللي اتسجلت قبل نظام الدفعات — مش الاتنين مع بعض.
   const totalPaid = getJobPaidAmount(job, payments);

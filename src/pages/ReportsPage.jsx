@@ -9,7 +9,7 @@ import { useEquipment }    from "../hooks/useEquipment";
 import { useDrivers }      from "../hooks/useDrivers";
 import EquipmentReportCard from "../features/reports/EquipmentReportCard";
 import DriverReportCard    from "../features/reports/DriverReportCard";
-import { Card, CardHeader, CardBody, EmptyState } from "../components/ui/Card";
+import { EmptyState } from "../components/ui/Card";
 import { ChartCard } from "../components/ui/ChartCard";
 import LoadingScreen       from "../components/ui/LoadingScreen";
 import { TractorIcon, DriverIcon, ChartIcon, RevenueIcon, AcreIcon, FuelIcon } from "../components/ui/Icons";

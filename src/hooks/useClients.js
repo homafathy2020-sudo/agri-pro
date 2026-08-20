@@ -4,7 +4,7 @@ import { useData } from "../contexts/DataContext";
 import { calcRevenue, calcRemainingAmount, derivePaymentStatus, getJobPaidAmount } from "../utils/calculations";
 
 export const useClients = () => {
-  const { jobs, payments, settings, loading } = useData();
+  const { jobs, payments, loading } = useData();
 
   const clients = useMemo(() => {
     const map = {};

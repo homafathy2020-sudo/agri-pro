@@ -3,20 +3,18 @@ import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useClients }    from "../hooks/useClients";
 import { useData }       from "../contexts/DataContext";
-import { useJobs }       from "../hooks/useJobs";
 import PaymentBadge      from "../features/clients/PaymentBadge";
 import { Card, CardHeader, CardBody, SummaryRow, EmptyState, ProgressBar } from "../components/ui/Card";
-import Button            from "../components/ui/Button";
 import LoadingScreen     from "../components/ui/LoadingScreen";
 import { formatCurrency, formatNumber, formatDateShort } from "../utils/formatters";
-import { DriverIcon, AcreIcon, FuelIcon, CalendarIcon, TractorIcon } from "../components/ui/Icons";
+import { AcreIcon, CalendarIcon, TractorIcon } from "../components/ui/Icons";
 
 const ClientDetailPage = () => {
   const { clientName }  = useParams();
   const navigate        = useNavigate();
   const decodedName     = decodeURIComponent(clientName);
   const { getClientSummary, loading } = useClients();
-  const { settings, equipment }       = useData();
+  const { equipment }       = useData();
 
   if (loading) return <LoadingScreen />;
 

@@ -3,7 +3,7 @@ import React from "react";
 import { useNavigate }       from "react-router-dom";
 import { useNotifications }  from "../hooks/useNotifications";
 import LoadingScreen         from "../components/ui/LoadingScreen";
-import { Card, EmptyState }  from "../components/ui/Card";
+import { Card }  from "../components/ui/Card";
 import Button                from "../components/ui/Button";
 import { AlertIcon, WrenchIcon, DriverIcon, WalletIcon } from "../components/ui/Icons";
 

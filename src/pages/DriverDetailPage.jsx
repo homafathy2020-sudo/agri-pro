@@ -10,7 +10,7 @@ import Modal               from "../components/ui/Modal";
 import ConfirmDialog       from "../components/ui/ConfirmDialog";
 import Button              from "../components/ui/Button";
 import DownloadReportButton from "../components/ui/DownloadReportButton";
-import { Card, CardHeader, CardBody, SummaryRow, StatCard, EmptyState, Badge } from "../components/ui/Card";
+import { Card, CardHeader, CardBody, StatCard, Badge } from "../components/ui/Card";
 import LoadingScreen       from "../components/ui/LoadingScreen";
 import {
   PlusIcon, TrashIcon, CalendarIcon,
@@ -62,7 +62,6 @@ const DriverDetailPage = () => {
   const MONTH_OPTIONS = useMemo(() => buildMonthOptions(), []);
   const [selectedMonth, setSelectedMonth] = useState(MONTH_OPTIONS[0].value);
   const [modal, setModal] = useState(null);
-  const [tab,   setTab]   = useState("salary"); // "salary" | "attendance"
 
   const driver = report.find((d) => d.id === driverId);
 

@@ -11,7 +11,7 @@ import DownloadReportButton from "../components/ui/DownloadReportButton";
 import { Card, StatCard, EmptyState, SummaryRow } from "../components/ui/Card";
 import LoadingScreen   from "../components/ui/LoadingScreen";
 import {
-  PlusIcon, WalletIcon, ArrowUpCircleIcon, ArrowDownCircleIcon,
+  WalletIcon, ArrowUpCircleIcon, ArrowDownCircleIcon,
   TrashIcon, EditIcon, CalendarIcon, AlertIcon, TractorIcon, DriverIcon, PrintIcon,
 } from "../components/ui/Icons";
 import { formatCurrency, formatDateShort, todayISO } from "../utils/formatters";

@@ -1,5 +1,5 @@
 // src/features/salary/SalaryEntryForm.jsx
-import React, { useState } from "react";
+import React from "react";
 import { useForm, Controller } from "react-hook-form";
 import { Input, Select, NumberInput } from "../../components/ui/Input";
 import Button from "../../components/ui/Button";

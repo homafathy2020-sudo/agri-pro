@@ -12,7 +12,7 @@ import LoadingScreen          from "../components/ui/LoadingScreen";
 import { formatCurrency, formatNumber, formatDateShort, formatPercent } from "../utils/formatters";
 import { getLastOilChange, getLastGreaseDate } from "../utils/serviceHistory";
 import {
-  TractorIcon, FuelIcon, AcreIcon, WrenchIcon, RevenueIcon, ProfitIcon, CalendarIcon, DriverIcon,
+  TractorIcon, FuelIcon, AcreIcon, RevenueIcon, ProfitIcon, CalendarIcon,
   EQUIP_TYPE_ICON_MAP, LinkIcon, OilCanIcon,
 } from "../components/ui/Icons";
 import { printEquipmentReport, downloadEquipmentReportPdf } from "../utils/pdfGenerator";

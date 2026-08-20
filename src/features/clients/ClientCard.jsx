@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, ProgressBar } from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import { formatCurrency, formatNumber, getInitial } from "../../utils/formatters";
-import { RevenueIcon, AcreIcon, AlertIcon, PlusIcon } from "../../components/ui/Icons";
+import { PlusIcon } from "../../components/ui/Icons";
 
 const ClientCard = ({ client, onQuickPayment }) => {
   const navigate = useNavigate();

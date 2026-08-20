@@ -1,6 +1,6 @@
 // src/features/reports/EquipmentReportCard.jsx
 import React from "react";
-import { Card, Badge, SummaryRow, ProgressBar } from "../../components/ui/Card";
+import { Card, Badge, ProgressBar } from "../../components/ui/Card";
 import { formatCurrency, formatNumber } from "../../utils/formatters";
 import { EQUIP_TYPE_ICON_MAP, TractorIcon } from "../../components/ui/Icons";
 
