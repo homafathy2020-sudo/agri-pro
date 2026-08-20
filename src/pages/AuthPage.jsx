@@ -3,13 +3,14 @@ import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { TractorIcon } from "../components/ui/Icons";
+import { TractorIcon, EyeIcon, EyeOffIcon } from "../components/ui/Icons";
 import toast from "react-hot-toast";
 
 const AuthPage = () => {
   const { login, register: registerUser, resetPassword } = useAuth();
   const navigate = useNavigate();
   const [mode, setMode] = useState("login"); // "login" | "register" | "forgot"
+  const [showPassword, setShowPassword] = useState(false);
 
   const { register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm();
 
@@ -87,9 +88,17 @@ const AuthPage = () => {
               style={{ direction: "ltr", textAlign: "right" }}
               {...register("email", { required: true })} />
             {mode !== "forgot" && (
-              <input type="password" className={inputClass} placeholder="كلمة المرور"
-                style={{ direction: "ltr", textAlign: "right" }}
-                {...register("password", { required: true, minLength: 6 })} />
+              <div className="relative">
+                <input type={showPassword ? "text" : "password"} className={`${inputClass} pl-11`} placeholder="كلمة المرور"
+                  style={{ direction: "ltr", textAlign: "right" }}
+                  {...register("password", { required: true, minLength: 6 })} />
+                <button type="button" onClick={() => setShowPassword((s) => !s)}
+                  tabIndex={-1}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+                  aria-label={showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}>
+                  {showPassword ? <EyeOffIcon size={18} /> : <EyeIcon size={18} />}
+                </button>
+              </div>
             )}
             {errors.password?.type === "minLength" && (
               <p className="text-xs text-red-400">6 أحرف على الأقل</p>
@@ -135,6 +144,7 @@ const AuthPage = () => {
         </div>
 
         <p className="text-center text-xs text-gray-600 mt-6">زراعي برو v1.0</p>
+        <p className="text-center text-[11px] tracking-wide text-gray-600 mt-2">MADE BY: ADHAM FATHY</p>
       </div>
     </div>
   );
