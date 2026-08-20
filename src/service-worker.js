@@ -17,7 +17,7 @@ import { clientsClaim } from "workbox-core";
 import { ExpirationPlugin } from "workbox-expiration";
 import { precacheAndRoute, createHandlerBoundToURL } from "workbox-precaching";
 import { registerRoute } from "workbox-routing";
-import { StaleWhileRevalidate, CacheFirst, NetworkFirst } from "workbox-strategies";
+import { StaleWhileRevalidate, CacheFirst } from "workbox-strategies";
 
 clientsClaim();
 
@@ -58,17 +58,15 @@ registerRoute(
   })
 );
 
-// طلبات Firestore/Firebase: سيبها تروح للنت أولًا، ولو مفيش نت
-// خليها ترجع تفشل بهدوء — Firestore SDK نفسه عنده كاش IndexedDB
-// منفصل (persistentLocalCache) بيتكفل بالبيانات أوف لاين،
-// فمش محتاجين الـ service worker يتدخل في طلبات الشبكة دي.
-registerRoute(
-  ({ url }) =>
-    url.hostname.includes("firestore.googleapis.com") ||
-    url.hostname.includes("firebase") ||
-    url.hostname.includes("googleapis.com"),
-  new NetworkFirst({ cacheName: "firebase-network-first" })
-);
+// طلبات Firestore/Firebase: متتلمسش خالص. Firestore بيستخدم قناة
+// اتصال مستمرة (streaming/long-polling) للقراءة والكتابة والمزامنة
+// اللحظية، والـ service worker لو اعترض عليها (حتى بمحاولة تحسين
+// زي NetworkFirst) بيقدر يبوّظ القناة دي أو يأخر اعتراف السيرفر
+// بالكتابات المعلّقة بعد الرجوع أونلاين. Firestore SDK نفسه عنده
+// كاش IndexedDB منفصل (persistentLocalCache) بيتكفل بالبيانات أوف
+// لاين من غير أي تدخل من الـ service worker — فالحل الصح هو تسيبها
+// تعدي على طول من غير ما تتسجل كـ route هنا خالص (مفيش fetch handler
+// بيمسكها، يعني بتروح direct للنت زي ما لو الـ SW مكانش موجود).
 
 self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "SKIP_WAITING") {

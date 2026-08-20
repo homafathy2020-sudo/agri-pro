@@ -36,7 +36,6 @@ const initialState = {
 
 const reducer = (state, action) => {
   switch (action.type) {
-    case "SET_ALL":     return { ...state, ...action.payload, loading: false };
     case "SET_LOADING": return { ...state, loading: action.payload };
     case "SET_ERROR":   return { ...state, error: action.payload, loading: false };
 
@@ -73,11 +72,27 @@ const reducer = (state, action) => {
     case "DELETE_CUSTODY": return { ...state, custody: state.custody.filter(c => c.id !== action.payload) };
 
     case "UPDATE_SETTINGS": return { ...state, settings: { ...state.settings, ...action.payload } };
+    // Only overwrite the collections that actually loaded successfully this
+    // round. Anything that failed keeps its previous value in state instead
+    // of being wiped to an empty array — see loadFailed below for why this
+    // matters: a failed read must never look like "your data got deleted".
+    case "SET_LOADED": return { ...state, ...action.payload, loading: false };
     default: return state;
   }
 };
 
-const safeFetch = (promise) => promise.catch(() => []);
+// Wraps a Firestore read so a failure is reported instead of silently
+// swallowed. Previously this caught every error and returned `[]`, which
+// meant ANY read failure on app start (e.g. still offline right after
+// reopening, before the local cache/tab lock settles) rendered as a
+// completely empty dashboard — indistinguishable from "my data got
+// deleted" from the user's point of view, even though nothing was
+// actually lost. Now a failed collection is reported and simply left out
+// of the state update, instead of overwriting real/previous data with [].
+const safeFetch = (promise) => promise.then(
+  (data) => ({ ok: true, data }),
+  (err) => ({ ok: false, err })
+);
 const DataContext = createContext(null);
 
 export const DataProvider = ({ children }) => {
@@ -129,45 +144,69 @@ export const DataProvider = ({ children }) => {
     }
   }, [pendingWrites]);
 
+  // Set whenever the most recent load attempt had at least one collection
+  // fail to fetch (e.g. still offline and the local cache read didn't
+  // resolve). The UI (OfflineBanner) surfaces this explicitly so a failed
+  // load reads as "couldn't load yet, will retry" — never as silence that
+  // could be mistaken for "your data is gone".
+  const [loadError, setLoadError] = useState(false);
+  const [reloadTick, setReloadTick] = useState(0);
+  const retryLoad = useCallback(() => setReloadTick((t) => t + 1), []);
+
   useEffect(() => {
     if (!user) return;
+    let cancelled = false;
     (async () => {
       try {
         dispatch({ type: "SET_LOADING", payload: true });
         // Every collection is fetched independently (safeFetch) so that a
-        // single failed read — e.g. offline on a brand-new device with no
-        // local cache yet for that one collection — doesn't take down the
-        // whole dashboard. Each one just falls back to an empty list/default
-        // and the rest of the app still loads normally.
-        const [equipment, jobs, drivers, maintenance, settings] = await Promise.all([
+        // single failed read doesn't take down the whole dashboard — but
+        // unlike before, a failure is now tracked instead of silently
+        // becoming an empty list. A failed collection is simply left out
+        // of this load's payload, so the reducer keeps whatever was there
+        // before (on a cold start that's still empty — there's nothing to
+        // show yet either way — but it will no longer stomp on real data
+        // during a retry/reconnect load).
+        const results = await Promise.all([
           safeFetch(equipmentService.getAll(user.uid)),
           safeFetch(jobService.getAll(user.uid)),
           safeFetch(driverService.getAll(user.uid)),
           safeFetch(maintenanceService.getAll(user.uid)),
-          settingsService.get(user.uid).catch(() => ({ fuelPrice: DEFAULT_FUEL_PRICE })),
-        ]);
-        const [payments, driverCosts, salaryEntries, attendance, custody] = await Promise.all([
+          safeFetch(settingsService.get(user.uid)),
           safeFetch(paymentService.getAll(user.uid)),
           safeFetch(driverCostService.getAll(user.uid)),
           safeFetch(salaryService.getAll(user.uid)),
           safeFetch(attendanceService.getAll(user.uid)),
           safeFetch(custodyService.getAll(user.uid)),
         ]);
+        const [
+          equipmentR, jobsR, driversR, maintenanceR, settingsR,
+          paymentsR, driverCostsR, salaryEntriesR, attendanceR, custodyR,
+        ] = results;
+
+        if (cancelled) return;
+
+        const anyFailed = results.some((r) => !r.ok);
+        results.filter((r) => !r.ok).forEach((r) => console.warn("فشل تحميل مجموعة بيانات:", r.err));
+        setLoadError(anyFailed);
 
         // One-time merge: fold any leftover legacy driverCosts docs into
         // salaryEntries, then remove the legacy docs so this only runs once.
-        let mergedSalaryEntries = salaryEntries;
-        if (driverCosts.length > 0) {
+        // Only attempted when both collections actually loaded — merging
+        // against a failed (and therefore unknown) salaryEntries list could
+        // duplicate entries next time the real data loads.
+        let mergedSalaryEntries = salaryEntriesR.ok ? salaryEntriesR.data : undefined;
+        if (driverCostsR.ok && salaryEntriesR.ok && driverCostsR.data.length > 0) {
           try {
             const migrated = await Promise.all(
-              driverCosts.map(async (cost) => {
+              driverCostsR.data.map(async (cost) => {
                 const payload = driverCostToSalaryEntry(cost);
                 const id = await salaryService.add(user.uid, payload);
                 await driverCostService.remove(cost.id);
                 return { id, ...payload };
               })
             );
-            mergedSalaryEntries = [...migrated, ...salaryEntries];
+            mergedSalaryEntries = [...migrated, ...salaryEntriesR.data];
             toast.success(`تم دمج ${migrated.length} من تكاليف السائقين القديمة داخل نظام الرواتب`);
           } catch (migrateErr) {
             // Non-fatal — leave legacy docs in place, try again next load.
@@ -175,13 +214,40 @@ export const DataProvider = ({ children }) => {
           }
         }
 
-        dispatch({ type: "SET_ALL", payload: { equipment, jobs, drivers, maintenance, settings, payments, salaryEntries: mergedSalaryEntries, attendance, custody } });
+        const payload = {};
+        if (equipmentR.ok)    payload.equipment    = equipmentR.data;
+        if (jobsR.ok)         payload.jobs         = jobsR.data;
+        if (driversR.ok)      payload.drivers      = driversR.data;
+        if (maintenanceR.ok)  payload.maintenance  = maintenanceR.data;
+        if (settingsR.ok)     payload.settings     = settingsR.data;
+        if (paymentsR.ok)     payload.payments     = paymentsR.data;
+        if (mergedSalaryEntries !== undefined) payload.salaryEntries = mergedSalaryEntries;
+        if (attendanceR.ok)   payload.attendance   = attendanceR.data;
+        if (custodyR.ok)      payload.custody      = custodyR.data;
+
+        dispatch({ type: "SET_LOADED", payload });
+
+        if (anyFailed) {
+          toast.error("تعذر تحميل بعض البيانات — هيتم إعادة المحاولة تلقائيًا لما النت يرجع");
+        }
       } catch (err) {
+        if (cancelled) return;
         dispatch({ type: "SET_ERROR", payload: err.message });
         toast.error("خطأ في تحميل البيانات");
       }
     })();
-  }, [user]);
+    return () => { cancelled = true; };
+  }, [user, reloadTick]);
+
+  // Auto-retry a failed load the moment the browser reports it's back
+  // online, so a load that failed while offline recovers on its own
+  // without the person needing to manually refresh.
+  useEffect(() => {
+    if (!loadError) return;
+    const handleOnline = () => retryLoad();
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
+  }, [loadError, retryLoad]);
 
   // ── Mutations ─────────────────────────────────────────────────────────
   // IMPORTANT: none of these `await` the Firestore write before updating
@@ -360,6 +426,7 @@ export const DataProvider = ({ children }) => {
   const value = {
     ...state,
     pendingWrites, lastSyncedAt, firstPendingWriteAt,
+    loadError, retryLoad,
     addEquipment, updateEquipment, deleteEquipment,
     addJob, updateJob, deleteJob,
     addDriver, updateDriver, deleteDriver,

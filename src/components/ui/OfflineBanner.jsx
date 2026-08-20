@@ -64,7 +64,7 @@ const useAutoResetMinimize = (active) => {
 const OfflineBanner = () => {
   const { isOnline, canInstall, installPrompt } = usePWA();
   const {
-    pendingWrites, lastSyncedAt, firstPendingWriteAt,
+    pendingWrites, lastSyncedAt, firstPendingWriteAt, loadError, retryLoad,
     equipment, jobs, drivers, maintenance, payments, salaryEntries, attendance, settings,
   } = useData();
 
@@ -107,6 +107,7 @@ const OfflineBanner = () => {
 
   // Each row's minimize state resets automatically the next time that row's
   // condition newly becomes true.
+  const [loadErrorMin, setLoadErrorMin]     = useAutoResetMinimize(loadError);
   const [offlineMin, setOfflineMin]         = useAutoResetMinimize(!isOnline);
   const [syncingMin, setSyncingMin]         = useAutoResetMinimize(showSyncing);
   const [syncedMin, setSyncedMin]           = useAutoResetMinimize(showSyncedFlash);
@@ -114,6 +115,7 @@ const OfflineBanner = () => {
   const [installMin, setInstallMin]         = useAutoResetMinimize(canInstall && isOnline);
 
   const showAnything =
+    (loadError && !loadErrorMin) ||
     (!isOnline && !offlineMin) ||
     (canInstall && !installMin) ||
     (showSyncing && !syncingMin) ||
@@ -123,6 +125,24 @@ const OfflineBanner = () => {
 
   return (
     <div className="fixed top-0 inset-x-0 z-50 flex flex-col gap-0" dir="rtl">
+      {/* Failed to load data on this open — explicit, not silent. A read
+          failure (usually still-offline right after reopening) must never
+          look like the data itself was deleted. */}
+      {loadError && !loadErrorMin && (
+        <div className="flex items-center justify-between gap-3 bg-orange-600 text-white text-xs font-bold py-2 px-4 flex-wrap">
+          <span>تعذر تحميل بعض بياناتك دلوقتي — البيانات لسه محفوظة، مش متمسوحة، وهتظهر تاني أول ما الاتصال يرجع</span>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={retryLoad}
+              className="bg-white text-orange-700 rounded-lg px-3 py-1 text-xs font-bold hover:bg-gray-100"
+            >
+              إعادة المحاولة
+            </button>
+            <MinimizeButton onClick={() => setLoadErrorMin(true)} />
+          </div>
+        </div>
+      )}
+
       {/* Long-pending urgent warning takes priority over the ordinary offline banner */}
       {isLongPending && !longPendingMin && (
         <div className="flex items-center justify-between gap-3 bg-red-700 text-white text-xs font-bold py-2 px-4 flex-wrap">
