@@ -112,6 +112,7 @@ const AdminPage = () => {
                 <th className="text-right font-semibold px-4 py-3">الاسم</th>
                 <th className="text-right font-semibold px-4 py-3">الإيميل</th>
                 <th className="text-right font-semibold px-4 py-3">حالة النشاط</th>
+                <th className="text-right font-semibold px-4 py-3">آخر دخول</th>
                 <th className="text-right font-semibold px-4 py-3">تاريخ التسجيل</th>
               </tr>
             </thead>
@@ -130,6 +131,9 @@ const AdminPage = () => {
                     ) : (
                       <Badge variant="gray">غير نشط</Badge>
                     )}
+                  </td>
+                  <td className="px-4 py-3 text-gray-400 whitespace-nowrap">
+                    {formatDateTime(u.lastActiveAt)}
                   </td>
                   <td className="px-4 py-3 text-gray-400 whitespace-nowrap">
                     {formatDateTime(u.createdAt)}
