@@ -5,7 +5,7 @@
 // الحسابات — البيانات التشغيلية الفعلية (معدات/شغل/سائقين) فاضلة
 // في مجموعاتها القديمة زي ما هي، معزولة بنفس الـ userId.
 // ─────────────────────────────────────────────────────────
-import { doc, setDoc, collection, getCountFromServer } from "firebase/firestore";
+import { doc, setDoc, collection, getDocs, getCountFromServer } from "firebase/firestore";
 import { db } from "../config/firebase";
 import { COLLECTIONS } from "../config/constants";
 
@@ -27,5 +27,15 @@ export const userProfileService = {
   getCount: async () => {
     const snap = await getCountFromServer(collection(db, COLLECTIONS.USERS));
     return snap.data().count;
+  },
+
+  /**
+   * أدمن بس (نفس قاعدة isAdmin() في firestore.rules، allow list). بترجع
+   * تفاصيل كل الحسابات (اسم/إيميل/تاريخ تسجيل/آخر نشاط) عشان شاشة
+   * الأدمن. أي حساب مش أدمن هياخد permission-denied بدل البيانات.
+   */
+  getAll: async () => {
+    const snap = await getDocs(collection(db, COLLECTIONS.USERS));
+    return snap.docs.map((d) => ({ uid: d.id, ...d.data() }));
   },
 };
