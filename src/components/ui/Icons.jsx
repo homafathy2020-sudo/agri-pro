@@ -316,3 +316,12 @@ export const RestoreIcon = (p) => <Icon {...p} d={[
   "M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8",
   "M3 3v5h5",
 ]} />;
+
+export const ShieldIcon = (p) => <Icon {...p} d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" />;
+
+export const UsersGroupIcon = (p) => <Icon {...p} d={[
+  "M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2",
+  "M9 11a4 4 0 100-8 4 4 0 000 8z",
+  "M22 21v-2a4 4 0 00-3-3.87",
+  "M16 3.13a4 4 0 010 7.75",
+]} />;

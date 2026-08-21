@@ -6,6 +6,7 @@ import { Toaster } from "react-hot-toast";
 import { AuthProvider }       from "./contexts/AuthContext";
 import { PrivacyProvider }    from "./contexts/PrivacyContext";
 import ProtectedRoute         from "./components/layout/ProtectedRoute";
+import AdminRoute             from "./components/layout/AdminRoute";
 import AppLayout              from "./components/layout/AppLayout";
 
 import AuthPage               from "./pages/AuthPage";
@@ -21,6 +22,7 @@ import ReportsPage            from "./pages/ReportsPage";
 import ClientsPage            from "./pages/ClientsPage";
 import ClientDetailPage       from "./pages/ClientDetailPage";
 import NotificationsPage      from "./pages/NotificationsPage";
+import AdminPage              from "./pages/AdminPage";
 
 const App = () => (
   <BrowserRouter>
@@ -42,6 +44,7 @@ const App = () => (
           <Route path="clients"                 element={<ClientsPage />} />
           <Route path="clients/:clientName"     element={<ClientDetailPage />} />
           <Route path="notifications"           element={<NotificationsPage />} />
+          <Route path="admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

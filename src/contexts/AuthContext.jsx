@@ -8,9 +8,32 @@ import {
   updateProfile,
   sendPasswordResetEmail,
 } from "firebase/auth";
+import { serverTimestamp } from "firebase/firestore";
 import { auth } from "../config/firebase";
+import { userProfileService } from "../services/userProfileService";
 
 const AuthContext = createContext(null);
+
+// أقل مسافة زمنية بين كتابتين لـ lastActiveAt لنفس المستخدم. من غيرها
+// كل فتح تاب/تحديث صفحة كان هيبعت كتابة لـ Firestore (الجلسة محفوظة
+// أصلاً وبتفضل مسجلة دخول لأسابيع). 6 ساعات كفاية توضح "آخر نشاط"
+// بدقة معقولة للأدمن من غير ما تستهلك من الكوتة اليومية على الفاضي.
+const LAST_ACTIVE_THROTTLE_MS = 6 * 60 * 60 * 1000;
+
+const touchLastActive = (firebaseUser) => {
+  const key  = `lastActiveWriteAt:${firebaseUser.uid}`;
+  const last = Number(localStorage.getItem(key) || 0);
+  if (Date.now() - last < LAST_ACTIVE_THROTTLE_MS) return;
+  localStorage.setItem(key, String(Date.now()));
+  // best-effort — لو الكتابة فشلت (مثلاً أوف لاين)، مش هنمنع المستخدم
+  // من استخدام التطبيق عشانها، وهي هتتحاول تاني بعد الـ throttle.
+  userProfileService.touch(firebaseUser.uid, {
+    uid: firebaseUser.uid,
+    email: firebaseUser.email,
+    displayName: firebaseUser.displayName,
+    lastActiveAt: serverTimestamp(),
+  }).catch(() => {});
+};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser]       = useState(null);
@@ -20,6 +43,7 @@ export const AuthProvider = ({ children }) => {
     const unsub = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       setLoading(false);
+      if (firebaseUser) touchLastActive(firebaseUser);
     });
     return unsub;
   }, []);
@@ -30,6 +54,15 @@ export const AuthProvider = ({ children }) => {
   const register = async (email, password, displayName) => {
     const cred = await createUserWithEmailAndPassword(auth, email, password);
     await updateProfile(cred.user, { displayName });
+    // بروفايل الأدمن — createdAt بيتبعت هنا بس، مرة واحدة طول عمر الحساب.
+    // ما بيتوقفش التسجيل لو فشل (مثلاً أوف لاين وقت التسجيل).
+    userProfileService.touch(cred.user.uid, {
+      uid: cred.user.uid,
+      email,
+      displayName,
+      createdAt: serverTimestamp(),
+      lastActiveAt: serverTimestamp(),
+    }).catch(() => {});
     return cred;
   };
 
