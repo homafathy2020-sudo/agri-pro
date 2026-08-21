@@ -12,7 +12,7 @@ service cloud.firestore {
     // مجرد إخفاء زرار في الواجهة، ده الحماية الحقيقية.
     function isAdmin() {
       return isSignedIn() && request.auth.uid in [
-       VOS2uWwCxJUsmTgT4aSBqvoxPwa2
+       "VOS2uWwCxJUsmTgT4aSBqvoxPwa2"
       ];
     }
 

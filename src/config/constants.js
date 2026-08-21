@@ -11,7 +11,7 @@
 //   3. حط القيمة دي هنا، وفي نفس القيمة بالظبط جوه isAdmin() في firestore.rules.
 //   4. انشر الـ rules تاني (firebase deploy --only firestore:rules).
 export const ADMIN_UIDS = [
-  VOS2uWwCxJUsmTgT4aSBqvoxPwa2,
+  "VOS2uWwCxJUsmTgT4aSBqvoxPwa2",
 ];
 
 // ─── Firestore Collections ────────────────────────────────────────────────────
