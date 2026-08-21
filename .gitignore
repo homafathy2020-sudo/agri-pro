@@ -67,3 +67,7 @@ node_modules/
 
 # dataconnect generated files
 .dataconnect
+-e 
+# Firebase Admin SDK service account key (never commit this)
+serviceAccountKey.json
+scripts/*.json

@@ -5,7 +5,7 @@
 // الحسابات — البيانات التشغيلية الفعلية (معدات/شغل/سائقين) فاضلة
 // في مجموعاتها القديمة زي ما هي، معزولة بنفس الـ userId.
 // ─────────────────────────────────────────────────────────
-import { doc, setDoc, getDocs, collection, query, orderBy } from "firebase/firestore";
+import { doc, setDoc, collection, getCountFromServer } from "firebase/firestore";
 import { db } from "../config/firebase";
 import { COLLECTIONS } from "../config/constants";
 
@@ -20,12 +20,12 @@ export const userProfileService = {
 
   /**
    * أدمن بس: قاعدة isAdmin() في firestore.rules هي اللي فعلياً بتمنع
-   * أي حد تاني يقرا القائمة دي — استدعاء الدالة دي من حساب مش أدمن
-   * هيرجع permission-denied مش بيانات وهمية.
+   * أي حد تاني يقرا العدد ده — استدعاء الدالة دي من حساب مش أدمن هيرجع
+   * permission-denied. بتستخدم getCountFromServer عشان تجيب رقم العدد
+   * بس من غير ما تنزّل بيانات أي مستخدم (اسم/إيميل/نشاط) للمتصفح خالص.
    */
-  getAll: async () => {
-    const q = query(collection(db, COLLECTIONS.USERS), orderBy("createdAt", "desc"));
-    const snap = await getDocs(q);
-    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  getCount: async () => {
+    const snap = await getCountFromServer(collection(db, COLLECTIONS.USERS));
+    return snap.data().count;
   },
 };

@@ -3,12 +3,13 @@ import { useState, useEffect, useCallback } from "react";
 import { userProfileService } from "../services/userProfileService";
 
 /**
- * قائمة كل حسابات المستخدمين (الشركات) — أدمن بس، الحماية الفعلية في
+ * عدد إجمالي لحسابات المستخدمين (الشركات) — أدمن بس، الحماية الفعلية في
  * firestore.rules (isAdmin). أي حساب تاني بيستدعي الهوك ده هياخد خطأ
- * permission-denied بدل بيانات.
+ * permission-denied بدل رقم. عمداً مفيش تفاصيل حسابات هنا (لا اسم ولا
+ * إيميل)، الرقم بس.
  */
 export const useAdminUsers = () => {
-  const [users, setUsers]     = useState([]);
+  const [count, setCount]     = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
 
@@ -16,8 +17,8 @@ export const useAdminUsers = () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await userProfileService.getAll();
-      setUsers(data);
+      const c = await userProfileService.getCount();
+      setCount(c);
     } catch (err) {
       setError(err);
     } finally {
@@ -27,5 +28,5 @@ export const useAdminUsers = () => {
 
   useEffect(() => { load(); }, [load]);
 
-  return { users, loading, error, reload: load };
+  return { count, loading, error, reload: load };
 };
