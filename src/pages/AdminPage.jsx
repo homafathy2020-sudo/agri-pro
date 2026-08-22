@@ -7,8 +7,28 @@ import { Input } from "../components/ui/Input";
 import LoadingScreen from "../components/ui/LoadingScreen";
 import { formatDateTime } from "../utils/formatters";
 import {
-  ShieldIcon, UsersGroupIcon, RestoreIcon, ClearIcon,
+  ShieldIcon, UsersGroupIcon, RestoreIcon, ClearIcon, ExternalLinkIcon,
 } from "../components/ui/Icons";
+
+// مشروع Firebase بتاع التطبيق — من .firebaserc. بيستخدم في بناء روابط
+// مباشرة لصفحات الاستخدام في الـ Console (أرقام حقيقية 100%، مش تقريبية).
+// لو غيّرت مشروع Firebase يوماً ما، عدّل القيمة دي.
+const FIREBASE_PROJECT_ID = "agri-pro-2b607";
+
+const USAGE_LINKS = [
+  {
+    label: "استهلاك Firestore (قراءة/كتابة/حذف يومي)",
+    url: `https://console.firebase.google.com/project/${FIREBASE_PROJECT_ID}/firestore/usage`,
+  },
+  {
+    label: "عدد المستخدمين المسجلين (Authentication)",
+    url: `https://console.firebase.google.com/project/${FIREBASE_PROJECT_ID}/authentication/users`,
+  },
+  {
+    label: "الفاتورة والخطة الحالية (Usage & Billing)",
+    url: `https://console.firebase.google.com/project/${FIREBASE_PROJECT_ID}/usage`,
+  },
+];
 
 const SearchIcon = (p) => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" {...p}>
@@ -74,7 +94,26 @@ const AdminPage = () => {
             <p className="text-xs text-gray-500 mt-1">إجمالي الحسابات</p>
           </div>
         </Card>
+      </div>
 
+      {/* أرقام الاستهلاك الحقيقية (قراءة/كتابة/تخزين) مش متاحة من غير
+          Backend — Firebase مش بيديها لتطبيقات الفرونت اند مباشرة. أسرع
+          وأدق طريقة هي Firebase Console نفسه، فالكارت ده بس بيوديك له
+          بضغطة واحدة بدل ما تدور. */}
+      <Card className="p-4 mb-5">
+        <p className="text-xs font-bold text-gray-500 mb-3">استهلاك Firebase (أرقام حقيقية من الـ Console)</p>
+        <div className="flex flex-col gap-2">
+          {USAGE_LINKS.map((link) => (
+            <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer"
+              className="flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl bg-surface-2 hover:bg-surface-3 border border-white/8 transition-colors group">
+              <span className="text-sm text-gray-300 group-hover:text-gray-100">{link.label}</span>
+              <ExternalLinkIcon size={15} className="text-gray-500 group-hover:text-brand-400 flex-shrink-0" />
+            </a>
+          ))}
+        </div>
+      </Card>
+
+      <div className="mb-5 flex items-center gap-4 flex-wrap">
         <div className="flex-1 min-w-[220px] relative">
           <span className="absolute inset-y-0 right-3.5 flex items-center text-gray-500 pointer-events-none">
             <SearchIcon />
