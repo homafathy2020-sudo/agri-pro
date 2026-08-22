@@ -7,6 +7,23 @@ import { getJobPaidAmount } from "./calculations";
 import { sortOilHistory, sortGreaseHistory } from "./serviceHistory";
 import { EQUIPMENT_CATEGORY } from "../config/constants";
 
+// ── HTML escaping ──────────────────────────────────────────────────────────────
+// كل نص جاي من المستخدم (اسم عميل، ملاحظات، اسم سائق...) بيتحط جوه الـ HTML
+// كـ template string، والـ HTML ده بيتنفذ فعلياً في نافذة الطباعة
+// (document.write) وفي التحميل (innerHTML). من غير escaping، نص زي
+// "<img src=x onerror=...>" في حقل ملاحظات كان هيتنفذ كـ سكريبت وقت
+// الطباعة/التحميل (Stored XSS). الدالة دي بتحول أي رمز خطير لـ HTML entity
+// مكافئ بحيث يتعرض كنص عادي بس، من غير ما تغيّر أي حاجة تانية في الشكل.
+const escapeHtml = (value) => {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+};
+
 // ── Shared styles ─────────────────────────────────────────────────────────────
 const BASE_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
@@ -54,7 +71,7 @@ const printWindow = (htmlContent, title) => {
     <html lang="ar" dir="rtl">
     <head>
       <meta charset="UTF-8"/>
-      <title>${title}</title>
+      <title>${escapeHtml(title)}</title>
       <style>${BASE_CSS}</style>
     </head>
     <body>
@@ -172,7 +189,7 @@ const buildClientInvoiceHtml = ({ job, equipmentName, driverName, fuelPrice, pay
   const paymentsRows = payments.map((p) => `
     <tr>
       <td>${formatDateTime(p.createdAt || p.date)}</td>
-      <td>${p.notes || "—"}</td>
+      <td>${escapeHtml(p.notes) || "—"}</td>
       <td>${formatCurrency(p.amount)}</td>
     </tr>
   `).join("");
@@ -180,8 +197,8 @@ const buildClientInvoiceHtml = ({ job, equipmentName, driverName, fuelPrice, pay
   const maintRows = maintenance.map((m) => `
     <tr>
       <td>${formatDateTime(m.createdAt || m.date)}</td>
-      <td>${m.type || "—"}</td>
-      <td>${m.notes || "—"}</td>
+      <td>${escapeHtml(m.type) || "—"}</td>
+      <td>${escapeHtml(m.notes) || "—"}</td>
       <td>${formatCurrency(m.cost)}</td>
     </tr>
   `).join("");
@@ -202,11 +219,11 @@ const buildClientInvoiceHtml = ({ job, equipmentName, driverName, fuelPrice, pay
 
       <div class="grid-2">
         <div class="stat-box">
-          <div class="stat-val">${job.client || "—"}</div>
+          <div class="stat-val">${escapeHtml(job.client) || "—"}</div>
           <div class="stat-lbl">اسم العميل / الأرض</div>
         </div>
         <div class="stat-box">
-          <div class="stat-val">${job.workType || "—"}</div>
+          <div class="stat-val">${escapeHtml(job.workType) || "—"}</div>
           <div class="stat-lbl">نوع العمل</div>
         </div>
         <div class="stat-box">
@@ -223,8 +240,8 @@ const buildClientInvoiceHtml = ({ job, equipmentName, driverName, fuelPrice, pay
       <div class="section">
         <h2>تفاصيل التشغيل</h2>
         <table>
-          <tr><td style="font-weight:600">المعدة المستخدمة</td><td>${equipmentName || "—"}</td></tr>
-          <tr><td style="font-weight:600">السائق</td><td>${driverName || "—"}</td></tr>
+          <tr><td style="font-weight:600">المعدة المستخدمة</td><td>${escapeHtml(equipmentName) || "—"}</td></tr>
+          <tr><td style="font-weight:600">السائق</td><td>${escapeHtml(driverName) || "—"}</td></tr>
           <tr><td style="font-weight:600">الوقود المستخدم</td><td>${formatNumber(job.fuelUsed)} لتر</td></tr>
           <tr><td style="font-weight:600">تكلفة الوقود</td><td style="color:#991b1b">${formatCurrency(fuelCost)}</td></tr>
           ${maintenance.length ? `<tr><td style="font-weight:600">تكلفة الصيانة (المعدة)</td><td style="color:#991b1b">${formatCurrency(maintCost)}</td></tr>` : ""}
@@ -263,7 +280,7 @@ const buildClientInvoiceHtml = ({ job, equipmentName, driverName, fuelPrice, pay
     </div>
   `;
 
-  return { html, title: `فاتورة - ${job.client}`, filename: `فاتورة-${job.client}` };
+  return { html, title: `فاتورة - ${job.client}`, filename: `فاتورة-${(job.client || "").replace(/[<>:"/\\|?*]/g, "")}` };
 };
 
 export const printClientInvoice = (args) => {
@@ -289,8 +306,8 @@ const buildEquipmentReportHtml = ({ equipment, jobs, maintenance, fuelPrice, dri
   const jobRows = jobs.map((j) => `
     <tr>
       <td>${formatDate(j.date)}</td>
-      <td>${j.client || "—"}</td>
-      <td>${j.workType || "—"}</td>
+      <td>${escapeHtml(j.client) || "—"}</td>
+      <td>${escapeHtml(j.workType) || "—"}</td>
       <td>${formatNumber(j.acres)}</td>
       <td>${formatCurrency(j.acres * j.pricePerAcre)}</td>
     </tr>
@@ -299,8 +316,8 @@ const buildEquipmentReportHtml = ({ equipment, jobs, maintenance, fuelPrice, dri
   const maintRows = maintenance.map((m) => `
     <tr>
       <td>${formatDate(m.date)}</td>
-      <td>${m.type}</td>
-      <td>${m.notes || "—"}</td>
+      <td>${escapeHtml(m.type)}</td>
+      <td>${escapeHtml(m.notes) || "—"}</td>
       <td>${formatCurrency(m.cost)}</td>
     </tr>
   `).join("");
@@ -331,12 +348,12 @@ const buildEquipmentReportHtml = ({ equipment, jobs, maintenance, fuelPrice, dri
       <div class="header">
         <div>
           <h1>تقرير معدة</h1>
-          <p class="brand">زراعي برو · ${equipment.name}</p>
+          <p class="brand">زراعي برو · ${escapeHtml(equipment.name)}</p>
         </div>
         <div class="meta">
           <p>تاريخ الطباعة: ${today}</p>
-          <p>النوع: ${equipment.type}</p>
-          ${driverName ? `<p>السائق: ${driverName}</p>` : ""}
+          <p>النوع: ${escapeHtml(equipment.type)}</p>
+          ${driverName ? `<p>السائق: ${escapeHtml(driverName)}</p>` : ""}
         </div>
       </div>
 
@@ -393,11 +410,11 @@ const buildEquipmentReportHtml = ({ equipment, jobs, maintenance, fuelPrice, dri
         </table>
       </div>` : ""}
 
-      <div class="footer">زراعي برو · تقرير معدة: ${equipment.name} · ${today}</div>
+      <div class="footer">زراعي برو · تقرير معدة: ${escapeHtml(equipment.name)} · ${today}</div>
     </div>
   `;
 
-  return { html, title: `تقرير - ${equipment.name}`, filename: `تقرير-معدة-${equipment.name}` };
+  return { html, title: `تقرير - ${equipment.name}`, filename: `تقرير-معدة-${(equipment.name || "").replace(/[<>:"/\\|?*]/g, "")}` };
 };
 
 export const printEquipmentReport = (args) => {
@@ -430,7 +447,7 @@ export const printMonthlySummary = ({ jobs, equipment, maintenance, drivers, fue
     const eqJobs   = monthJobs.filter((j) => j.equipmentId === id);
     const revenue  = eqJobs.reduce((s, j) => s + (j.acres * j.pricePerAcre), 0);
     const acres    = eqJobs.reduce((s, j) => s + j.acres, 0);
-    return `<tr><td>${eq?.name || "—"}</td><td>${eqJobs.length}</td><td>${formatNumber(acres)}</td><td>${formatCurrency(revenue)}</td></tr>`;
+    return `<tr><td>${escapeHtml(eq?.name) || "—"}</td><td>${eqJobs.length}</td><td>${formatNumber(acres)}</td><td>${formatCurrency(revenue)}</td></tr>`;
   }).join("");
 
   const html = `
@@ -494,8 +511,8 @@ const buildDriverPayslipHtml = ({ driver, month, summary, entries, attendance })
     };
     return `<tr>
       <td>${formatDate(e.date)}</td>
-      <td>${typeLabels[e.type] || e.type}</td>
-      <td>${e.reason || e.notes || "—"}</td>
+      <td>${typeLabels[e.type] || escapeHtml(e.type)}</td>
+      <td>${escapeHtml(e.reason || e.notes) || "—"}</td>
       <td style="color:${isDeduct?"#991b1b":"#15803d"};font-weight:700">
         ${isDeduct ? "-" : "+"} ${formatCurrency(e.amount)}
       </td>
@@ -507,8 +524,8 @@ const buildDriverPayslipHtml = ({ driver, month, summary, entries, attendance })
     const colors  = { present:"#15803d", absent:"#991b1b", late:"#92400e", half:"#1d4ed8" };
     return `<tr>
       <td>${formatDate(r.date)}</td>
-      <td style="color:${colors[r.status]||"#1a1a2e"};font-weight:700">${labels[r.status]||r.status}</td>
-      <td>${r.notes||"—"}</td>
+      <td style="color:${colors[r.status]||"#1a1a2e"};font-weight:700">${labels[r.status] || escapeHtml(r.status)}</td>
+      <td>${escapeHtml(r.notes) || "—"}</td>
     </tr>`;
   }).join("");
 
@@ -521,8 +538,8 @@ const buildDriverPayslipHtml = ({ driver, month, summary, entries, attendance })
         </div>
         <div class="meta">
           <p>تاريخ الطباعة: ${today}</p>
-          <p>السائق: ${driver.name}</p>
-          ${driver.phone ? `<p>الهاتف: ${driver.phone}</p>` : ""}
+          <p>السائق: ${escapeHtml(driver.name)}</p>
+          ${driver.phone ? `<p>الهاتف: ${escapeHtml(driver.phone)}</p>` : ""}
         </div>
       </div>
 
@@ -555,11 +572,11 @@ const buildDriverPayslipHtml = ({ driver, month, summary, entries, attendance })
         </table>
       </div>` : ""}
 
-      <div class="footer">زراعي برو · كشف راتب: ${driver.name} · ${monthLabel} · ${today}</div>
+      <div class="footer">زراعي برو · كشف راتب: ${escapeHtml(driver.name)} · ${monthLabel} · ${today}</div>
     </div>
   `;
 
-  return { html, title: `كشف راتب - ${driver.name} - ${monthLabel}`, filename: `كشف-راتب-${driver.name}-${monthLabel}` };
+  return { html, title: `كشف راتب - ${driver.name} - ${monthLabel}`, filename: `كشف-راتب-${(driver.name || "").replace(/[<>:"/\\|?*]/g, "")}-${monthLabel}` };
 };
 
 export const printDriverPayslip = (args) => {
@@ -585,16 +602,16 @@ const buildCustodyReportHtml = ({ transactions, totalDeposits, totalExpenses, ba
     const isDeposit = t.type === "deposit";
     const linkedName = getLinkedName ? getLinkedName(t) : null;
     const desc = isDeposit
-      ? (t.source || "إضافة فلوس")
-      : (t.category === "other" && t.otherLabel ? t.otherLabel : (categoryLabels[t.category] || "صرف"));
+      ? escapeHtml(t.source) || "إضافة فلوس"
+      : (t.category === "other" && t.otherLabel ? escapeHtml(t.otherLabel) : (categoryLabels[t.category] || "صرف"));
     return `
     <tr>
       <td>${formatDate(t.date)}</td>
       <td>
         <span class="badge ${isDeposit ? "badge-green" : "badge-red"}">${isDeposit ? "إضافة" : "صرف"}</span>
       </td>
-      <td>${desc}${linkedName ? ` · ${linkedName}` : ""}</td>
-      <td>${t.notes || "—"}</td>
+      <td>${desc}${linkedName ? ` · ${escapeHtml(linkedName)}` : ""}</td>
+      <td>${escapeHtml(t.notes) || "—"}</td>
       <td style="color:${isDeposit ? "#15803d" : "#991b1b"};font-weight:700">
         ${isDeposit ? "+" : "-"} ${formatCurrency(t.amount)}
       </td>
