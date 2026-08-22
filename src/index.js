@@ -5,6 +5,9 @@ import toast from "react-hot-toast";
 import "./index.css";
 import App from "./App";
 import * as serviceWorkerRegistration from "./serviceWorkerRegistration";
+import { initGlobalErrorLogger } from "./utils/globalErrorLogger";
+
+initGlobalErrorLogger();
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(

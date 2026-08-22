@@ -98,5 +98,14 @@ service cloud.firestore {
         allow read, write: if isSignedIn() && isOwner(userId);
       }
     }
+
+    // سجل أخطاء التطبيق — أي مستخدم مسجّل دخول يقدر يكتب خطأ حصل عنده
+    // (write-only بالنسبة له، مش بيقرا القائمة أبداً)، والأدمن بس اللي
+    // يقدر يقرا/يعدّل (يعلّم كـ "متحلّة")/يمسح. isOwner على create زي باقي
+    // الـ collections، بيمنع مستخدم إنه يزوّر خطأ باسم مستخدم تاني.
+    match /errorLogs/{id} {
+      allow create: if isSignedIn() && hasUserId() && isOwner(request.resource.data.userId);
+      allow read, update, delete: if isAdmin();
+    }
   }
 }

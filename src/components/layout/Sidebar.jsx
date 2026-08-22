@@ -11,7 +11,7 @@ import ProfileModal from "../../features/profile/ProfileModal";
 import {
   HomeIcon, TractorIcon, ClipboardIcon,
   DriverIcon, WrenchIcon, ChartIcon,
-  FuelIcon, LogoutIcon, AlertIcon, WalletIcon, ShieldIcon,
+  FuelIcon, LogoutIcon, AlertIcon, WalletIcon, ShieldIcon, BugIcon,
 } from "../ui/Icons";
 
 const NAV_ITEMS = [
@@ -100,6 +100,7 @@ const Sidebar = ({ onClose }) => {
             <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-2 mb-2 mt-4">أدمن</p>
             <NavLink
               to="/admin"
+              end
               onClick={onClose}
               className={({ isActive }) =>
                 clsx(
@@ -114,6 +115,25 @@ const Sidebar = ({ onClose }) => {
                 <>
                   <ShieldIcon size={18} className={isActive ? "text-purple-400" : "text-gray-500"} />
                   <span className="flex-1">حسابات الشركات</span>
+                </>
+              )}
+            </NavLink>
+            <NavLink
+              to="/admin/errors"
+              onClick={onClose}
+              className={({ isActive }) =>
+                clsx(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150",
+                  isActive
+                    ? "bg-gradient-to-l from-purple-900/60 to-purple-900/20 text-purple-300 border border-purple-800/50 shadow-sm"
+                    : "text-gray-400 hover:text-gray-200 hover:bg-white/5"
+                )
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <BugIcon size={18} className={isActive ? "text-purple-400" : "text-gray-500"} />
+                  <span className="flex-1">سجل الأخطاء</span>
                 </>
               )}
             </NavLink>

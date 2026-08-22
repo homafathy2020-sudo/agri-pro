@@ -8,6 +8,7 @@ import { PrivacyProvider }    from "./contexts/PrivacyContext";
 import ProtectedRoute         from "./components/layout/ProtectedRoute";
 import AdminRoute             from "./components/layout/AdminRoute";
 import AppLayout              from "./components/layout/AppLayout";
+import ErrorBoundary          from "./components/system/ErrorBoundary";
 
 import AuthPage               from "./pages/AuthPage";
 import DashboardPage          from "./pages/DashboardPage";
@@ -23,8 +24,10 @@ import ClientsPage            from "./pages/ClientsPage";
 import ClientDetailPage       from "./pages/ClientDetailPage";
 import NotificationsPage      from "./pages/NotificationsPage";
 import AdminPage              from "./pages/AdminPage";
+import AdminErrorsPage        from "./pages/AdminErrorsPage";
 
 const App = () => (
+  <ErrorBoundary>
   <BrowserRouter>
     <AuthProvider>
     <PrivacyProvider>
@@ -45,6 +48,7 @@ const App = () => (
           <Route path="clients/:clientName"     element={<ClientDetailPage />} />
           <Route path="notifications"           element={<NotificationsPage />} />
           <Route path="admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
+          <Route path="admin/errors" element={<AdminRoute><AdminErrorsPage /></AdminRoute>} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
@@ -67,6 +71,7 @@ const App = () => (
     </PrivacyProvider>
     </AuthProvider>
   </BrowserRouter>
+  </ErrorBoundary>
 );
 
 export default App;
