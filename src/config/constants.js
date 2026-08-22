@@ -30,6 +30,7 @@ export const COLLECTIONS = {
   CUSTODY:        "custodyTransactions",
   USERS:          "users",
   ERROR_LOGS:     "errorLogs",
+  ADMIN_MESSAGES: "adminMessages",
 };
 
 // ─── Backup ───────────────────────────────────────────────────────────────────

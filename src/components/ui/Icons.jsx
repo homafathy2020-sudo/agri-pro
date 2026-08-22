@@ -333,3 +333,11 @@ export const BugIcon = (p) => <Icon {...p} d={[
   "M12 7V5a2 2 0 114 0",
   "M12 7V5a2 2 0 10-4 0",
 ]} />;
+
+export const MegaphoneIcon = (p) => <Icon {...p} d={[
+  "M3 11v2a2 2 0 002 2h1l3 5V4l-3 5H5a2 2 0 00-2 2z",
+  "M14 8a4 4 0 010 8",
+  "M17 5a8 8 0 010 14",
+]} />;
+
+export const SendIcon = (p) => <Icon {...p} d={["M22 2L11 13", "M22 2l-7 20-4-9-9-4 20-7z"]} />;

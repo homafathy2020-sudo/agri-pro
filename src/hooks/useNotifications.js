@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { useData } from "../contexts/DataContext";
 import { checkMaintenanceDue, checkOverdueDebts } from "../utils/calculations";
 import { CUSTODY_TYPES } from "../config/constants";
+import { useAdminMessages } from "./useAdminMessages";
 
 /**
  * Derives all active alerts from existing data — no extra Firestore reads.
@@ -10,6 +11,7 @@ import { CUSTODY_TYPES } from "../config/constants";
  */
 export const useNotifications = () => {
   const { equipment, maintenance, jobs, payments, settings, custody, loading } = useData();
+  const { messages: adminMessages, loading: adminLoading, dismiss } = useAdminMessages();
 
   const maintenanceAlerts = useMemo(
     () => checkMaintenanceDue(equipment, maintenance, 14),
@@ -82,16 +84,31 @@ export const useNotifications = () => {
       });
     }
 
+    // Admin broadcast/targeted messages — دايماً فوق كل حاجة تانية،
+    // بترتيبها هي بالتاريخ (الأحدث الأول)، مش متدمجة مع ترتيب severity
+    // بتاع باقي التنبيهات عشان تفضل واضحة إنها من الإدارة.
+    const adminItems = adminMessages.map((m) => ({
+      id:       `admin-${m.id}`,
+      type:     "admin_message",
+      severity: m.severity || "medium",
+      title:    m.title,
+      body:     m.body,
+      dismissible: true,
+      onDismiss: () => dismiss(m.id),
+    }));
+
     // Sort: high severity first, then by title
-    return list.sort((a, b) => {
+    const sorted = list.sort((a, b) => {
       if (a.severity === "high" && b.severity !== "high") return -1;
       if (b.severity === "high" && a.severity !== "high") return  1;
       return a.title.localeCompare(b.title, "ar");
     });
-  }, [maintenanceAlerts, debtAlerts, custody, custodyBalance]);
+
+    return [...adminItems, ...sorted];
+  }, [maintenanceAlerts, debtAlerts, custody, custodyBalance, adminMessages, dismiss]);
 
   const highCount = notifications.filter((n) => n.severity === "high").length;
   const totalCount = notifications.length;
 
-  return { notifications, highCount, totalCount, loading };
+  return { notifications, highCount, totalCount, loading: loading || adminLoading };
 };

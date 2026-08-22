@@ -25,6 +25,7 @@ import ClientDetailPage       from "./pages/ClientDetailPage";
 import NotificationsPage      from "./pages/NotificationsPage";
 import AdminPage              from "./pages/AdminPage";
 import AdminErrorsPage        from "./pages/AdminErrorsPage";
+import AdminMessagesPage      from "./pages/AdminMessagesPage";
 
 const App = () => (
   <ErrorBoundary>
@@ -49,6 +50,7 @@ const App = () => (
           <Route path="notifications"           element={<NotificationsPage />} />
           <Route path="admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
           <Route path="admin/errors" element={<AdminRoute><AdminErrorsPage /></AdminRoute>} />
+          <Route path="admin/messages" element={<AdminRoute><AdminMessagesPage /></AdminRoute>} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

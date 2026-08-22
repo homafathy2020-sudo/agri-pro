@@ -5,7 +5,7 @@ import { useNotifications }  from "../hooks/useNotifications";
 import LoadingScreen         from "../components/ui/LoadingScreen";
 import { Card }  from "../components/ui/Card";
 import Button                from "../components/ui/Button";
-import { AlertIcon, WrenchIcon, DriverIcon, WalletIcon } from "../components/ui/Icons";
+import { AlertIcon, WrenchIcon, DriverIcon, WalletIcon, MegaphoneIcon, ClearIcon } from "../components/ui/Icons";
 
 const SEVERITY_STYLE = {
   high:   {
@@ -30,6 +30,7 @@ const TYPE_ICONS = {
   maintenance_due:   WrenchIcon,
   debt_overdue:      DriverIcon,
   custody_overdrawn: WalletIcon,
+  admin_message:     MegaphoneIcon,
 };
 
 const NotificationsPage = () => {
@@ -81,11 +82,16 @@ const NotificationsPage = () => {
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <p className="text-sm font-bold text-gray-100">{n.title}</p>
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${style.labelBg}`}>
-                          {style.label}
+                          {n.type === "admin_message" ? "من الإدارة" : style.label}
                         </span>
                       </div>
                       <p className="text-xs text-gray-400">{n.body}</p>
                     </div>
+                    {n.dismissible && (
+                      <button onClick={n.onDismiss} className="text-gray-500 hover:text-gray-300 flex-shrink-0 p-1" aria-label="إخفاء">
+                        <ClearIcon size={16} />
+                      </button>
+                    )}
                   </div>
                   {n.actionPath && (
                     <div className="mt-3 flex justify-end">

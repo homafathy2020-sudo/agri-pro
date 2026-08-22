@@ -107,5 +107,18 @@ service cloud.firestore {
       allow create: if isSignedIn() && hasUserId() && isOwner(request.resource.data.userId);
       allow read, update, delete: if isAdmin();
     }
+
+    // تنبيهات بيبعتها الأدمن للمستخدمين — إما لكل الشركات (targetUserId
+    // == null) أو لشركة واحدة بعينها (targetUserId == uid بتاعها).
+    // القراءة مسموحة للمستخدم لو الرسالة موجهالكل الناس أو موجهاله هو
+    // بالتحديد — الشرط ده بيتأكد منه Firestore نفسه لكل مستند على حدة،
+    // مش بس بيثق في فلتر الكويري اللي الفرونت باعته.
+    match /adminMessages/{id} {
+      allow read: if isSignedIn() &&
+        (resource.data.targetUserId == null ||
+         resource.data.targetUserId == request.auth.uid ||
+         isAdmin());
+      allow create, update, delete: if isAdmin();
+    }
   }
 }
