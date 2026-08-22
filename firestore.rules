@@ -6,6 +6,11 @@ service cloud.firestore {
     function isOwner(uid)  { return request.auth.uid == uid; }
     function ownsDoc()     { return resource.data.userId == request.auth.uid; }
     function hasUserId()   { return request.resource.data.keys().hasAll(['userId']); }
+    // بتمنع إن أي update يغيّر حقل userId نفسه — من غيرها، صاحب مستند شرعي
+    // يقدر "ينقل" مستنده لحساب شركة تانية بمجرد ما يعدّل الحقل ده، وده مش
+    // IDOR بالمعنى الكلاسيكي (مفيش حد بيقرا بيانات مش بتاعته) لكنه بيسمح
+    // بحقن مستند غريب جوه بيانات شركة تانية من غير علمها.
+    function keepsOwner()  { return request.resource.data.userId == resource.data.userId; }
 
     // أدمن التطبيق — لازم تحط نفس الـ UID هنا وفي src/config/constants.js
     // (ADMIN_UIDS). ده اللي بيسمح فعلياً بقراءة قائمة كل المستخدمين — مش
@@ -19,47 +24,56 @@ service cloud.firestore {
     match /equipment/{id} {
       allow read:   if isSignedIn() && ownsDoc();
       allow create: if isSignedIn() && hasUserId() && isOwner(request.resource.data.userId);
-      allow update, delete: if isSignedIn() && ownsDoc();
+      allow update: if isSignedIn() && ownsDoc() && keepsOwner();
+      allow delete: if isSignedIn() && ownsDoc();
     }
     match /jobs/{id} {
       allow read:   if isSignedIn() && ownsDoc();
       allow create: if isSignedIn() && hasUserId() && isOwner(request.resource.data.userId);
-      allow update, delete: if isSignedIn() && ownsDoc();
+      allow update: if isSignedIn() && ownsDoc() && keepsOwner();
+      allow delete: if isSignedIn() && ownsDoc();
     }
     match /drivers/{id} {
       allow read:   if isSignedIn() && ownsDoc();
       allow create: if isSignedIn() && hasUserId() && isOwner(request.resource.data.userId);
-      allow update, delete: if isSignedIn() && ownsDoc();
+      allow update: if isSignedIn() && ownsDoc() && keepsOwner();
+      allow delete: if isSignedIn() && ownsDoc();
     }
     match /maintenance/{id} {
       allow read:   if isSignedIn() && ownsDoc();
       allow create: if isSignedIn() && hasUserId() && isOwner(request.resource.data.userId);
-      allow update, delete: if isSignedIn() && ownsDoc();
+      allow update: if isSignedIn() && ownsDoc() && keepsOwner();
+      allow delete: if isSignedIn() && ownsDoc();
     }
     match /payments/{id} {
       allow read:   if isSignedIn() && ownsDoc();
       allow create: if isSignedIn() && hasUserId() && isOwner(request.resource.data.userId);
-      allow update, delete: if isSignedIn() && ownsDoc();
+      allow update: if isSignedIn() && ownsDoc() && keepsOwner();
+      allow delete: if isSignedIn() && ownsDoc();
     }
     match /driverCosts/{id} {
       allow read:   if isSignedIn() && ownsDoc();
       allow create: if isSignedIn() && hasUserId() && isOwner(request.resource.data.userId);
-      allow update, delete: if isSignedIn() && ownsDoc();
+      allow update: if isSignedIn() && ownsDoc() && keepsOwner();
+      allow delete: if isSignedIn() && ownsDoc();
     }
     match /salaryEntries/{id} {
       allow read:   if isSignedIn() && ownsDoc();
       allow create: if isSignedIn() && hasUserId() && isOwner(request.resource.data.userId);
-      allow update, delete: if isSignedIn() && ownsDoc();
+      allow update: if isSignedIn() && ownsDoc() && keepsOwner();
+      allow delete: if isSignedIn() && ownsDoc();
     }
     match /attendance/{id} {
       allow read:   if isSignedIn() && ownsDoc();
       allow create: if isSignedIn() && hasUserId() && isOwner(request.resource.data.userId);
-      allow update, delete: if isSignedIn() && ownsDoc();
+      allow update: if isSignedIn() && ownsDoc() && keepsOwner();
+      allow delete: if isSignedIn() && ownsDoc();
     }
     match /custodyTransactions/{id} {
       allow read:   if isSignedIn() && ownsDoc();
       allow create: if isSignedIn() && hasUserId() && isOwner(request.resource.data.userId);
-      allow update, delete: if isSignedIn() && ownsDoc();
+      allow update: if isSignedIn() && ownsDoc() && keepsOwner();
+      allow delete: if isSignedIn() && ownsDoc();
     }
     match /settings/{userId} {
       allow read, write: if isSignedIn() && isOwner(userId);
