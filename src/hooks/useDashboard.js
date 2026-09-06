@@ -39,18 +39,19 @@ export const useDashboard = () => {
     [taxDeductions]
   );
 
-  // الفاتورة بتدخل في صافي الربح فورًا وقت تسجيلها (استحقاق)، بغض النظر
-  // إنها اتدفعت للمورد ولا لسه — بالظبط زي ما إيراد العميل بيتحسب فور
-  // تسجيل الـ job، مش وقت ما العميل يدفع فعليًا. متابعة "المدفوع فعليًا"
-  // (totalPayable) منفصلة تمامًا وموجودة في useSuppliers، وده رقم
-  // تدفقات نقدية (cash flow) مش ربحية.
+  // الفاتورة بتدخل في صافي الربح على أساس نقدي (cash basis): اللي بيتخصم
+  // هو اللي اتدفع فعليًا للمورد لحد دلوقتي (totalPayable = المتبقي، يعني
+  // إجمالي الفاتورة ناقص أي دفعات)، مش إجمالي الفاتورة الأصلي. لو دفعت
+  // نص الفاتورة، نص التكلفة بس اللي بيتخصم من الربح — ونفس الرقم ده هو
+  // اللي بيظهر في تنبيه "مستحقات عليك للموردين" وفي "صافي وضعك المالي"،
+  // عشان الرقم يبقى واحد متسق في كل الصفحة مش رقمين مختلفين لنفس الحاجة.
   const supplierStats = useMemo(
     () => aggregateSupplierInvoices(supplierInvoices, supplierPayments),
     [supplierInvoices, supplierPayments]
   );
-  const totalSupplierInvoiced = supplierStats.totalInvoiced;
+  const totalSupplierPayable = supplierStats.totalPayable;
 
-  const netProfit = totals.netProfit - totalMaintCost - totalSalaries - totalTaxDeductions - totalSupplierInvoiced;
+  const netProfit = totals.netProfit - totalMaintCost - totalSalaries - totalTaxDeductions - totalSupplierPayable;
 
   const margin = totals.totalRevenue > 0
     ? (netProfit / totals.totalRevenue) * 100
@@ -78,7 +79,7 @@ export const useDashboard = () => {
     totalMaintCost,
     totalSalaries,
     totalTaxDeductions,
-    totalSupplierInvoiced,
+    totalSupplierPayable,
     netProfit,
     margin,
     dailyRevenue,
