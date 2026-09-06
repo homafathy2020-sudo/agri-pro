@@ -9,9 +9,10 @@ import Button from "../../components/ui/Button";
 import { SummaryRow } from "../../components/ui/Card";
 import { formatCurrency, todayISO } from "../../utils/formatters";
 import { MAX_MONEY_VALUE } from "../../config/constants";
+import { calcRemainingAmount } from "../../utils/calculations";
 
 const SupplierPaymentForm = ({ supplierInvoiceId, invoiceAmount, alreadyPaid, onSave, onClose }) => {
-  const maxRemaining = Math.max(0, invoiceAmount - alreadyPaid);
+  const maxRemaining = calcRemainingAmount(invoiceAmount, alreadyPaid);
 
   const {
     register,
@@ -24,7 +25,7 @@ const SupplierPaymentForm = ({ supplierInvoiceId, invoiceAmount, alreadyPaid, on
 
   const onSubmit = async (data) => {
     const amount = Number(data.amount) || 0;
-    if (amount <= 0) return;
+    if (amount <= 0 || amount > maxRemaining) return;
     await onSave({
       supplierInvoiceId,
       amount,
@@ -51,10 +52,13 @@ const SupplierPaymentForm = ({ supplierInvoiceId, invoiceAmount, alreadyPaid, on
           control={control}
           rules={{
             required: "أدخل المبلغ",
-            validate: (v) =>
-              Number(v) > 0 && Number(v) <= MAX_MONEY_VALUE
-                ? true
-                : Number(v) <= 0 ? "يجب أن يكون أكبر من صفر" : `أكبر من الحد المسموح (${MAX_MONEY_VALUE.toLocaleString()})`,
+            validate: (v) => {
+              const num = Number(v);
+              if (!(num > 0)) return "يجب أن يكون أكبر من صفر";
+              if (num > maxRemaining) return `تم تخطي الحد الأقصى من الدفعة (الحد الأقصى: ${formatCurrency(maxRemaining)})`;
+              if (num > MAX_MONEY_VALUE) return `أكبر من الحد المسموح (${MAX_MONEY_VALUE.toLocaleString()})`;
+              return true;
+            },
           }}
           render={({ field }) => (
             <NumberInput

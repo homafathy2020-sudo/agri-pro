@@ -209,12 +209,21 @@ const JobForm = ({ initial, equipment, drivers, fuelPrice, onSave, onClose }) =>
           <Controller
             name="amountPaid"
             control={control}
-            rules={{ validate: (v) => !v || (Number(v) >= 0 && Number(v) <= MAX_MONEY_VALUE) || (Number(v) < 0 ? "لا يمكن أن يكون سالبًا" : `أكبر من الحد المسموح (${MAX_MONEY_VALUE.toLocaleString()})`) }}
+            rules={{
+              validate: (v) => {
+                if (!v) return true;
+                const num = Number(v);
+                if (num < 0) return "لا يمكن أن يكون سالبًا";
+                if (revenue > 0 && num > revenue) return `تم تخطي الحد الأقصى من الدفعة (الحد الأقصى: ${formatCurrency(revenue)})`;
+                if (num > MAX_MONEY_VALUE) return `أكبر من الحد المسموح (${MAX_MONEY_VALUE.toLocaleString()})`;
+                return true;
+              },
+            }}
             render={({ field }) => (
               <NumberInput
                 label="دفعة مقدّمة عند التسجيل (ج.م)"
                 placeholder="0"
-                hint={revenue > 0 ? `الإجمالي: ${formatCurrency(revenue)}` : undefined}
+                hint={revenue > 0 ? `الحد الأقصى: ${formatCurrency(revenue)}` : undefined}
                 error={errors.amountPaid?.message}
                 {...field}
               />
