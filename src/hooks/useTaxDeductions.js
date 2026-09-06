@@ -1,6 +1,7 @@
 // src/hooks/useTaxDeductions.js
 import { useMemo } from "react";
 import { useData } from "../contexts/DataContext";
+import { calcTotalTaxDeductions, calcTaxDeductionsByType } from "../utils/taxCalculations";
 
 export const useTaxDeductions = () => {
   const {
@@ -16,19 +17,15 @@ export const useTaxDeductions = () => {
 
   /** إجمالي كل الضرائب والخصومات — البند اللي بيتخصم من صافي الربح */
   const total = useMemo(
-    () => taxDeductions.reduce((s, t) => s + (Number(t.amount) || 0), 0),
+    () => calcTotalTaxDeductions(taxDeductions),
     [taxDeductions]
   );
 
   /** الإجمالي مجمّع حسب النوع (ضريبة / رسوم حكومية / غرامة / أخرى) */
-  const totalByType = useMemo(() => {
-    const map = {};
-    taxDeductions.forEach((t) => {
-      const key = t.type || "other";
-      map[key] = (map[key] || 0) + (Number(t.amount) || 0);
-    });
-    return map;
-  }, [taxDeductions]);
+  const totalByType = useMemo(
+    () => calcTaxDeductionsByType(taxDeductions),
+    [taxDeductions]
+  );
 
   return {
     entries,

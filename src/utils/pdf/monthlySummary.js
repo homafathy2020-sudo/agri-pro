@@ -4,6 +4,7 @@
 // downloadable PDF (current month / previous month / all time).
 
 import { formatCurrency, formatNumber } from "../formatters";
+import { calcRevenue, calcFuelCost } from "../calculations";
 import { escapeHtml, downloadReportPdf } from "./core";
 
 const buildMonthlySummaryHtml = ({ jobs, equipment, maintenance, drivers, fuelPrice, month, year, allTime = false, totalSalariesPaid = 0, totalTaxDeductions = 0 }) => {
@@ -24,17 +25,17 @@ const buildMonthlySummaryHtml = ({ jobs, equipment, maintenance, drivers, fuelPr
   const monthJobs = allTime ? jobs : jobs.filter((j) => j.date?.startsWith(prefix));
   const monthMaintenance = allTime ? maintenance : maintenance.filter((m) => m.date?.startsWith(prefix));
 
-  const totalRevenue  = monthJobs.reduce((s, j) => s + (j.acres * j.pricePerAcre), 0);
+  const totalRevenue  = monthJobs.reduce((s, j) => s + calcRevenue(j.acres, j.pricePerAcre), 0);
   const totalAcres    = monthJobs.reduce((s, j) => s + (j.acres || 0), 0);
   const totalFuel     = monthJobs.reduce((s, j) => s + (j.fuelUsed || 0), 0);
-  const totalFuelCost = totalFuel * fuelPrice;
+  const totalFuelCost = calcFuelCost(totalFuel, fuelPrice);
   const maintCost     = monthMaintenance.reduce((s, m) => s + (m.cost || 0), 0);
   const netProfit     = totalRevenue - totalFuelCost - maintCost - totalSalariesPaid - totalTaxDeductions;
 
   const equip = [...new Set(monthJobs.map((j) => j.equipmentId))].map((id) => {
     const eq       = equipment.find((e) => e.id === id);
     const eqJobs   = monthJobs.filter((j) => j.equipmentId === id);
-    const revenue  = eqJobs.reduce((s, j) => s + (j.acres * j.pricePerAcre), 0);
+    const revenue  = eqJobs.reduce((s, j) => s + calcRevenue(j.acres, j.pricePerAcre), 0);
     const acres    = eqJobs.reduce((s, j) => s + j.acres, 0);
     return `<tr><td>${escapeHtml(eq?.name) || "—"}</td><td>${eqJobs.length}</td><td>${formatNumber(acres)}</td><td>${formatCurrency(revenue)}</td></tr>`;
   }).join("");

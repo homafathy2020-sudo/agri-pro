@@ -26,6 +26,7 @@ import {
   getInvoicePaidAmount,
   aggregateSupplierInvoices,
 } from "./calculations";
+import { MAX_MONEY_VALUE } from "../config/constants";
 
 // ─── calcRevenue / calcFuelCost ────────────────────────────────────────────
 
@@ -373,6 +374,45 @@ describe("getInvoicePaidAmount", () => {
   test("also accepts a pre-built Map (used internally by aggregateSupplierInvoices)", () => {
     const map = new Map([["inv1", 5000]]);
     expect(getInvoicePaidAmount({ id: "inv1" }, map)).toBe(5000);
+  });
+});
+
+// ─── Boundary values (0 / negative / MAX_MONEY_VALUE-scale) ────────────────────
+// These exist specifically because item #6 of the SC-2026-9114 review asked
+// to confirm edge values are covered, not just the happy path.
+
+describe("boundary values across the money-math functions", () => {
+  test("calcRevenue/calcFuelCost handle a value at MAX_MONEY_VALUE without overflow", () => {
+    expect(calcRevenue(1, MAX_MONEY_VALUE)).toBe(MAX_MONEY_VALUE);
+    expect(calcFuelCost(1, MAX_MONEY_VALUE)).toBe(MAX_MONEY_VALUE);
+  });
+
+  test("negative acres/price still multiply normally (validation happens at the form layer, not here)", () => {
+    expect(calcRevenue(-10, 100)).toBe(-1000);
+  });
+
+  test("calcRemainingAmount clamps to 0 at the exact boundary (paid === revenue)", () => {
+    expect(calcRemainingAmount(1000, 1000)).toBe(0);
+  });
+
+  test("derivePaymentStatus at the exact zero boundary is 'unpaid', not 'partial'", () => {
+    expect(derivePaymentStatus(1000, 0)).toBe("unpaid");
+  });
+
+  test("aggregateJobs handles a very large single job without losing precision", () => {
+    const jobs = [{ id: "big", acres: 1, pricePerAcre: MAX_MONEY_VALUE, fuelUsed: 0, date: "2026-01-01" }];
+    const totals = aggregateJobs(jobs, 0, []);
+    expect(totals.totalRevenue).toBe(MAX_MONEY_VALUE);
+    expect(totals.totalRemaining).toBe(MAX_MONEY_VALUE);
+  });
+
+  test("checkOverdueDebts treats exactly `overdueDays` old as overdue (inclusive boundary)", () => {
+    const boundaryDate = new Date();
+    boundaryDate.setDate(boundaryDate.getDate() - 30);
+    const iso = boundaryDate.toISOString().split("T")[0];
+    const jobs = [{ id: "j1", date: iso, acres: 10, pricePerAcre: 100 }];
+    const overdue = checkOverdueDebts(jobs, 12, 30, []);
+    expect(overdue).toHaveLength(1);
   });
 });
 

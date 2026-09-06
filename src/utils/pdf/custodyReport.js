@@ -8,6 +8,7 @@
 
 import { formatCurrency, formatDate, formatDateTime } from "../formatters";
 import { escapeHtml, INVOICE_CSS, downloadReportPdf } from "./core";
+import { calcTotalExpenses, calcExpensesByCategory } from "../custodyCalculations";
 
 const buildCustodyReportNumber = () => {
   const d = new Date();
@@ -33,14 +34,10 @@ const buildCustodyReportHtml = ({ transactions, totalExpenses, expensesByCategor
   // in — so a monthly download can't accidentally show all-time numbers.
   const expensesOnly = (!allTime && month) ? allExpenses.filter((t) => (t.date || "").startsWith(month)) : allExpenses;
   const periodTotalExpenses = (!allTime && month)
-    ? expensesOnly.reduce((s, t) => s + (Number(t.amount) || 0), 0)
+    ? calcTotalExpenses(expensesOnly)
     : totalExpenses;
   const periodExpensesByCategory = (!allTime && month)
-    ? expensesOnly.reduce((acc, t) => {
-        const key = t.category || "other";
-        acc[key] = (acc[key] || 0) + (Number(t.amount) || 0);
-        return acc;
-      }, {})
+    ? calcExpensesByCategory(expensesOnly)
     : expensesByCategory;
 
   const periodLabel = (!allTime && month)

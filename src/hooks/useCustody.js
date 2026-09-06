@@ -1,7 +1,11 @@
 // src/hooks/useCustody.js
 import { useMemo, useCallback } from "react";
 import { useData } from "../contexts/DataContext";
-import { CUSTODY_TYPES } from "../config/constants";
+import {
+  calcCustodyBalance,
+  calcExpensesByCategory,
+  getCustodyTransactionsForMonth,
+} from "../utils/custodyCalculations";
 
 export const useCustody = () => {
   const {
@@ -16,36 +20,17 @@ export const useCustody = () => {
     [custody]
   );
 
-  const totalDeposits = useMemo(
-    () => custody
-      .filter((c) => c.type === CUSTODY_TYPES.DEPOSIT)
-      .reduce((s, c) => s + (Number(c.amount) || 0), 0),
+  /** الرصيد المتبقي من العهدة + إجمالي الإيداع/الصرف + هل الرصيد سالب */
+  const { totalDeposits, totalExpenses, balance, isOverdrawn } = useMemo(
+    () => calcCustodyBalance(custody),
     [custody]
   );
-
-  const totalExpenses = useMemo(
-    () => custody
-      .filter((c) => c.type === CUSTODY_TYPES.EXPENSE)
-      .reduce((s, c) => s + (Number(c.amount) || 0), 0),
-    [custody]
-  );
-
-  /** الرصيد المتبقي من العهدة */
-  const balance = totalDeposits - totalExpenses;
-
-  const isOverdrawn = balance < 0;
 
   /** إجمالي المصروفات مجمّعة حسب التصنيف (ميكنة / سائقين / أخرى) */
-  const expensesByCategory = useMemo(() => {
-    const map = {};
-    custody
-      .filter((c) => c.type === CUSTODY_TYPES.EXPENSE)
-      .forEach((c) => {
-        const key = c.category || "other";
-        map[key] = (map[key] || 0) + (Number(c.amount) || 0);
-      });
-    return map;
-  }, [custody]);
+  const expensesByCategory = useMemo(
+    () => calcExpensesByCategory(custody),
+    [custody]
+  );
 
   /** اسم المعدة/السائق المرتبط بالمصروف، إن وجد */
   const getLinkedName = useCallback(
@@ -59,10 +44,7 @@ export const useCustody = () => {
 
   /** معاملات شهر معيّن */
   const getTransactionsForMonth = useCallback(
-    (year, month) => {
-      const prefix = `${year}-${String(month).padStart(2, "0")}`;
-      return custody.filter((c) => c.date?.startsWith(prefix));
-    },
+    (year, month) => getCustodyTransactionsForMonth(custody, year, month),
     [custody]
   );
 

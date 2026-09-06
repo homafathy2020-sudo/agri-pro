@@ -18,6 +18,7 @@ import { formatCurrency, formatNumber } from "../utils/formatters";
 import { TEAM_ROLE } from "../config/constants";
 import { useData }                from "../contexts/DataContext";
 import { calcTotalSalariesPaid }  from "../utils/salaryCalculations";
+import { calcTotalTaxDeductions } from "../utils/taxCalculations";
 import { downloadMonthlySummaryPdf } from "../utils/pdfGenerator";
 import { shortNum, truncateLabel, createAngledNameTick } from "../components/charts/chartHelpers";
 
@@ -110,7 +111,7 @@ const ReportsPage = () => {
   const { report: equipReport, loading: eLoading } = useEquipment();
   const { salaryEntries = [], equipment = [], jobs = [], drivers = [], maintenance = [], taxDeductions = [], settings } = useData();
   const totalSalariesPaid = calcTotalSalariesPaid(salaryEntries);
-  const totalTaxDeductions = taxDeductions.reduce((s, t) => s + (Number(t.amount) || 0), 0);
+  const totalTaxDeductions = calcTotalTaxDeductions(taxDeductions);
   const { report: driverReportAll, loading: dLoading } = useDrivers();
   // تقرير الأداء ده خاص بالعمليات الميدانية (أفدنة/عمليات/إيراد) — مالهاش
   // معنى للإداريين والمحاسبين، فبيفلتر بس السائقين الفعليين.

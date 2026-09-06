@@ -4,7 +4,7 @@ import { useData } from "../contexts/DataContext";
 import { useAuth } from "../contexts/AuthContext";
 import { checkOverdueDebts } from "../utils/calculations";
 import { findDuplicateSalaryEntries } from "../utils/findDuplicateSalaryEntries";
-import { CUSTODY_TYPES } from "../config/constants";
+import { calcCustodyBalance } from "../utils/custodyCalculations";
 import { useAdminMessages } from "./useAdminMessages";
 
 // حالة "مقروء" و"محذوف" لكل تنبيه متخزنة محلياً على الجهاز (زي فكرة
@@ -46,15 +46,10 @@ export const useNotifications = () => {
     [jobs, settings.fuelPrice, payments]
   );
 
-  const custodyBalance = useMemo(() => {
-    const deposits = custody
-      .filter((c) => c.type === CUSTODY_TYPES.DEPOSIT)
-      .reduce((s, c) => s + (Number(c.amount) || 0), 0);
-    const expenses = custody
-      .filter((c) => c.type === CUSTODY_TYPES.EXPENSE)
-      .reduce((s, c) => s + (Number(c.amount) || 0), 0);
-    return deposits - expenses;
-  }, [custody]);
+  // Same balance calculation useCustody.js uses — pulled from the shared,
+  // tested custodyCalculations.js so the two never drift apart (they were a
+  // hand-copied duplicate of each other before this change).
+  const custodyBalance = useMemo(() => calcCustodyBalance(custody).balance, [custody]);
 
   // Possible duplicate salaryEntries left over from the old driverCosts
   // migration (see utils/findDuplicateSalaryEntries.js). Detection only —

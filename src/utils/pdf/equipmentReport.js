@@ -2,16 +2,17 @@
 // Equipment Report. Extracted from the old single pdfGenerator.js — logic unchanged.
 
 import { formatCurrency, formatNumber, formatDate } from "../formatters";
+import { calcRevenue, calcFuelCost } from "../calculations";
 import { sortOilHistory, sortGreaseHistory } from "../serviceHistory";
 import { EQUIPMENT_CATEGORY } from "../../config/constants";
 import { escapeHtml, printWindow, downloadReportPdf } from "./core";
 
 const buildEquipmentReportHtml = ({ equipment, jobs, maintenance, fuelPrice, driverName }) => {
   const today      = new Date().toLocaleDateString("ar-EG");
-  const totalRevenue  = jobs.reduce((s, j) => s + (j.acres * j.pricePerAcre), 0);
+  const totalRevenue  = jobs.reduce((s, j) => s + calcRevenue(j.acres, j.pricePerAcre), 0);
   const totalAcres    = jobs.reduce((s, j) => s + (j.acres || 0), 0);
   const totalFuel     = jobs.reduce((s, j) => s + (j.fuelUsed || 0), 0);
-  const totalFuelCost = totalFuel * fuelPrice;
+  const totalFuelCost = calcFuelCost(totalFuel, fuelPrice);
   const maintCost     = maintenance.reduce((s, m) => s + (m.cost || 0), 0);
   const netProfit     = totalRevenue - totalFuelCost - maintCost;
 
@@ -21,7 +22,7 @@ const buildEquipmentReportHtml = ({ equipment, jobs, maintenance, fuelPrice, dri
       <td>${escapeHtml(j.client) || "—"}</td>
       <td>${escapeHtml(j.workType) || "—"}</td>
       <td>${formatNumber(j.acres)}</td>
-      <td>${formatCurrency(j.acres * j.pricePerAcre)}</td>
+      <td>${formatCurrency(calcRevenue(j.acres, j.pricePerAcre))}</td>
     </tr>
   `).join("");
 

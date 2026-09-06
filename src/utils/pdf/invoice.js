@@ -3,7 +3,7 @@
 // Extracted from the old single pdfGenerator.js — logic unchanged.
 
 import { formatCurrency, formatNumber, formatDateTime } from "../formatters";
-import { getJobPaidAmount } from "../calculations";
+import { getJobPaidAmount, calcRevenue, calcFuelCost } from "../calculations";
 import { escapeHtml, INVOICE_CSS, printWindow, downloadReportPdf } from "./core";
 
 // رقم فاتورة ثابت لكل عملية (سنة العملية + جزء من معرّفها) — مفيش نظام
@@ -17,8 +17,8 @@ const buildInvoiceNumber = (job) => {
 };
 
 const buildClientInvoiceHtml = ({ job, equipmentName, driverName, fuelPrice, payments = [], maintenance = [], company = {} }) => {
-  const revenue   = (job.acres || 0) * (job.pricePerAcre || 0);
-  const fuelCost  = (job.fuelUsed || 0) * fuelPrice;
+  const revenue   = calcRevenue(job.acres, job.pricePerAcre);
+  const fuelCost  = calcFuelCost(job.fuelUsed, fuelPrice);
   // مصدر واحد للمدفوع: مجموع سجلات payments، أو job.amountPaid كـ fallback
   // للعمليات القديمة اللي اتسجلت قبل نظام الدفعات — مش الاتنين مع بعض.
   const totalPaid = getJobPaidAmount(job, payments);

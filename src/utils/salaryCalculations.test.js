@@ -7,7 +7,7 @@ import {
   calcDailyRate,
   calcAttendanceSummary,
 } from "./salaryCalculations";
-import { SALARY_ENTRY_TYPES } from "../config/constants";
+import { SALARY_ENTRY_TYPES, MAX_MONEY_VALUE } from "../config/constants";
 
 // ─── calcMonthlySalary ────────────────────────────────────────────────────────
 
@@ -59,6 +59,45 @@ describe("calcMonthlySalary", () => {
     // entry contributes to nothing
     expect(result.base).toBe(1000);
     expect(result.gross).toBe(1000);
+  });
+});
+
+// ─── Boundary values ────────────────────────────────────────────────────────
+
+describe("calcMonthlySalary — boundary values", () => {
+  test("handles a MAX_MONEY_VALUE-scale bonus without losing precision", () => {
+    const entries = [
+      { type: SALARY_ENTRY_TYPES.BASE, amount: 0 },
+      { type: SALARY_ENTRY_TYPES.BONUS, amount: MAX_MONEY_VALUE },
+    ];
+    const result = calcMonthlySalary(entries);
+    expect(result.gross).toBe(MAX_MONEY_VALUE);
+  });
+
+  // Deduction + advance + advance-repayment together in the same month —
+  // the exact combined scenario the SC-2026-9114 review asked to confirm.
+  test("net salary is correct when deduction, advance and advance-repayment all land in the same month", () => {
+    const entries = [
+      { type: SALARY_ENTRY_TYPES.BASE, amount: 3000 },
+      { type: SALARY_ENTRY_TYPES.DEDUCTION, amount: 200 },   // e.g. absence
+      { type: SALARY_ENTRY_TYPES.ADVANCE, amount: 1000 },    // new advance taken
+      { type: SALARY_ENTRY_TYPES.ADVANCE_REPAY, amount: 500 }, // repaying an older advance
+    ];
+    const result = calcMonthlySalary(entries);
+    // net = gross(3000) - deductions(200) - advanceRepayments(500)
+    // the new advance itself does NOT reduce this month's net pay — it's
+    // money already handed out, tracked separately via calcOutstandingAdvances
+    expect(result.net).toBe(2300);
+    expect(result.advances).toBe(1000);
+  });
+
+  test("net salary can go negative when deductions/repayments exceed gross pay", () => {
+    const entries = [
+      { type: SALARY_ENTRY_TYPES.BASE, amount: 500 },
+      { type: SALARY_ENTRY_TYPES.ADVANCE_REPAY, amount: 800 },
+    ];
+    const result = calcMonthlySalary(entries);
+    expect(result.net).toBe(-300);
   });
 });
 

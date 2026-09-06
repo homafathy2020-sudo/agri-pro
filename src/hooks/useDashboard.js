@@ -9,6 +9,7 @@ import {
   aggregateSupplierInvoices,
 } from "../utils/calculations";
 import { calcTotalSalariesPaid } from "../utils/salaryCalculations";
+import { calcTotalTaxDeductions } from "../utils/taxCalculations";
 
 export const useDashboard = () => {
   const {
@@ -35,7 +36,7 @@ export const useDashboard = () => {
   );
 
   const totalTaxDeductions = useMemo(
-    () => taxDeductions.reduce((s, t) => s + (Number(t.amount) || 0), 0),
+    () => calcTotalTaxDeductions(taxDeductions),
     [taxDeductions]
   );
 
