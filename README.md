@@ -28,13 +28,14 @@ without having to read the whole codebase first.
    - 7.5 [Driver Payroll: Attendance + Salary Entries](#75-driver-payroll-attendance--salary-entries)
    - 7.6 [Legacy Driver-Costs Migration](#76-legacy-driver-costs-migration)
    - 7.7 [Custody (Cash-in-Hand) Ledger](#77-custody-cash-in-hand-ledger)
-   - 7.8 [Maintenance Scheduling](#78-maintenance-scheduling)
-   - 7.9 [Notifications Center](#79-notifications-center)
-   - 7.10 [Automatic Daily Backup](#710-automatic-daily-backup)
-   - 7.11 [Manual Backup, Restore & JSON Import/Export](#711-manual-backup-restore--jsonimportexport)
-   - 7.12 [Reports & Dashboard](#712-reports--dashboard)
-   - 7.13 [Admin Back-Office](#713-admin-back-office)
-   - 7.14 [PWA / Offline Installability](#714-pwa--offline-installability)
+   - 7.8 [Taxes & Deductions (Net-Profit Adjustments)](#78-taxes--deductions-net-profit-adjustments)
+   - 7.9 [Maintenance Scheduling](#79-maintenance-scheduling)
+   - 7.10 [Notifications Center](#710-notifications-center)
+   - 7.11 [Automatic Daily Backup](#711-automatic-daily-backup)
+   - 7.12 [Manual Backup, Restore & JSON Import/Export](#712-manual-backup-restore--jsonimportexport)
+   - 7.13 [Reports & Dashboard](#713-reports--dashboard)
+   - 7.14 [Admin Back-Office](#714-admin-back-office)
+   - 7.15 [PWA / Offline Installability](#715-pwa--offline-installability)
 8. [Security Model](#8-security-model)
 9. [Known Dead Code / Housekeeping Notes](#9-known-dead-code--housekeeping-notes)
 10. [Setup & Local Development](#10-setup--local-development)
@@ -60,6 +61,9 @@ operations:
   service is due.
 - Track a **cash custody ledger** (an owner hands over cash periodically;
   expenses are logged against it; the app tracks the running balance).
+- Log a separate **taxes & deductions** ledger (taxes, government fees,
+  fines, other deductions) that reduces net profit on the dashboard without
+  touching the custody balance.
 - See a **dashboard** and **reports** (per-equipment and per-driver
   profitability).
 - Get **in-app notifications** for overdue debts, due maintenance, an
@@ -152,10 +156,11 @@ src/
 │   ├── salaryService.js
 │   ├── attendanceService.js
 │   ├── custodyService.js
+│   ├── taxDeductionService.js    # taxes/gov-fees/fines ledger, see §7.8
 │   ├── settingsService.js
 │   ├── driverCostService.js     # legacy-only, see §7.6 / §9
-│   ├── backupService.js         # create/list/restore snapshots (§7.10-11)
-│   ├── exportService.js         # local JSON file export/import (§7.11)
+│   ├── backupService.js         # create/list/restore snapshots (§7.11-12)
+│   ├── exportService.js         # local JSON file export/import (§7.12)
 │   ├── backupToExcelService.js  # admin: snapshot → multi-sheet Excel
 │   ├── userProfileService.js    # tiny per-user profile doc (for admin list)
 │   ├── errorLogService.js       # global error logging (admin-only reads)
@@ -176,9 +181,10 @@ src/
 │   ├── usePayments.js
 │   ├── useSalary.js
 │   ├── useCustody.js
+│   ├── useTaxDeductions.js
 │   ├── useClients.js
 │   ├── useDashboard.js
-│   ├── useNotifications.js  # derives all alerts, see §7.9
+│   ├── useNotifications.js  # derives all alerts, see §7.10
 │   ├── usePWA.js             # online/offline + install-prompt state
 │   ├── useConfirm.js         # promise-based confirm dialog
 │   ├── useAdminUsers.js, useAdminBackups.js, useAdminErrors.js,
@@ -187,7 +193,8 @@ src/
 │
 ├── features/                 # Domain UI grouped by entity
 │   ├── equipment/, jobs/, drivers/, maintenance/, payments/, salary/,
-│   │   attendance/, custody/, clients/, reports/, notifications/, admin/
+│   │   attendance/, custody/, taxDeductions/, clients/, reports/,
+│   │   notifications/, admin/
 │   ├── profile/               # ProfileModal, RestoreModal, ImportModal
 │   ├── search/                # GlobalSearch
 │   └── driverCosts/            # ⚠️ orphaned — see §9
@@ -212,7 +219,7 @@ src/
 │   └── globalErrorLogger.js   # wires window.onerror/unhandledrejection → errorLogService
 │
 ├── App.jsx                    # Router + providers + toast host
-├── index.js / serviceWorkerRegistration.js / service-worker.js  # PWA (§7.14)
+├── index.js / serviceWorkerRegistration.js / service-worker.js  # PWA (§7.15)
 └── index.css
 ```
 
@@ -234,6 +241,7 @@ users/{uid}                          → tiny profile doc (email, displayName,
 ├── salaryEntries/{id}
 ├── attendance/{id}
 ├── custodyTransactions/{id}
+├── taxDeductions/{id}               → taxes/gov-fees/fines/other, see §7.8
 ├── driverCosts/{id}                 → legacy collection, read/cleaned up
 │                                       only by the one-time migration (§7.6)
 └── meta/settings                    → { fuelPrice, ... }
@@ -286,6 +294,7 @@ Why this shape:
 | `/drivers`, `/drivers/:id` | DriversPage / DriverDetailPage | signed-in |
 | `/maintenance` | MaintenancePage | signed-in |
 | `/custody` | CustodyPage | signed-in |
+| `/tax-deductions` | TaxDeductionsPage | signed-in |
 | `/reports` | ReportsPage | signed-in |
 | `/clients`, `/clients/:name` | ClientsPage / ClientDetailPage | signed-in |
 | `/notifications` | NotificationsPage | signed-in |
@@ -301,9 +310,9 @@ not just file locations.
 
 1. `AuthContext` resolves the current Firebase user (or `null`).
 2. If signed in, `ProtectedRoute` mounts `DataProvider`, which immediately
-   fires off **one parallel `Promise.all`** of all ten collection reads
+   fires off **one parallel `Promise.all`** of all eleven collection reads
    (equipment, jobs, drivers, maintenance, settings, payments, driverCosts,
-   salaryEntries, attendance, custody).
+   salaryEntries, attendance, custody, taxDeductions).
 3. Every read is wrapped in `safeFetch`, which **never throws** — it
    resolves to `{ ok: true, data }` or `{ ok: false, err }`. This means one
    failed collection (e.g. the device just came back online and the local
@@ -450,14 +459,37 @@ balance = sum(deposits) − sum(expenses); `useNotifications.js` raises a
 high-severity alert the moment that balance goes negative (no arbitrary
 "low balance" threshold — only true overdraft).
 
-### 7.8 Maintenance Scheduling
+### 7.8 Taxes & Deductions (Net-Profit Adjustments)
+
+A record book independent from custody: variable amounts on different dates
+— taxes, government fees, fines, other deductions (`TAX_DEDUCTION_TYPES` in
+`config/constants.js`) — logged via `taxDeductionService` /
+`useTaxDeductions.js` and shown on `TaxDeductionsPage`. Each entry has a
+`type`, `amount`, `date`, and optional note.
+
+- **Affects the dashboard, not custody**: `useDashboard.js` subtracts the
+  sum of all entries from net profit (`netProfit = totals.netProfit -
+  totalMaintCost - totalSalaries - totalTaxDeductions`), but this ledger has
+  **no effect whatsoever** on the custody running balance in §7.7 — the two
+  are deliberately kept separate so a tax payment doesn't get confused with
+  an operational cash expense.
+- `useTaxDeductions.js` also exposes a `totalByType` breakdown (tax / gov
+  fee / fine / other) for reporting.
+- Included like every other operational collection in the boot load (§7.1),
+  the automatic daily backup (§7.11), manual Firestore restore, and the
+  local JSON export/import (§7.12) — a snapshot or JSON file that predates
+  this feature simply won't have a `taxDeductions` key, which
+  `exportService.readBackupFile` and `backupService.restoreSnapshot` treat
+  as invalid/incomplete rather than silently dropping the collection.
+
+### 7.9 Maintenance Scheduling
 
 Maintenance records are logged per equipment (type, date, cost, notes).
 `checkMaintenanceDue` (`utils/calculations.js`) compares each machine's
 last service against `MAINTENANCE_INTERVALS` to compute days-until-due, and
 feeds both the equipment detail page and the notifications system.
 
-### 7.9 Notifications Center
+### 7.10 Notifications Center
 
 `useNotifications.js` is a **pure derivation** — it does not read any extra
 Firestore collection. It recomputes a merged, sorted alert list from data
@@ -474,7 +506,7 @@ Read/dismissed state is **per-device**, stored in `localStorage`
 (`readNotifs:<uid>` / `hiddenNotifs:<uid>`) — these are derived alerts, not
 Firestore documents, so there's nothing to sync across devices for them.
 
-### 7.10 Automatic Daily Backup
+### 7.11 Automatic Daily Backup
 
 Lives inside `DataContext.jsx` (not a separate hook) specifically so it
 keeps running for as long as the tab is open, regardless of which page is
@@ -500,11 +532,11 @@ Behavior:
    a backup that was due while offline runs as soon as connectivity
    returns.
 
-### 7.11 Manual Backup, Restore & JSON Import/Export
+### 7.12 Manual Backup, Restore & JSON Import/Export
 
 Three independent safety mechanisms exist, deliberately separate:
 
-1. **Automatic Firestore snapshots** (§7.10) — inside the same Firebase
+1. **Automatic Firestore snapshots** (§7.11) — inside the same Firebase
    project.
 2. **Manual restore from a Firestore snapshot** (`RestoreModal.jsx`) — pick
    a past snapshot, review its record counts against current live counts,
@@ -526,7 +558,7 @@ The restore itself deletes any live doc not present in the snapshot and
 upserts every snapshot item back under its original id, batched in chunks
 of 450 writes (Firestore's batch limit).
 
-### 7.12 Reports & Dashboard
+### 7.13 Reports & Dashboard
 
 `useDashboard.js` aggregates KPIs and chart series (area/pie charts on
 `DashboardPage`) from live state — no separate reporting backend or
@@ -535,7 +567,7 @@ the rest of the app uses, so reports are always consistent with what's
 actually stored. `ReportsPage` offers per-equipment and per-driver
 profitability tabs with margin/performance bars.
 
-### 7.13 Admin Back-Office
+### 7.14 Admin Back-Office
 
 Visible only to UIDs in `ADMIN_UIDS` (and enforced server-side by
 `isAdmin()` in `firestore.rules`):
@@ -548,12 +580,12 @@ Visible only to UIDs in `ADMIN_UIDS` (and enforced server-side by
   resolve/delete* them.
 - **AdminMessagesPage** — send a broadcast (all companies) or a targeted
   (one company) message, shown inside every affected user's normal
-  notifications list (§7.9).
+  notifications list (§7.10).
 - **AdminBackupToExcelPage** — pick any company's latest data and export it
   as a multi-sheet Excel workbook (`backupToExcelService.js`) with IDs
   resolved to human-readable names, for offline reference.
 
-### 7.14 PWA / Offline Installability
+### 7.15 PWA / Offline Installability
 
 `service-worker.js` (Workbox: precache + runtime caching strategies) is
 registered once from `index.js` at app startup — not gated behind login.
@@ -602,7 +634,7 @@ clean up:
   Safe to delete outright.
 - **`src/hooks/useAutoBackup.js`** — an earlier, standalone implementation
   of the daily-backup idea. It has been superseded by the inline
-  implementation inside `DataContext.jsx` (§7.10), which needs to live at
+  implementation inside `DataContext.jsx` (§7.11), which needs to live at
   the provider level to survive page navigation. This hook is not imported
   anywhere. Safe to delete once confirmed nobody has a reason to keep it as
   reference.
