@@ -22,6 +22,7 @@ const BACKUP_COLLECTIONS = [
   ["salaryEntries",       "salaryEntries"],
   ["attendance",          "attendance"],
   ["custodyTransactions", "custodyTransactions"],
+  ["taxDeductions",       "taxDeductions"],
 ];
 
 const countsFor = (data) =>

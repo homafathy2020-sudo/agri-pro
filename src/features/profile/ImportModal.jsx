@@ -19,6 +19,7 @@ const COUNT_LABELS = {
   salaryEntries: "المرتبات",
   attendance:    "الحضور",
   custodyTransactions: "العهدة",
+  taxDeductions: "الضرائب والخصومات",
 };
 
 const CONFIRM_WORD = "استرجاع";
@@ -43,6 +44,7 @@ const ImportModal = ({ open, onClose }) => {
     salaryEntries: data.salaryEntries?.length || 0,
     attendance:    data.attendance?.length    || 0,
     custodyTransactions: data.custody?.length || 0,
+    taxDeductions: data.taxDeductions?.length || 0,
   };
 
   const reset = () => {
@@ -84,6 +86,7 @@ const ImportModal = ({ open, onClose }) => {
         salaryEntries: data.salaryEntries,
         attendance:    data.attendance,
         custodyTransactions: data.custody,
+        taxDeductions: data.taxDeductions,
         settings:      data.settings,
       });
 

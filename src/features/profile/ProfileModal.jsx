@@ -322,6 +322,7 @@ const ProfileModal = ({ open, onClose }) => {
         salaryEntries: data.salaryEntries,
         attendance:    data.attendance,
         custodyTransactions: data.custody,
+        taxDeductions: data.taxDeductions,
         settings:      data.settings,
       });
       localStorage.setItem(`lastBackupAt:${user.uid}`, String(Date.now()));
@@ -347,6 +348,7 @@ const ProfileModal = ({ open, onClose }) => {
         salaryEntries: data.salaryEntries,
         attendance:    data.attendance,
         custodyTransactions: data.custody,
+        taxDeductions: data.taxDeductions,
         settings:      data.settings,
       });
       const now = String(Date.now());
