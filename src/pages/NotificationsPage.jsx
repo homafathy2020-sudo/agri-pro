@@ -8,7 +8,7 @@ import LoadingScreen         from "../components/ui/LoadingScreen";
 import { Card }  from "../components/ui/Card";
 import Button                from "../components/ui/Button";
 import ConfirmDialog         from "../components/ui/ConfirmDialog";
-import { AlertIcon, WrenchIcon, DriverIcon, WalletIcon, MegaphoneIcon, ClearIcon, CheckCircleIcon, TrashIcon } from "../components/ui/Icons";
+import { AlertIcon, DriverIcon, WalletIcon, MegaphoneIcon, ClearIcon, CheckCircleIcon, TrashIcon } from "../components/ui/Icons";
 
 const SEVERITY_STYLE = {
   high:   {
@@ -30,7 +30,6 @@ const SEVERITY_STYLE = {
 };
 
 const TYPE_ICONS = {
-  maintenance_due:   WrenchIcon,
   debt_overdue:      DriverIcon,
   custody_overdrawn: WalletIcon,
   admin_message:     MegaphoneIcon,

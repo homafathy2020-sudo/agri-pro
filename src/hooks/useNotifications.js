@@ -2,7 +2,7 @@
 import { useMemo, useState, useCallback } from "react";
 import { useData } from "../contexts/DataContext";
 import { useAuth } from "../contexts/AuthContext";
-import { checkMaintenanceDue, checkOverdueDebts } from "../utils/calculations";
+import { checkOverdueDebts } from "../utils/calculations";
 import { findDuplicateSalaryEntries } from "../utils/findDuplicateSalaryEntries";
 import { CUSTODY_TYPES } from "../config/constants";
 import { useAdminMessages } from "./useAdminMessages";
@@ -25,7 +25,7 @@ const saveSet = (key, set) => localStorage.setItem(key, JSON.stringify([...set])
  * and action info, plus helpers to mark-read / delete (single or bulk).
  */
 export const useNotifications = () => {
-  const { equipment, maintenance, jobs, payments, settings, custody, salaryEntries = [], drivers = [], loading } = useData();
+  const { jobs, payments, settings, custody, salaryEntries = [], drivers = [], loading } = useData();
   const { user } = useAuth();
   const { messages: adminMessages, loading: adminLoading, dismiss } = useAdminMessages();
 
@@ -39,11 +39,6 @@ export const useNotifications = () => {
   const latestCustodyDate = useMemo(
     () => [...custody].sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0]?.date || null,
     [custody]
-  );
-
-  const maintenanceAlerts = useMemo(
-    () => checkMaintenanceDue(equipment, maintenance, 14),
-    [equipment, maintenance]
   );
 
   const debtAlerts = useMemo(
@@ -85,25 +80,6 @@ export const useNotifications = () => {
 
   const notifications = useMemo(() => {
     const list = [];
-
-    // Maintenance alerts
-    maintenanceAlerts.forEach(({ equipment: eq, daysLeft, isOverdue }) => {
-      list.push({
-        id:       `maint-${eq.id}`,
-        type:     "maintenance_due",
-        severity: isOverdue ? "high" : "medium",
-        title:    isOverdue
-          ? `${eq.name} — تجاوز موعد الصيانة`
-          : `${eq.name} — موعد الصيانة قريب`,
-        body: isOverdue
-          ? `تأخر الصيانة بـ ${Math.abs(daysLeft)} يوم`
-          : `باقي ${daysLeft} يوم للصيانة`,
-        date: new Date(Date.now() + daysLeft * 86400000).toISOString(),
-        equipmentId: eq.id,
-        actionLabel: "عرض المعدة",
-        actionPath:  `/equipment/${eq.id}`,
-      });
-    });
 
     // Debt alerts
     debtAlerts.forEach(({ job, remaining, daysDiff }) => {
@@ -179,7 +155,7 @@ export const useNotifications = () => {
     return [...adminItems, ...sorted]
       .filter((n) => !hiddenSet.has(n.id))
       .map((n) => ({ ...n, read: readSet.has(n.id) }));
-  }, [maintenanceAlerts, debtAlerts, custody, custodyBalance, latestCustodyDate, salaryDuplicatesByDriver, drivers, adminMessages, dismiss, readSet, hiddenSet]);
+  }, [debtAlerts, custody, custodyBalance, latestCustodyDate, salaryDuplicatesByDriver, drivers, adminMessages, dismiss, readSet, hiddenSet]);
 
   const bump = () => setVersion((v) => v + 1);
 

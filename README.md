@@ -484,10 +484,14 @@ A record book independent from custody: variable amounts on different dates
 
 ### 7.9 Maintenance Scheduling
 
-Maintenance records are logged per equipment (type, date, cost, notes).
-`checkMaintenanceDue` (`utils/calculations.js`) compares each machine's
-last service against `MAINTENANCE_INTERVALS` to compute days-until-due, and
-feeds both the equipment detail page and the notifications system.
+Maintenance records are logged per equipment (type, date, cost, notes) and
+shown on the equipment detail page's service history. There is currently no
+automatic "maintenance due soon" alert — an earlier attempt at this
+(`checkMaintenanceDue` keyed off a per-equipment `maintenanceIntervalDays`
+field) was removed because no form in the app ever let a user actually set
+that field, so the alert could never fire for any real equipment. If this
+is added back, it needs a UI to configure the interval per equipment before
+the alert logic is worth keeping.
 
 ### 7.10 Notifications Center
 
@@ -495,7 +499,6 @@ feeds both the equipment detail page and the notifications system.
 Firestore collection. It recomputes a merged, sorted alert list from data
 already in `DataContext`, on every relevant change:
 
-- Maintenance due/overdue
 - Overdue client debts
 - Custody overdrawn
 - Possible duplicate salary entries (see §7.6)

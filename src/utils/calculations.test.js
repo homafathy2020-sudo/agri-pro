@@ -21,7 +21,6 @@ import {
   buildClientList,
   calcTotalPaidForJob,
   derivePaymentStatusFromPayments,
-  checkMaintenanceDue,
   checkOverdueDebts,
 } from "./calculations";
 
@@ -284,35 +283,6 @@ describe("derivePaymentStatusFromPayments", () => {
     const payments = [{ jobId: "j1", amount: 400 }];
     const result = derivePaymentStatusFromPayments(1000, payments, "j1");
     expect(result).toEqual({ paid: 400, remaining: 600, status: "partial" });
-  });
-});
-
-// ─── Maintenance alerts ───────────────────────────────────────────────────────
-
-describe("checkMaintenanceDue", () => {
-  test("flags equipment whose maintenance is overdue", () => {
-    const today = new Date();
-    const longAgo = new Date(today);
-    longAgo.setDate(longAgo.getDate() - 40);
-    const isoLongAgo = longAgo.toISOString().split("T")[0];
-
-    const equipment = [{ id: "eq1", maintenanceIntervalDays: 30 }];
-    const maintenance = [{ id: "m1", equipmentId: "eq1", date: isoLongAgo }];
-
-    const alerts = checkMaintenanceDue(equipment, maintenance, 7);
-    expect(alerts).toHaveLength(1);
-    expect(alerts[0].isOverdue).toBe(true);
-  });
-
-  test("ignores equipment without a maintenance interval configured", () => {
-    const equipment = [{ id: "eq1" }]; // no maintenanceIntervalDays
-    const maintenance = [{ id: "m1", equipmentId: "eq1", date: "2020-01-01" }];
-    expect(checkMaintenanceDue(equipment, maintenance)).toEqual([]);
-  });
-
-  test("ignores equipment with no maintenance history yet", () => {
-    const equipment = [{ id: "eq1", maintenanceIntervalDays: 30 }];
-    expect(checkMaintenanceDue(equipment, [])).toEqual([]);
   });
 });
 

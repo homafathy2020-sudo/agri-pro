@@ -210,28 +210,6 @@ export const derivePaymentStatusFromPayments = (revenue, payments, jobId) => {
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 
-/**
- * Check which equipment needs maintenance soon.
- * Returns list of { equipment, daysSinceLast, isOverdue }
- */
-export const checkMaintenanceDue = (equipment, maintenance, warningDays = 7) => {
-  const alerts = [];
-  equipment.forEach((eq) => {
-    if (!eq.maintenanceIntervalDays) return;
-    const lastMaint = maintenance
-      .filter((m) => m.equipmentId === eq.id)
-      .sort((a, b) => b.date.localeCompare(a.date))[0];
-    if (!lastMaint) return;
-    const lastDate   = new Date(lastMaint.date);
-    const today      = new Date();
-    const daysSince  = Math.floor((today - lastDate) / 86400000);
-    const daysLeft   = eq.maintenanceIntervalDays - daysSince;
-    if (daysLeft <= warningDays) {
-      alerts.push({ equipment: eq, daysSince, daysLeft, isOverdue: daysLeft < 0 });
-    }
-  });
-  return alerts;
-};
 
 /**
  * Check clients with overdue debt (jobs older than X days unpaid).
