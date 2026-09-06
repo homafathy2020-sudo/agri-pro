@@ -9,6 +9,7 @@ import {
 } from "recharts";
 import { useDashboard }  from "../hooks/useDashboard";
 import { useClients }    from "../hooks/useClients";
+import { useSuppliers }  from "../hooks/useSuppliers";
 import { usePrivacy }    from "../contexts/PrivacyContext";
 import { StatCard, Card, CardHeader, CardBody, SummaryRow, EmptyState } from "../components/ui/Card";
 import { ChartCard } from "../components/ui/ChartCard";
@@ -77,7 +78,7 @@ const BarTooltip = ({ active, payload, label }) => {
 const DashboardPage = () => {
   const navigate = useNavigate();
   const {
-    totals, totalMaintCost, totalSalaries, totalTaxDeductions, netProfit, margin,
+    totals, totalMaintCost, totalSalaries, totalTaxDeductions, totalSupplierInvoiced, netProfit, margin,
     dailyRevenue, workTypeBreakdown,
     equipReport, bestEquipment,
     recentJobs,
@@ -86,7 +87,10 @@ const DashboardPage = () => {
   } = useDashboard();
 
   const { clients, totalDebt } = useClients();
+  const { totalPayable } = useSuppliers();
   const totalCollected = clients.reduce((s, c) => s + c.totalPaid, 0);
+  // صافي وضعك المالي = اللي ليك عند العملاء − اللي عليك للموردين.
+  const netPosition = totalDebt - totalPayable;
   const { isPrivate } = usePrivacy();
 
   if (loading) return <LoadingScreen />;
@@ -135,6 +139,42 @@ const DashboardPage = () => {
             style={{ filter: isPrivate ? "blur(6px)" : "none", userSelect: isPrivate ? "none" : "auto" }}
           >
             {formatCurrency(totalDebt)}
+          </span>
+        </div>
+      )}
+
+      {/* ── Supplier payable alert ─────────────────────────── */}
+      {totalPayable > 0 && (
+        <div
+          className="flex items-center justify-between gap-4 bg-red-900/20 border border-red-800/40 rounded-2xl px-5 py-3.5 cursor-pointer hover:bg-red-900/30 transition-colors"
+          onClick={() => navigate("/suppliers")}
+        >
+          <div className="flex items-center gap-3">
+            <AlertIcon size={18} className="text-red-400 flex-shrink-0"/>
+            <div>
+              <p className="text-sm font-bold text-red-300">مستحقات عليك للموردين</p>
+              <p className="text-xs text-red-500/80 mt-0.5">اضغط لعرض التفاصيل</p>
+            </div>
+          </div>
+          <span
+            className="text-base font-extrabold text-red-400 tabular-nums flex-shrink-0 transition-[filter] duration-300"
+            style={{ filter: isPrivate ? "blur(6px)" : "none", userSelect: isPrivate ? "none" : "auto" }}
+          >
+            {formatCurrency(totalPayable)}
+          </span>
+        </div>
+      )}
+
+      {/* ── Net financial position: what clients owe you minus what you
+          owe suppliers — the number neither side alone can show. ────── */}
+      {(totalDebt > 0 || totalPayable > 0) && (
+        <div className="flex items-center justify-between gap-4 bg-surface border border-white/8 rounded-2xl px-5 py-3.5">
+          <p className="text-sm font-bold text-gray-300">صافي وضعك المالي (ليك − عليك)</p>
+          <span
+            className={`text-base font-extrabold tabular-nums flex-shrink-0 transition-[filter] duration-300 ${netPosition >= 0 ? "text-green-400" : "text-red-400"}`}
+            style={{ filter: isPrivate ? "blur(6px)" : "none", userSelect: isPrivate ? "none" : "auto" }}
+          >
+            {formatCurrency(netPosition)}
           </span>
         </div>
       )}
@@ -209,6 +249,7 @@ const DashboardPage = () => {
             <SummaryRow label="تكلفة الوقود"    value={formatCurrency(totals.totalFuelCost)} valueColor="text-red-400" sensitive/>
             <SummaryRow label="تكاليف الصيانة"  value={formatCurrency(totalMaintCost)}  valueColor="text-red-400" sensitive/>
             <SummaryRow label="مرتبات الفريق" value={formatCurrency(totalSalaries||0)} valueColor="text-red-400" sensitive/>
+            <SummaryRow label="فواتير الموردين" value={formatCurrency(totalSupplierInvoiced||0)} valueColor="text-red-400" sensitive/>
             <SummaryRow label="ضرائب وخصومات"   value={formatCurrency(totalTaxDeductions||0)} valueColor="text-red-400" sensitive/>
             <div className="border-t border-white/8 mt-2 pt-2">
               <SummaryRow label="صافي الربح" value={formatCurrency(netProfit)}

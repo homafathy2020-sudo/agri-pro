@@ -6,12 +6,14 @@ import {
   buildDailyRevenue,
   groupByWorkType,
   buildEquipmentReport,
+  aggregateSupplierInvoices,
 } from "../utils/calculations";
 import { calcTotalSalariesPaid } from "../utils/salaryCalculations";
 
 export const useDashboard = () => {
   const {
     jobs, equipment, maintenance, drivers, payments = [],
+    supplierInvoices = [], supplierPayments = [],
     settings, salaryEntries = [], taxDeductions = [], loading,
   } = useData();
 
@@ -37,7 +39,18 @@ export const useDashboard = () => {
     [taxDeductions]
   );
 
-  const netProfit = totals.netProfit - totalMaintCost - totalSalaries - totalTaxDeductions;
+  // الفاتورة بتدخل في صافي الربح فورًا وقت تسجيلها (استحقاق)، بغض النظر
+  // إنها اتدفعت للمورد ولا لسه — بالظبط زي ما إيراد العميل بيتحسب فور
+  // تسجيل الـ job، مش وقت ما العميل يدفع فعليًا. متابعة "المدفوع فعليًا"
+  // (totalPayable) منفصلة تمامًا وموجودة في useSuppliers، وده رقم
+  // تدفقات نقدية (cash flow) مش ربحية.
+  const supplierStats = useMemo(
+    () => aggregateSupplierInvoices(supplierInvoices, supplierPayments),
+    [supplierInvoices, supplierPayments]
+  );
+  const totalSupplierInvoiced = supplierStats.totalInvoiced;
+
+  const netProfit = totals.netProfit - totalMaintCost - totalSalaries - totalTaxDeductions - totalSupplierInvoiced;
 
   const margin = totals.totalRevenue > 0
     ? (netProfit / totals.totalRevenue) * 100
@@ -65,6 +78,7 @@ export const useDashboard = () => {
     totalMaintCost,
     totalSalaries,
     totalTaxDeductions,
+    totalSupplierInvoiced,
     netProfit,
     margin,
     dailyRevenue,

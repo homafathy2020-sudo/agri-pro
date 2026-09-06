@@ -23,6 +23,8 @@ import TaxDeductionsPage      from "./pages/TaxDeductionsPage";
 import ReportsPage            from "./pages/ReportsPage";
 import ClientsPage            from "./pages/ClientsPage";
 import ClientDetailPage       from "./pages/ClientDetailPage";
+import SuppliersPage          from "./pages/SuppliersPage";
+import SupplierDetailPage     from "./pages/SupplierDetailPage";
 import NotificationsPage      from "./pages/NotificationsPage";
 import AdminPage              from "./pages/AdminPage";
 import AdminErrorsPage        from "./pages/AdminErrorsPage";
@@ -50,6 +52,8 @@ const App = () => (
           <Route path="reports"                 element={<ReportsPage />} />
           <Route path="clients"                 element={<ClientsPage />} />
           <Route path="clients/:clientName"     element={<ClientDetailPage />} />
+          <Route path="suppliers"               element={<SuppliersPage />} />
+          <Route path="suppliers/:supplierName" element={<SupplierDetailPage />} />
           <Route path="notifications"           element={<NotificationsPage />} />
           <Route path="admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
           <Route path="admin/errors" element={<AdminRoute><AdminErrorsPage /></AdminRoute>} />

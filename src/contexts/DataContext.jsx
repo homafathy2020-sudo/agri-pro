@@ -10,6 +10,8 @@ import { driverService }       from "../services/driverService";
 import { maintenanceService }  from "../services/maintenanceService";
 import { settingsService }     from "../services/settingsService";
 import { paymentService }      from "../services/paymentService";
+import { supplierInvoiceService } from "../services/supplierInvoiceService";
+import { supplierPaymentService } from "../services/supplierPaymentService";
 // driverCostService is kept only to read/clean up the legacy `driverCosts`
 // collection during the one-time migration below — it's no longer exposed
 // for creating new records (see migrateDriverCosts.js).
@@ -28,6 +30,8 @@ const initialState = {
   drivers:       [],
   maintenance:   [],
   payments:      [],
+  supplierInvoices: [],
+  supplierPayments: [],
   salaryEntries: [],
   attendance:    [],
   custody:       [],
@@ -64,6 +68,18 @@ const reducer = (state, action) => {
     // بيحذف كل الدفعات المرتبطة بعملية معينة دفعة واحدة — مستخدمة لما
     // بنحذف عملية من "سجل الشغل" ومعاها كل معلوماتها المالية.
     case "DELETE_PAYMENTS_BY_JOB": return { ...state, payments: state.payments.filter(p => p.jobId !== action.payload) };
+
+    case "ADD_SUPPLIER_INVOICE":    return { ...state, supplierInvoices: [action.payload, ...state.supplierInvoices] };
+    case "UPDATE_SUPPLIER_INVOICE": return { ...state, supplierInvoices: state.supplierInvoices.map(i => i.id === action.payload.id ? action.payload : i) };
+    case "DELETE_SUPPLIER_INVOICE": return { ...state, supplierInvoices: state.supplierInvoices.filter(i => i.id !== action.payload) };
+
+    case "ADD_SUPPLIER_PAYMENT":    return { ...state, supplierPayments: [action.payload, ...state.supplierPayments] };
+    case "UPDATE_SUPPLIER_PAYMENT": return { ...state, supplierPayments: state.supplierPayments.map(p => p.id === action.payload.id ? action.payload : p) };
+    case "DELETE_SUPPLIER_PAYMENT": return { ...state, supplierPayments: state.supplierPayments.filter(p => p.id !== action.payload) };
+    // بيحذف كل الدفعات المرتبطة بفاتورة مورد معينة دفعة واحدة — نفس منطق
+    // DELETE_PAYMENTS_BY_JOB بالظبط، مستخدمة لما نحذف فاتورة مورد.
+    case "DELETE_SUPPLIER_PAYMENTS_BY_INVOICE":
+      return { ...state, supplierPayments: state.supplierPayments.filter(p => p.supplierInvoiceId !== action.payload) };
 
     case "ADD_SALARY":    return { ...state, salaryEntries: [action.payload, ...state.salaryEntries] };
     case "UPDATE_SALARY": return { ...state, salaryEntries: state.salaryEntries.map(s => s.id === action.payload.id ? action.payload : s) };
@@ -238,6 +254,8 @@ export const DataProvider = ({ children }) => {
           safeFetch(maintenanceService.getAll(user.uid)),
           safeFetch(settingsService.get(user.uid)),
           safeFetch(paymentService.getAll(user.uid)),
+          safeFetch(supplierInvoiceService.getAll(user.uid)),
+          safeFetch(supplierPaymentService.getAll(user.uid)),
           driverCostsFetch,
           safeFetch(salaryService.getAll(user.uid)),
           safeFetch(attendanceService.getAll(user.uid)),
@@ -246,7 +264,8 @@ export const DataProvider = ({ children }) => {
         ]);
         const [
           equipmentR, jobsR, driversR, maintenanceR, settingsR,
-          paymentsR, driverCostsR, salaryEntriesR, attendanceR, custodyR,
+          paymentsR, supplierInvoicesR, supplierPaymentsR,
+          driverCostsR, salaryEntriesR, attendanceR, custodyR,
           taxDeductionsR,
         ] = results;
 
@@ -335,6 +354,8 @@ export const DataProvider = ({ children }) => {
         if (maintenanceR.ok)  payload.maintenance  = maintenanceR.data;
         if (settingsR.ok)     payload.settings     = settingsR.data;
         if (paymentsR.ok)     payload.payments     = paymentsR.data;
+        if (supplierInvoicesR.ok) payload.supplierInvoices = supplierInvoicesR.data;
+        if (supplierPaymentsR.ok) payload.supplierPayments = supplierPaymentsR.data;
         if (mergedSalaryEntries !== undefined) payload.salaryEntries = mergedSalaryEntries;
         if (attendanceR.ok)   payload.attendance   = attendanceR.data;
         if (custodyR.ok)      payload.custody      = custodyR.data;
@@ -417,6 +438,8 @@ export const DataProvider = ({ children }) => {
           drivers:       state.drivers,
           maintenance:   state.maintenance,
           payments:      state.payments,
+          supplierInvoices: state.supplierInvoices,
+          supplierPayments: state.supplierPayments,
           salaryEntries: state.salaryEntries,
           attendance:    state.attendance,
           custodyTransactions: state.custody,
@@ -644,6 +667,88 @@ export const DataProvider = ({ children }) => {
     toast.success("تم حذف الدفعة");
   }, [user, trackWrite]);
 
+  const addSupplierInvoice = useCallback(async (d) => {
+    const { id, promise } = supplierInvoiceService.add(user.uid, d);
+    dispatch({ type: "ADD_SUPPLIER_INVOICE", payload: { id, ...d } });
+    trackWrite(promise, {
+      rollback: () => dispatch({ type: "DELETE_SUPPLIER_INVOICE", payload: id }),
+      errorMessage: "تعذر حفظ فاتورة المورد، تم التراجع عن التسجيل",
+    });
+    toast.success("تم تسجيل الفاتورة");
+    return { id, promise };
+  }, [user, trackWrite]);
+  const updateSupplierInvoice = useCallback(async (id, d) => {
+    const previous = stateRef.current.supplierInvoices.find((i) => i.id === id);
+    dispatch({ type: "UPDATE_SUPPLIER_INVOICE", payload: { id, ...d } });
+    trackWrite(supplierInvoiceService.update(user.uid, id, d), {
+      rollback: () => previous && dispatch({ type: "UPDATE_SUPPLIER_INVOICE", payload: previous }),
+      errorMessage: "تعذر حفظ تعديل الفاتورة، تم التراجع عن التعديل",
+    });
+    toast.success("تم تحديث الفاتورة");
+  }, [user, trackWrite]);
+  const deleteSupplierInvoice = useCallback(async (id) => {
+    // نفس منطق deleteJob بالظبط: حذف الفاتورة بيمسح معاه كل الدفعات
+    // المرتبطة بيها في batch واحد atomic، عشان الشاشة والسيرفر ميختلفوش
+    // لو النت اتقطع نص الطريق.
+    const previousInvoice = stateRef.current.supplierInvoices.find((i) => i.id === id);
+    const relatedPayments = stateRef.current.supplierPayments.filter((p) => p.supplierInvoiceId === id);
+
+    dispatch({ type: "DELETE_SUPPLIER_PAYMENTS_BY_INVOICE", payload: id });
+    dispatch({ type: "DELETE_SUPPLIER_INVOICE", payload: id });
+
+    const writePromise = (async () => {
+      const paymentsSnap = await getDocs(
+        query(collection(db, "users", user.uid, "supplierPayments"), where("supplierInvoiceId", "==", id))
+      );
+      const batch = writeBatch(db);
+      paymentsSnap.docs.forEach((d) => batch.delete(d.ref));
+      batch.delete(doc(db, "users", user.uid, "supplierInvoices", id));
+      await batch.commit();
+    })();
+
+    trackWrite(writePromise, {
+      rollback: () => {
+        relatedPayments.forEach((p) => dispatch({ type: "ADD_SUPPLIER_PAYMENT", payload: p }));
+        previousInvoice && dispatch({ type: "ADD_SUPPLIER_INVOICE", payload: previousInvoice });
+      },
+      errorMessage: "تعذر حذف الفاتورة، تم استرجاعها",
+    });
+    toast.success(
+      relatedPayments.length > 0
+        ? `تم حذف الفاتورة و${relatedPayments.length} دفعة مرتبطة بها`
+        : "تم حذف الفاتورة"
+    );
+  }, [user, trackWrite]);
+
+  const addSupplierPayment = useCallback(async (d) => {
+    const { id, promise } = supplierPaymentService.add(user.uid, d);
+    dispatch({ type: "ADD_SUPPLIER_PAYMENT", payload: { id, ...d } });
+    trackWrite(promise, {
+      rollback: () => dispatch({ type: "DELETE_SUPPLIER_PAYMENT", payload: id }),
+      errorMessage: "تعذر حفظ الدفعة، تم التراجع عن التسجيل",
+    });
+    toast.success("تم تسجيل الدفعة");
+    return id;
+  }, [user, trackWrite]);
+  const updateSupplierPayment = useCallback(async (id, d) => {
+    const previous = stateRef.current.supplierPayments.find((p) => p.id === id);
+    dispatch({ type: "UPDATE_SUPPLIER_PAYMENT", payload: { id, ...d } });
+    trackWrite(supplierPaymentService.update(user.uid, id, d), {
+      rollback: () => previous && dispatch({ type: "UPDATE_SUPPLIER_PAYMENT", payload: previous }),
+      errorMessage: "تعذر حفظ تعديل الدفعة، تم التراجع عن التعديل",
+    });
+    toast.success("تم تحديث الدفعة");
+  }, [user, trackWrite]);
+  const deleteSupplierPayment = useCallback(async (id) => {
+    const previous = stateRef.current.supplierPayments.find((p) => p.id === id);
+    dispatch({ type: "DELETE_SUPPLIER_PAYMENT", payload: id });
+    trackWrite(supplierPaymentService.remove(user.uid, id), {
+      rollback: () => previous && dispatch({ type: "ADD_SUPPLIER_PAYMENT", payload: previous }),
+      errorMessage: "تعذر حذف الدفعة، تم استرجاعها",
+    });
+    toast.success("تم حذف الدفعة");
+  }, [user, trackWrite]);
+
   const addSalaryEntry = useCallback(async (d) => {
     const { id, promise } = salaryService.add(user.uid, d);
     dispatch({ type: "ADD_SALARY", payload: { id, ...d } });
@@ -785,6 +890,8 @@ export const DataProvider = ({ children }) => {
     addDriver, updateDriver, deleteDriver,
     addMaintenance, updateMaintenance, deleteMaintenance,
     addPayment, updatePayment, deletePayment,
+    addSupplierInvoice, updateSupplierInvoice, deleteSupplierInvoice,
+    addSupplierPayment, updateSupplierPayment, deleteSupplierPayment,
     addSalaryEntry, updateSalaryEntry, deleteSalaryEntry,
     addAttendance, updateAttendance, deleteAttendance,
     addCustody, updateCustody, deleteCustody,

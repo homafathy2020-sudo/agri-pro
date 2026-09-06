@@ -12,6 +12,7 @@ const TITLES = {
   "/maintenance":   "الصيانة",
   "/reports":       "التقارير",
   "/clients":       "العملاء والديون",
+  "/suppliers":     "الموردين",
   "/custody":       "العهدة",
   "/notifications": "التنبيهات",
 };
@@ -23,6 +24,7 @@ const TopBar = ({ onMenuToggle }) => {
   if (!title) {
     if (pathname.startsWith("/equipment/")) title = "تفاصيل المعدة";
     else if (pathname.startsWith("/clients/"))  title = "تفاصيل العميل";
+    else if (pathname.startsWith("/suppliers/")) title = "تفاصيل المورد";
     else if (pathname.startsWith("/drivers/"))  title = "الرواتب والحضور";
     else title = "زراعي برو";
   }

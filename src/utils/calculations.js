@@ -186,6 +186,99 @@ export const buildClientList = (jobs, fuelPrice, payments = []) => {
     .sort((a, b) => b.totalRemaining - a.totalRemaining);
 };
 
+// ─── Supplier / Payable helpers ────────────────────────────────────────────
+//
+// Mirror image of the "Client / Debt" section above, but flipped: here the
+// business is the one who OWES money to a supplier/contractor who did work
+// for it (jobs/clients = money owed TO the business).
+//
+// Same single-source-of-truth rule as jobs/payments applies: a supplier
+// invoice's "amount" is the total owed, and how much of it has been paid is
+// NEVER stored on the invoice itself — it's always derived by summing
+// `supplierPayments` for that invoice (see buildPaidAmountsByInvoiceId /
+// getInvoicePaidAmount below). Storing a second "amountPaid" field would
+// reintroduce the exact split-source-of-truth bug that paymentUtils.js
+// warns about for jobs.
+
+/**
+ * Builds a supplierInvoiceId → total-paid Map in a single O(supplierPayments)
+ * pass, same technique as buildPaidAmountsByJobId above.
+ */
+const buildPaidAmountsByInvoiceId = (supplierPayments = []) => {
+  const map = new Map();
+  for (const p of supplierPayments) {
+    if (!p || !p.supplierInvoiceId) continue;
+    map.set(p.supplierInvoiceId, (map.get(p.supplierInvoiceId) || 0) + safeNum(p.amount));
+  }
+  return map;
+};
+
+/**
+ * Single source of truth for "how much of this supplier invoice have we
+ * actually paid so far". `supplierPayments` may be the raw array or a
+ * pre-built Map (see buildPaidAmountsByInvoiceId) for batch use.
+ */
+export const getInvoicePaidAmount = (invoice, supplierPayments = []) => {
+  const paidByInvoiceId = supplierPayments instanceof Map
+    ? supplierPayments
+    : buildPaidAmountsByInvoiceId(supplierPayments);
+  return paidByInvoiceId.get(invoice.id) || 0;
+};
+
+/**
+ * How much is still owed on a single supplier invoice. Same shape as
+ * calcRemainingAmount(revenue, amountPaid) for jobs.
+ */
+export const calcSupplierRemaining = (invoiceAmount, amountPaid) =>
+  Math.max(0, safeNum(invoiceAmount) - safeNum(amountPaid));
+
+/**
+ * Aggregate stats across ALL supplier invoices — used for the dashboard's
+ * "total payable" figure and for the net-profit calculation (accrual: the
+ * full invoice amount counts as a cost the moment it's recorded, regardless
+ * of whether it's been paid yet — exactly like job revenue counts the
+ * moment the job is recorded, regardless of whether the client has paid).
+ */
+export const aggregateSupplierInvoices = (supplierInvoices = [], supplierPayments = []) => {
+  const paidByInvoiceId = buildPaidAmountsByInvoiceId(supplierPayments);
+  const totalInvoiced = supplierInvoices.reduce((s, inv) => s + safeNum(inv.amount), 0);
+  const totalPaidOut  = supplierInvoices.reduce(
+    (s, inv) => s + getInvoicePaidAmount(inv, paidByInvoiceId), 0
+  );
+  const totalPayable  = supplierInvoices.reduce((s, inv) => {
+    const paid = getInvoicePaidAmount(inv, paidByInvoiceId);
+    return s + calcSupplierRemaining(inv.amount, paid);
+  }, 0);
+  return { totalInvoiced, totalPaidOut, totalPayable };
+};
+
+/**
+ * Aggregate all invoices for a single supplier name.
+ */
+export const buildSupplierSummary = (supplierName, supplierInvoices, supplierPayments = []) => {
+  const invoices = supplierInvoices.filter((inv) => inv.supplierName === supplierName);
+  const stats     = aggregateSupplierInvoices(invoices, supplierPayments);
+  return {
+    supplierName,
+    invoices,
+    ops:           invoices.length,
+    totalInvoiced: stats.totalInvoiced,
+    totalPaidOut:  stats.totalPaidOut,
+    totalPayable:  stats.totalPayable,
+  };
+};
+
+/**
+ * Build the full supplier list from supplierInvoices, sorted by how much
+ * we still owe them (descending) — same convention as buildClientList.
+ */
+export const buildSupplierList = (supplierInvoices = [], supplierPayments = []) => {
+  const names = [...new Set(supplierInvoices.map((inv) => inv.supplierName).filter(Boolean))];
+  return names
+    .map((name) => buildSupplierSummary(name, supplierInvoices, supplierPayments))
+    .sort((a, b) => b.totalPayable - a.totalPayable);
+};
+
 // ─── Payment instalments ──────────────────────────────────────────────────────
 
 /**
