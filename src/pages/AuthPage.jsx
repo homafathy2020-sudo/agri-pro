@@ -1,7 +1,7 @@
 // src/pages/AuthPage.jsx
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { EyeIcon, EyeOffIcon } from "../components/ui/Icons";
 import toast from "react-hot-toast";
@@ -9,7 +9,10 @@ import toast from "react-hot-toast";
 const AuthPage = () => {
   const { login, register: registerUser, resetPassword } = useAuth();
   const navigate = useNavigate();
-  const [mode, setMode] = useState("login"); // "login" | "register" | "forgot"
+  const [searchParams] = useSearchParams();
+  // Lets the landing page's "ابدأ الآن" CTA link straight to /auth?mode=register
+  // instead of dropping every visitor onto the login form by default.
+  const [mode, setMode] = useState(searchParams.get("mode") === "register" ? "register" : "login"); // "login" | "register" | "forgot"
   const [showPassword, setShowPassword] = useState(false);
 
   const { register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm();
