@@ -6,18 +6,22 @@ import { useData }       from "../contexts/DataContext";
 import SupplierPaymentForm from "../features/suppliers/SupplierPaymentForm";
 import Modal              from "../components/ui/Modal";
 import Button              from "../components/ui/Button";
+import { Input }           from "../components/ui/Input";
 import { Card, CardHeader, CardBody, SummaryRow, EmptyState, ProgressBar, Badge } from "../components/ui/Card";
 import LoadingScreen      from "../components/ui/LoadingScreen";
 import { formatCurrency, formatDateShort } from "../utils/formatters";
-import { CalendarIcon, PlusIcon } from "../components/ui/Icons";
+import { CalendarIcon, PlusIcon, EditIcon } from "../components/ui/Icons";
 
 const SupplierDetailPage = () => {
   const { supplierName }  = useParams();
   const navigate           = useNavigate();
   const decodedName        = decodeURIComponent(supplierName);
   const { getSupplierSummary, loading } = useSuppliers();
-  const { addSupplierPayment } = useData();
+  const { addSupplierPayment, renameSupplier } = useData();
   const [payModal, setPayModal] = useState(null);
+  const [renameModal, setRenameModal] = useState(false);
+  const [renameValue, setRenameValue] = useState(decodedName);
+  const [renaming, setRenaming] = useState(false);
 
   if (loading) return <LoadingScreen />;
 
@@ -28,6 +32,21 @@ const SupplierDetailPage = () => {
   const handleSavePayment = async (data) => {
     await addSupplierPayment(data);
     setPayModal(null);
+  };
+
+  // بعد التصحيح بيتنقل تلقائيًا لصفحة المورد بالاسم الجديد، لأن الرابط
+  // (وده المورد نفسه فعليًا) مبني على الاسم — مفيش id تاني نرجعله.
+  const handleRename = async () => {
+    const trimmed = renameValue.trim();
+    if (!trimmed || trimmed === decodedName) { setRenameModal(false); return; }
+    setRenaming(true);
+    try {
+      await renameSupplier(decodedName, trimmed);
+      navigate(`/suppliers/${encodeURIComponent(trimmed)}`, { replace: true });
+    } finally {
+      setRenaming(false);
+      setRenameModal(false);
+    }
   };
 
   return (
@@ -45,8 +64,17 @@ const SupplierDetailPage = () => {
         <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-900/60 to-surface-3 border border-red-800/30 flex items-center justify-center text-2xl font-extrabold text-red-300">
           {decodedName.charAt(0)}
         </div>
-        <div>
-          <h1 className="text-xl font-extrabold text-gray-100">{decodedName}</h1>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-extrabold text-gray-100 truncate">{decodedName}</h1>
+            <button
+              onClick={() => { setRenameValue(decodedName); setRenameModal(true); }}
+              className="text-gray-500 hover:text-gray-300 flex-shrink-0"
+              title="تصحيح اسم المورد"
+            >
+              <EditIcon size={15} />
+            </button>
+          </div>
           <p className="text-sm text-gray-500">{ops} فاتورة</p>
         </div>
       </div>
@@ -153,6 +181,28 @@ const SupplierDetailPage = () => {
             />
           );
         })()}
+      </Modal>
+
+      {/* Rename modal — bulk-updates every invoice under this name, since
+          there's no separate supplier id to edit in one place. */}
+      <Modal open={renameModal} onClose={() => !renaming && setRenameModal(false)} title="تصحيح اسم المورد" size="sm">
+        <p className="text-xs text-gray-500 mb-4 leading-relaxed">
+          هيتغير الاسم في كل فواتير "{decodedName}" ({ops}) دفعة واحدة — استخدمها لو الاسم اتكتب بغلطة إملائية، مش لعمل مورد جديد.
+        </p>
+        <Input
+          label="الاسم الصحيح"
+          value={renameValue}
+          onChange={(e) => setRenameValue(e.target.value)}
+          autoFocus
+        />
+        <div className="flex gap-3 justify-end mt-6 pt-4 border-t border-white/8">
+          <Button variant="ghost" size="sm" disabled={renaming} onClick={() => setRenameModal(false)}>إلغاء</Button>
+          <Button variant="primary" size="sm" loading={renaming}
+            disabled={!renameValue.trim() || renameValue.trim() === decodedName}
+            onClick={handleRename}>
+            حفظ
+          </Button>
+        </div>
       </Modal>
     </div>
   );

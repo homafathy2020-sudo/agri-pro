@@ -84,7 +84,11 @@ const SuppliersPage = () => {
 
       {/* New invoice modal */}
       <Modal open={invoiceModal} onClose={() => setInvoiceModal(false)} title="تسجيل فاتورة مورد جديدة">
-        <SupplierInvoiceForm onSave={handleSaveInvoice} onClose={() => setInvoiceModal(false)} />
+        <SupplierInvoiceForm
+          existingSupplierNames={suppliers.map((s) => s.supplierName)}
+          onSave={handleSaveInvoice}
+          onClose={() => setInvoiceModal(false)}
+        />
       </Modal>
 
       {/* Quick payment modal */}

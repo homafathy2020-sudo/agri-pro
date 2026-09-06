@@ -22,6 +22,9 @@ import {
   calcTotalPaidForJob,
   derivePaymentStatusFromPayments,
   checkOverdueDebts,
+  calcSupplierRemaining,
+  getInvoicePaidAmount,
+  aggregateSupplierInvoices,
 } from "./calculations";
 
 // ─── calcRevenue / calcFuelCost ────────────────────────────────────────────
@@ -329,5 +332,75 @@ describe("checkOverdueDebts", () => {
     const overdue = checkOverdueDebts(jobs, 12, 30, []);
     expect(overdue[0].job.id).toBe("big");
     expect(overdue[1].job.id).toBe("small");
+  });
+});
+
+// ─── Supplier invoices/payments (money the business owes OUT) ─────────────────
+// Mirror of the client-side tests above, flipped direction. These back the
+// "مستحقات الموردين" figure on the dashboard and its net-profit deduction,
+// so a silent regression here directly misstates the business's profit.
+
+describe("calcSupplierRemaining", () => {
+  test("subtracts what's been paid from the invoice amount", () => {
+    expect(calcSupplierRemaining(10000, 4000)).toBe(6000);
+  });
+
+  test("never goes negative, even if overpaid", () => {
+    expect(calcSupplierRemaining(1000, 1500)).toBe(0);
+  });
+
+  test("treats missing/invalid values as zero", () => {
+    expect(calcSupplierRemaining(undefined, undefined)).toBe(0);
+    expect(calcSupplierRemaining(1000, "not-a-number")).toBe(1000);
+  });
+});
+
+describe("getInvoicePaidAmount", () => {
+  const payments = [
+    { supplierInvoiceId: "inv1", amount: 3000 },
+    { supplierInvoiceId: "inv1", amount: 2000 },
+    { supplierInvoiceId: "inv2", amount: 500 },
+  ];
+
+  test("sums every payment linked to that invoice id", () => {
+    expect(getInvoicePaidAmount({ id: "inv1" }, payments)).toBe(5000);
+  });
+
+  test("returns 0 for an invoice with no payments yet", () => {
+    expect(getInvoicePaidAmount({ id: "inv3" }, payments)).toBe(0);
+  });
+
+  test("also accepts a pre-built Map (used internally by aggregateSupplierInvoices)", () => {
+    const map = new Map([["inv1", 5000]]);
+    expect(getInvoicePaidAmount({ id: "inv1" }, map)).toBe(5000);
+  });
+});
+
+describe("aggregateSupplierInvoices", () => {
+  const invoices = [
+    { id: "inv1", supplierName: "ورشة السيد", amount: 10000 },
+    { id: "inv2", supplierName: "محمد النجار", amount: 4000 },
+  ];
+
+  test("with no payments at all, everything invoiced is still payable", () => {
+    const stats = aggregateSupplierInvoices(invoices, []);
+    expect(stats).toEqual({ totalInvoiced: 14000, totalPaidOut: 0, totalPayable: 14000 });
+  });
+
+  // This is the exact scenario behind the dashboard bug: a 10,000 invoice
+  // partially paid down to 5,000 must show as 5,000 payable everywhere,
+  // not stay stuck at the original 10,000.
+  test("a partial payment shrinks totalPayable immediately (cash basis, not accrual)", () => {
+    const payments = [{ supplierInvoiceId: "inv1", amount: 5000 }];
+    const stats = aggregateSupplierInvoices(invoices, payments);
+    expect(stats.totalInvoiced).toBe(14000); // historical total never changes
+    expect(stats.totalPaidOut).toBe(5000);
+    expect(stats.totalPayable).toBe(9000);   // 5,000 left on inv1 + all of inv2
+  });
+
+  test("a fully paid invoice contributes nothing to totalPayable", () => {
+    const payments = [{ supplierInvoiceId: "inv1", amount: 10000 }];
+    const stats = aggregateSupplierInvoices(invoices, payments);
+    expect(stats.totalPayable).toBe(4000); // only inv2 left
   });
 });

@@ -10,7 +10,14 @@ import { todayISO } from "../../utils/formatters";
 // or made/supplied something for the business. "amount" is the FULL amount
 // owed, recorded immediately (accrual) — paying it off later is tracked
 // separately via SupplierPaymentForm, never by editing this amount.
-const SupplierInvoiceForm = ({ initial, onSave, onClose }) => {
+//
+// A supplier isn't a real entity with its own id — it's just whatever name
+// gets typed here, grouped later by exact string match (see useSuppliers.js).
+// That means a typo creates a brand-new "supplier" instead of adding to an
+// existing one. `existingSupplierNames` backs a browser autocomplete
+// (<datalist>) so re-typing an existing supplier's name suggests the exact
+// spelling already on file instead of inviting a near-duplicate.
+const SupplierInvoiceForm = ({ initial, existingSupplierNames = [], onSave, onClose }) => {
   const {
     register,
     handleSubmit,
@@ -45,9 +52,15 @@ const SupplierInvoiceForm = ({ initial, onSave, onClose }) => {
           <Input
             label="اسم المورد / الشخص *"
             placeholder="مثال: ورشة السيد، محمد النجار..."
+            list="supplier-name-options"
             error={errors.supplierName?.message}
             {...register("supplierName", { required: "هذا الحقل مطلوب" })}
           />
+          {existingSupplierNames.length > 0 && (
+            <datalist id="supplier-name-options">
+              {existingSupplierNames.map((name) => <option key={name} value={name} />)}
+            </datalist>
+          )}
         </div>
 
         <div className="sm:col-span-2">

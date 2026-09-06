@@ -1,7 +1,7 @@
 // src/contexts/DataContext.jsx
 import React, { createContext, useContext, useCallback, useReducer, useEffect, useState, useRef } from "react";
 import toast from "react-hot-toast";
-import { waitForPendingWrites, writeBatch, doc, collection, query, where, getDocs } from "firebase/firestore";
+import { waitForPendingWrites, writeBatch, doc, collection, query, where, getDocs, serverTimestamp } from "firebase/firestore";
 import { db } from "../config/firebase";
 import { useAuth }              from "./AuthContext";
 import { equipmentService }    from "../services/equipmentService";
@@ -749,6 +749,47 @@ export const DataProvider = ({ children }) => {
     toast.success("تم حذف الدفعة");
   }, [user, trackWrite]);
 
+  // مفيش "مورد" حقيقي بـ id خاص بيه — هو بس اسم متكرر في كل فاتورة (زي
+  // العميل بالظبط). فلو اتكتب بغلطة إملائية مختلفة قبل كده، تصحيح الاسم
+  // معناه تحديث كل الفواتير اللي عليها الاسم القديم دفعة واحدة، مش فاتورة
+  // بفاتورة — عشان الفواتير القديمة تفضل تتجمع تحت نفس المورد بعد التصحيح
+  // بدل ما تتقسم بين اسمين. نفس أسلوب batch الذري المستخدم في
+  // deleteSupplierInvoice فوق.
+  const renameSupplier = useCallback(async (oldName, newName) => {
+    const trimmedNewName = (newName || "").trim();
+    if (!trimmedNewName || trimmedNewName === oldName) return;
+
+    const affectedInvoices = stateRef.current.supplierInvoices.filter(
+      (inv) => inv.supplierName === oldName
+    );
+    if (affectedInvoices.length === 0) return;
+
+    affectedInvoices.forEach((inv) =>
+      dispatch({ type: "UPDATE_SUPPLIER_INVOICE", payload: { ...inv, supplierName: trimmedNewName } })
+    );
+
+    const writePromise = (async () => {
+      const batch = writeBatch(db);
+      affectedInvoices.forEach((inv) => {
+        batch.update(doc(db, "users", user.uid, "supplierInvoices", inv.id), {
+          supplierName: trimmedNewName,
+          updatedAt: serverTimestamp(),
+        });
+      });
+      await batch.commit();
+    })();
+
+    trackWrite(writePromise, {
+      rollback: () => {
+        affectedInvoices.forEach((inv) =>
+          dispatch({ type: "UPDATE_SUPPLIER_INVOICE", payload: inv })
+        );
+      },
+      errorMessage: "تعذر تعديل اسم المورد، تم التراجع عن التغيير",
+    });
+    toast.success(`تم تغيير الاسم إلى "${trimmedNewName}" في ${affectedInvoices.length} فاتورة`);
+  }, [user, trackWrite]);
+
   const addSalaryEntry = useCallback(async (d) => {
     const { id, promise } = salaryService.add(user.uid, d);
     dispatch({ type: "ADD_SALARY", payload: { id, ...d } });
@@ -890,7 +931,7 @@ export const DataProvider = ({ children }) => {
     addDriver, updateDriver, deleteDriver,
     addMaintenance, updateMaintenance, deleteMaintenance,
     addPayment, updatePayment, deletePayment,
-    addSupplierInvoice, updateSupplierInvoice, deleteSupplierInvoice,
+    addSupplierInvoice, updateSupplierInvoice, deleteSupplierInvoice, renameSupplier,
     addSupplierPayment, updateSupplierPayment, deleteSupplierPayment,
     addSalaryEntry, updateSalaryEntry, deleteSalaryEntry,
     addAttendance, updateAttendance, deleteAttendance,

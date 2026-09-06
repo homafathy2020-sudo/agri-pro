@@ -234,10 +234,10 @@ export const calcSupplierRemaining = (invoiceAmount, amountPaid) =>
 
 /**
  * Aggregate stats across ALL supplier invoices — used for the dashboard's
- * "total payable" figure and for the net-profit calculation (accrual: the
- * full invoice amount counts as a cost the moment it's recorded, regardless
- * of whether it's been paid yet — exactly like job revenue counts the
- * moment the job is recorded, regardless of whether the client has paid).
+ * "total payable" figure and for the net-profit calculation (cash basis:
+ * only the unpaid remainder counts as a cost, so partial payments shrink
+ * it immediately — see useDashboard.js for why this isn't accrual like
+ * job revenue).
  */
 export const aggregateSupplierInvoices = (supplierInvoices = [], supplierPayments = []) => {
   const paidByInvoiceId = buildPaidAmountsByInvoiceId(supplierPayments);
@@ -250,33 +250,6 @@ export const aggregateSupplierInvoices = (supplierInvoices = [], supplierPayment
     return s + calcSupplierRemaining(inv.amount, paid);
   }, 0);
   return { totalInvoiced, totalPaidOut, totalPayable };
-};
-
-/**
- * Aggregate all invoices for a single supplier name.
- */
-export const buildSupplierSummary = (supplierName, supplierInvoices, supplierPayments = []) => {
-  const invoices = supplierInvoices.filter((inv) => inv.supplierName === supplierName);
-  const stats     = aggregateSupplierInvoices(invoices, supplierPayments);
-  return {
-    supplierName,
-    invoices,
-    ops:           invoices.length,
-    totalInvoiced: stats.totalInvoiced,
-    totalPaidOut:  stats.totalPaidOut,
-    totalPayable:  stats.totalPayable,
-  };
-};
-
-/**
- * Build the full supplier list from supplierInvoices, sorted by how much
- * we still owe them (descending) — same convention as buildClientList.
- */
-export const buildSupplierList = (supplierInvoices = [], supplierPayments = []) => {
-  const names = [...new Set(supplierInvoices.map((inv) => inv.supplierName).filter(Boolean))];
-  return names
-    .map((name) => buildSupplierSummary(name, supplierInvoices, supplierPayments))
-    .sort((a, b) => b.totalPayable - a.totalPayable);
 };
 
 // ─── Payment instalments ──────────────────────────────────────────────────────
