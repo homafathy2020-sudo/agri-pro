@@ -21,8 +21,15 @@ import { attendanceService }   from "../services/attendanceService";
 import { custodyService }      from "../services/custodyService";
 import { taxDeductionService } from "../services/taxDeductionService";
 import { backupService }       from "../services/backupService";
+// Write-only, experimental — see the "Dashboard summary (write-only,
+// experimental)" block further down for the one place this is used, and
+// dashboardSummaryService.js for the rollback note.
+import { dashboardSummaryService } from "../services/dashboardSummaryService";
 import { DEFAULT_FUEL_PRICE, BACKUP_INTERVAL_MS } from "../config/constants";
 import { driverCostToSalaryEntry } from "../utils/migrateDriverCosts";
+import { aggregateJobs, aggregateSupplierInvoices } from "../utils/calculations";
+import { calcTotalSalariesPaid } from "../utils/salaryCalculations";
+import { calcTotalTaxDeductions } from "../utils/taxCalculations";
 
 const initialState = {
   equipment:     [],
@@ -365,6 +372,58 @@ export const DataProvider = ({ children }) => {
 
         if (anyFailed) {
           toast.error("تعذر تحميل بعض البيانات — هيتم إعادة المحاولة تلقائيًا لما النت يرجع");
+        }
+
+        // ── Dashboard summary (write-only, experimental) ─────────────────
+        // Nothing reads this document anywhere yet — see
+        // dashboardSummaryService.js. This block only runs the exact same
+        // calculation useDashboard.js already does (same functions, same
+        // arguments, imported directly — not reimplemented), using the
+        // freshly-fetched values from this load round, then persists the
+        // result. Skipped entirely (no write attempted) unless every
+        // collection this calculation depends on loaded successfully this
+        // round — writing a summary derived from a partially-failed load
+        // would just be a wrong number sitting in Firestore for a later
+        // phase to accidentally trust.
+        if (
+          jobsR.ok && paymentsR.ok && maintenanceR.ok && settingsR.ok &&
+          mergedSalaryEntries !== undefined && taxDeductionsR.ok &&
+          supplierInvoicesR.ok && supplierPaymentsR.ok
+        ) {
+          try {
+            const fuelPrice = settingsR.data?.fuelPrice ?? DEFAULT_FUEL_PRICE;
+            const totals = aggregateJobs(jobsR.data, fuelPrice, paymentsR.data);
+            const totalMaintCost = maintenanceR.data.reduce((s, m) => s + (Number(m.cost) || 0), 0);
+            const totalSalariesPaid = calcTotalSalariesPaid(mergedSalaryEntries);
+            const totalTaxDeductions = calcTotalTaxDeductions(taxDeductionsR.data);
+            const { totalPayable: totalSupplierPayable } =
+              aggregateSupplierInvoices(supplierInvoicesR.data, supplierPaymentsR.data);
+            const netProfit = totals.netProfit - totalMaintCost - totalSalariesPaid - totalTaxDeductions - totalSupplierPayable;
+            const margin = totals.totalRevenue > 0 ? (netProfit / totals.totalRevenue) * 100 : 0;
+
+            // Fire-and-forget on purpose: a failed summary write must never
+            // surface to the user or affect anything else in the app — it
+            // isn't real data, just a cached hint nothing reads yet.
+            dashboardSummaryService
+              .write(user.uid, {
+                totalRevenue: totals.totalRevenue,
+                totalFuelCost: totals.totalFuelCost,
+                totalPaid: totals.totalPaid,
+                totalRemaining: totals.totalRemaining,
+                totalMaintCost,
+                totalSalariesPaid,
+                totalTaxDeductions,
+                totalSupplierPayable,
+                netProfit,
+                margin,
+              })
+              .catch((err) => console.warn("Dashboard summary write failed (non-fatal, ignored):", err));
+          } catch (err) {
+            // Same non-fatal contract even if the calculation itself throws
+            // (e.g. unexpected shape in one of the collections) — this must
+            // never take down the real load that already succeeded above.
+            console.warn("Dashboard summary compute failed (non-fatal, ignored):", err);
+          }
         }
       } catch (err) {
         if (cancelled) return;
