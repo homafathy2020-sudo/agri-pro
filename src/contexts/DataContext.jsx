@@ -49,14 +49,6 @@ const reducer = (state, action) => {
     case "ADD_EQUIPMENT":    return { ...state, equipment: [action.payload, ...state.equipment] };
     case "UPDATE_EQUIPMENT": return { ...state, equipment: state.equipment.map(e => e.id === action.payload.id ? action.payload : e) };
     case "DELETE_EQUIPMENT": return { ...state, equipment: state.equipment.filter(e => e.id !== action.payload) };
-    // EXPERIMENTAL (equipment-only pilot) — full-array replace from the live
-    // onSnapshot listener in the effect below. This fires moments after any
-    // ADD/UPDATE/DELETE_EQUIPMENT optimistic dispatch too (Firestore
-    // includes locally-pending writes in its cache), and since it's a full
-    // replace keyed by the same doc IDs the optimistic dispatch already
-    // used, it naturally reconciles into the confirmed state without ever
-    // duplicating or fighting the optimistic update above.
-    case "SET_EQUIPMENT":    return { ...state, equipment: action.payload };
 
     case "ADD_JOB":    return { ...state, jobs: [action.payload, ...state.jobs] };
     case "UPDATE_JOB": return { ...state, jobs: state.jobs.map(j => j.id === action.payload.id ? action.payload : j) };
@@ -220,116 +212,6 @@ export const DataProvider = ({ children }) => {
   const [reloadTick, setReloadTick] = useState(0);
   const retryLoad = useCallback(() => setReloadTick((t) => t + 1), []);
 
-  // ── EXPERIMENTAL — equipment-only pilot ──────────────────────────────────
-  // `equipmentReady`: true once it's SAFE to stop showing a loading state —
-  // either the server has confirmed the data, the device is genuinely
-  // offline (cache is the best truth available), or (the fix below) a
-  // reasonable wait for server confirmation has passed without one arriving
-  // while the device *appears* online — e.g. Firestore's connection is
-  // silently blocked by a firewall/VPN/captive portal even though
-  // navigator.onLine reports true. Combined into the exposed `loading`
-  // below so no page can render off of an unconfirmed cache-only snapshot
-  // *indefinitely* — but it also must never hang forever, since an
-  // infinitely stuck loading screen is worse than a clearly-labeled
-  // best-effort one.
-  //
-  // `equipmentDataConfirmed`: true ONLY when the current equipment data is
-  // actually known to match the server (fromCache === false this session).
-  // False in both the genuine-offline case AND the timeout-fallback case —
-  // deliberately kept separate from `equipmentReady` so a future consumer
-  // can tell "safe to stop showing a spinner" apart from "this is verified
-  // fresh", instead of the timeout fallback quietly masquerading as a real
-  // confirmation. Nothing reads this yet (pilot only touches these two
-  // files), but it exists so the distinction the fix requires is real in
-  // the data, not just in a comment.
-  const [equipmentReady, setEquipmentReady] = useState(false);
-  const [equipmentDataConfirmed, setEquipmentDataConfirmed] = useState(false);
-
-  // How long to wait for a server-confirmed snapshot before falling back to
-  // "use whatever the cache gave us, clearly marked as unconfirmed" instead
-  // of waiting forever. 8s is generous for a normal connection (the server
-  // round-trip is normally near-instant) while still being short enough
-  // that a genuinely stuck connection doesn't leave the user staring at a
-  // spinner for an unreasonable time.
-  const EQUIPMENT_CONFIRM_TIMEOUT_MS = 8000;
-
-  useEffect(() => {
-    if (!user) {
-      setEquipmentReady(false);
-      setEquipmentDataConfirmed(false);
-      return;
-    }
-    setEquipmentReady(false);
-    setEquipmentDataConfirmed(false);
-    let settled = false; // true once ready has been decided one way or another, for any reason
-
-    // Fires only if neither a server-confirmed snapshot nor a genuine-
-    // offline snapshot arrives within the window — i.e. exactly the "looks
-    // online but Firestore is unreachable" case this fix targets. Whatever
-    // the listener has delivered so far (possibly nothing, possibly a
-    // cached snapshot) is treated as the best available truth so the app
-    // can proceed, but equipmentDataConfirmed stays false so this state is
-    // never mistaken for a real server confirmation.
-    const timeoutId = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      console.warn("equipment: server confirmation timed out — proceeding with cached/partial data");
-      setLoadError(true);
-      setEquipmentReady(true);
-      // equipmentDataConfirmed intentionally left false here.
-    }, EQUIPMENT_CONFIRM_TIMEOUT_MS);
-
-    const unsubscribe = equipmentService.subscribe(
-      user.uid,
-      (docs, { fromCache }) => {
-        dispatch({ type: "SET_EQUIPMENT", payload: docs });
-        if (settled) return;
-        // Genuine confirmation (server-confirmed) or genuine offline (best
-        // truth available while disconnected) — either way, this is a
-        // real, well-understood state, not a guess, so it resolves
-        // immediately without waiting for the timeout.
-        if (!fromCache) {
-          settled = true;
-          clearTimeout(timeoutId);
-          setEquipmentDataConfirmed(true);
-          setEquipmentReady(true);
-        } else if (!navigator.onLine) {
-          settled = true;
-          clearTimeout(timeoutId);
-          setEquipmentReady(true);
-          // equipmentDataConfirmed intentionally left false — this is
-          // cache data while genuinely offline, not a server confirmation.
-        }
-        // Otherwise (fromCache && navigator.onLine): still waiting to see
-        // whether a real confirmation arrives before the timeout above
-        // fires — this is exactly the ambiguous "looks online" window the
-        // timeout exists to bound.
-      },
-      (err) => {
-        // Same philosophy as safeFetch for every other collection: a
-        // failure here must not hang the ENTIRE app forever (equipmentReady
-        // feeds into the global `loading` below) — surface it via the
-        // existing loadError/OfflineBanner/retry mechanism instead, and let
-        // the rest of the app proceed with whatever equipment data (if any)
-        // is already in state.
-        if (settled) return;
-        settled = true;
-        clearTimeout(timeoutId);
-        console.warn("equipment onSnapshot error:", err);
-        setLoadError(true);
-        setEquipmentReady(true);
-      }
-    );
-    // MUST unsubscribe on logout/user switch — otherwise a listener for the
-    // previous account keeps running (and keeps billing reads) forever.
-    // Also clears the timeout so it can never fire after this effect has
-    // already been torn down (e.g. a fast logout right after login).
-    return () => {
-      clearTimeout(timeoutId);
-      unsubscribe();
-    };
-  }, [user]);
-
   // Guards the one-time driverCosts→salaryEntries migration below against
   // running concurrently (e.g. a retry/online-reconnect load firing while a
   // previous load's migration is still in flight). Without this, two
@@ -357,22 +239,6 @@ export const DataProvider = ({ children }) => {
           ? Promise.resolve({ ok: true, data: [] })
           : safeFetch(driverCostService.getAll(user.uid));
 
-        // Fetch every collection in parallel. jobs/payments/attendance are
-        // fetched in full (getAll), same as everything else — see the
-        // architecture review notes in this file's header comment for why
-        // a "recent-first, then full" split was tried and then reverted:
-        // once every page that reads these three waits for the complete
-        // list before rendering anything (required — see useDashboard.js
-        // etc.), fetching a "recent" slice first bought zero time-to-usable
-        // improvement while re-reading the same recent documents twice.
-        //
-        // `equipment` is deliberately NOT in this batch anymore — it's an
-        // experimental pilot now sourced by a live onSnapshot listener (see
-        // the dedicated effect below) instead of a one-time getAll(), to
-        // actually make use of the persistentLocalCache already configured
-        // in config/firebase.js. No other collection is touched by this
-        // pilot.
-        //
         // Every collection is fetched independently (safeFetch) so that a
         // single failed read doesn't take down the whole dashboard — but
         // unlike before, a failure is now tracked instead of silently
@@ -382,6 +248,7 @@ export const DataProvider = ({ children }) => {
         // show yet either way — but it will no longer stomp on real data
         // during a retry/reconnect load).
         const results = await Promise.all([
+          safeFetch(equipmentService.getAll(user.uid)),
           safeFetch(jobService.getAll(user.uid)),
           safeFetch(driverService.getAll(user.uid)),
           safeFetch(maintenanceService.getAll(user.uid)),
@@ -396,7 +263,7 @@ export const DataProvider = ({ children }) => {
           safeFetch(taxDeductionService.getAll(user.uid)),
         ]);
         const [
-          jobsR, driversR, maintenanceR, settingsR,
+          equipmentR, jobsR, driversR, maintenanceR, settingsR,
           paymentsR, supplierInvoicesR, supplierPaymentsR,
           driverCostsR, salaryEntriesR, attendanceR, custodyR,
           taxDeductionsR,
@@ -481,6 +348,7 @@ export const DataProvider = ({ children }) => {
         }
 
         const payload = {};
+        if (equipmentR.ok)    payload.equipment    = equipmentR.data;
         if (jobsR.ok)         payload.jobs         = jobsR.data;
         if (driversR.ok)      payload.drivers      = driversR.data;
         if (maintenanceR.ok)  payload.maintenance  = maintenanceR.data;
@@ -534,17 +402,12 @@ export const DataProvider = ({ children }) => {
 
   useEffect(() => {
     // Guard against backing up incomplete/stale data: only proceed once the
-    // user is authenticated, the current load has finished, that load
-    // didn't leave any required collection unloaded (loadError), AND —
-    // during this equipment-only pilot — the live equipment listener has
-    // delivered its first confirmed snapshot too (equipmentReady). Without
-    // this last check, a backup could fire the instant the OTHER 12
-    // collections finish their batch load, while state.equipment is still
-    // whatever the listener happened to have delivered so far (possibly
-    // still empty on a cold cache) — producing an incomplete backup. Once
-    // equipment moves off this pilot onto the same footing as everything
-    // else, this extra check goes away with it.
-    if (!user || state.loading || loadError || !equipmentReady) return;
+    // user is authenticated, the current load has finished, and that load
+    // didn't leave any required collection unloaded (loadError). Without
+    // this, a failed/partial load (state.loading === false but some
+    // collections missing) would still let a backup run and snapshot
+    // whatever partial state happens to be in memory.
+    if (!user || state.loading || loadError) return;
     let cancelled = false;
     let runningNow = false;
 
@@ -615,7 +478,7 @@ export const DataProvider = ({ children }) => {
       clearInterval(interval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, state.loading, loadError, equipmentReady, backupRetryTick]);
+  }, [user, state.loading, loadError, backupRetryTick]);
 
   // ── Mutations ─────────────────────────────────────────────────────────
   // IMPORTANT: none of these `await` the Firestore write before updating
@@ -1060,22 +923,6 @@ export const DataProvider = ({ children }) => {
 
   const value = {
     ...state,
-    // EXPERIMENTAL (equipment-only pilot): the batch load (state.loading)
-    // and the equipment listener (equipmentReady) are two independent
-    // readiness sources right now — combine them here so every existing
-    // consumer's `loading` check keeps meaning exactly what it always
-    // meant ("everything required is confirmed, safe to render"), without
-    // any of those 9+ hooks needing to know equipment is sourced
-    // differently under the hood.
-    loading: state.loading || !equipmentReady,
-    // EXPERIMENTAL (equipment-only pilot): true only when the equipment
-    // currently in state is actually known to match the server this
-    // session — false during the genuine-offline and timeout-fallback
-    // "best effort" cases (see the effect above), so a future consumer can
-    // choose to show something like "equipment: not yet confirmed" without
-    // that ever being confused with a real confirmation. Nothing reads
-    // this yet — it exists for the next phase.
-    equipmentDataConfirmed,
     pendingWrites, lastSyncedAt, firstPendingWriteAt,
     loadError, retryLoad,
     backupFailCount, retryBackupNow,
