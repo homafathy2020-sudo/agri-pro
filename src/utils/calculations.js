@@ -267,6 +267,23 @@ export const aggregateSupplierInvoices = (supplierInvoices = [], supplierPayment
   return { totalInvoiced, totalPaidOut, totalPayable };
 };
 
+/**
+ * Single source of truth for "صافي الربح", used identically by the
+ * dashboard, the Reports page, and the monthly/all-time PDF — so the same
+ * period always shows the same number everywhere. Cash-basis on the
+ * supplier side (totalSupplierPaidOut, not totalPayable — see
+ * aggregateSupplierInvoices above for why).
+ */
+export const calcNetProfit = ({
+  totalRevenue = 0,
+  totalFuelCost = 0,
+  totalMaintCost = 0,
+  totalSalariesPaid = 0,
+  totalTaxDeductions = 0,
+  totalSupplierPaidOut = 0,
+} = {}) =>
+  totalRevenue - totalFuelCost - totalMaintCost - totalSalariesPaid - totalTaxDeductions - totalSupplierPaidOut;
+
 // ─── Payment instalments ──────────────────────────────────────────────────────
 
 /**

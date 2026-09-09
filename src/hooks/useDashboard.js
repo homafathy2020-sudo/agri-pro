@@ -7,6 +7,7 @@ import {
   groupByWorkType,
   buildEquipmentReport,
   aggregateSupplierInvoices,
+  calcNetProfit,
 } from "../utils/calculations";
 import { calcTotalSalariesPaid } from "../utils/salaryCalculations";
 import { calcTotalTaxDeductions } from "../utils/taxCalculations";
@@ -53,7 +54,14 @@ export const useDashboard = () => {
   );
   const totalSupplierPaidOut = supplierStats.totalPaidOut;
 
-  const netProfit = totals.netProfit - totalMaintCost - totalSalaries - totalTaxDeductions - totalSupplierPaidOut;
+  const netProfit = calcNetProfit({
+    totalRevenue: totals.totalRevenue,
+    totalFuelCost: totals.totalFuelCost,
+    totalMaintCost,
+    totalSalariesPaid: totalSalaries,
+    totalTaxDeductions,
+    totalSupplierPaidOut,
+  });
 
   const margin = totals.totalRevenue > 0
     ? (netProfit / totals.totalRevenue) * 100

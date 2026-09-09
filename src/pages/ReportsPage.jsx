@@ -19,6 +19,7 @@ import { TEAM_ROLE } from "../config/constants";
 import { useData }                from "../contexts/DataContext";
 import { calcTotalSalariesPaid }  from "../utils/salaryCalculations";
 import { calcTotalTaxDeductions } from "../utils/taxCalculations";
+import { aggregateSupplierInvoices, calcNetProfit } from "../utils/calculations";
 import { downloadMonthlySummaryPdf } from "../utils/pdfGenerator";
 import { shortNum, truncateLabel, createAngledNameTick } from "../components/charts/chartHelpers";
 
@@ -109,9 +110,16 @@ const Legend = ({ items }) => (
 // ── ReportsPage ───────────────────────────────────────────────────────────
 const ReportsPage = () => {
   const { report: equipReport, loading: eLoading } = useEquipment();
-  const { salaryEntries = [], equipment = [], jobs = [], drivers = [], maintenance = [], taxDeductions = [], settings } = useData();
+  const {
+    salaryEntries = [], equipment = [], jobs = [], drivers = [], maintenance = [],
+    taxDeductions = [], supplierInvoices = [], supplierPayments = [], settings,
+  } = useData();
   const totalSalariesPaid = calcTotalSalariesPaid(salaryEntries, drivers);
   const totalTaxDeductions = calcTotalTaxDeductions(taxDeductions);
+  // نفس أسلوب الداشبورد بالظبط (cash basis): اللي بيتخصم من الربح هو
+  // الواصل فعلاً للموردين، مش المتبقي غير المدفوع — عشان "صافي الربح" هنا
+  // يتطابق مع نفس الرقم في الداشبورد لنفس الفترة (كل الوقت).
+  const totalSupplierPaidOut = aggregateSupplierInvoices(supplierInvoices, supplierPayments).totalPaidOut;
   const { report: driverReportAll, loading: dLoading } = useDrivers();
   // تقرير الأداء ده خاص بالعمليات الميدانية (أفدنة/عمليات/إيراد) — مالهاش
   // معنى للإداريين والمحاسبين، فبيفلتر بس السائقين الفعليين.
@@ -132,6 +140,7 @@ const ReportsPage = () => {
         allTime: true,
         totalSalariesPaid,
         totalTaxDeductions,
+        totalSupplierPaidOut,
       });
     }
 
@@ -144,6 +153,13 @@ const ReportsPage = () => {
     const taxDeductionsForPeriod = taxDeductions
       .filter((t) => (t.date || "").startsWith(monthPrefix))
       .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    // Cash basis scoped to the period: only count supplier payments actually
+    // made during this month, same "الواصل للمورد" idea as totalSupplierPaidOut
+    // above but filtered to match the rest of this month's figures.
+    const supplierPaidOutForPeriod = aggregateSupplierInvoices(
+      supplierInvoices,
+      supplierPayments.filter((p) => (p.date || "").startsWith(monthPrefix))
+    ).totalPaidOut;
 
     return downloadMonthlySummaryPdf({
       jobs, equipment, maintenance, drivers,
@@ -152,16 +168,25 @@ const ReportsPage = () => {
       allTime: false,
       totalSalariesPaid: salariesForPeriod,
       totalTaxDeductions: taxDeductionsForPeriod,
+      totalSupplierPaidOut: supplierPaidOutForPeriod,
     });
   };
 
   if (eLoading || dLoading) return <LoadingScreen />;
 
   const totalRevenue   = equipReport.reduce((s, e) => s + (e.totalRevenue  || 0), 0);
-  const totalGrossProfit = equipReport.reduce((s, e) => s + (e.netProfit || 0), 0);
-  const totalProfit      = totalGrossProfit - totalSalariesPaid - totalTaxDeductions;
   const totalFuelCost  = equipReport.reduce((s, e) => s + (e.totalFuelCost || 0), 0);
   const totalMaintCost = equipReport.reduce((s, e) => s + (e.maintCost     || 0), 0);
+  // نفس الدالة المشتركة اللي بيستخدمها الداشبورد بالظبط، عشان "صافي الربح"
+  // هنا يتطابق مع نفس الرقم في الداشبورد لنفس الفترة (كل الوقت).
+  const totalProfit = calcNetProfit({
+    totalRevenue,
+    totalFuelCost,
+    totalMaintCost,
+    totalSalariesPaid,
+    totalTaxDeductions,
+    totalSupplierPaidOut,
+  });
 
   const revenueVsProfit = equipReport.map((eq) => ({
     name:    eq.name,
@@ -239,12 +264,13 @@ const ReportsPage = () => {
       {equipReport.length > 0 && (
         <>
           {/* KPI strip */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 mb-6">
             {[
               { label:"إجمالي الإيراد",  value:formatCurrency(totalRevenue),  color:"text-amber-400",  icon:<RevenueIcon size={18}/> },
               { label:"تكلفة الوقود",    value:formatCurrency(totalFuelCost), color:"text-blue-400",   icon:<FuelIcon size={18}/> },
               { label:"تكاليف الصيانة",   value:formatCurrency(totalMaintCost),      color:"text-purple-400", icon:<AcreIcon size={18}/> },
               { label:"مرتبات الفريق", value:formatCurrency(totalSalariesPaid), color:"text-red-400",    icon:<DriverIcon size={18}/> },
+              { label:"الواصل للمورد", value:formatCurrency(totalSupplierPaidOut), color:"text-red-400",    icon:<ReceiptIcon size={18}/> },
               { label:"ضرائب وخصومات",   value:formatCurrency(totalTaxDeductions), color:"text-red-400",    icon:<ReceiptIcon size={18}/> },
               { label:"صافي الربح",      value:formatCurrency(totalProfit),   color:totalProfit>=0?"text-green-400":"text-red-400", icon:<ChartIcon size={18}/> },
             ].map((s) => (

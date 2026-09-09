@@ -4,18 +4,19 @@
 // downloadable PDF (current month / previous month / all time).
 
 import { formatCurrency, formatNumber } from "../formatters";
-import { calcRevenue, calcFuelCost, getJobFuelPrice } from "../calculations";
+import { calcRevenue, calcFuelCost, getJobFuelPrice, calcNetProfit } from "../calculations";
 import { escapeHtml, downloadReportPdf } from "./core";
 
-const buildMonthlySummaryHtml = ({ jobs, equipment, maintenance, drivers, fuelPrice, month, year, allTime = false, totalSalariesPaid = 0, totalTaxDeductions = 0 }) => {
+const buildMonthlySummaryHtml = ({ jobs, equipment, maintenance, drivers, fuelPrice, month, year, allTime = false, totalSalariesPaid = 0, totalTaxDeductions = 0, totalSupplierPaidOut = 0 }) => {
   const today = new Date().toLocaleDateString("ar-EG");
   // allTime reuses the exact same report layout/calculations below, just
   // without the date filters on jobs/maintenance — so it lines up with the
   // Reports page's own all-time totals instead of one calendar month.
-  // totalSalariesPaid defaults to 0 only for callers that don't pass it;
-  // the caller is expected to already scope it to match (month-filtered
-  // salary entries for a monthly report, the page's own all-time total for
-  // allTime) — this function doesn't filter it itself.
+  // totalSalariesPaid/totalTaxDeductions/totalSupplierPaidOut default to 0
+  // only for callers that don't pass them; the caller is expected to
+  // already scope each to match the period (month-filtered entries for a
+  // monthly report, the page's own all-time total for allTime) — this
+  // function doesn't filter any of them itself.
   const periodLabel = allTime
     ? "كل الوقت"
     : new Date(year, month - 1).toLocaleDateString("ar-EG", { month:"long", year:"numeric" });
@@ -29,7 +30,16 @@ const buildMonthlySummaryHtml = ({ jobs, equipment, maintenance, drivers, fuelPr
   const totalAcres    = monthJobs.reduce((s, j) => s + (j.acres || 0), 0);
   const totalFuelCost = monthJobs.reduce((s, j) => s + calcFuelCost(j.fuelUsed, getJobFuelPrice(j, fuelPrice)), 0);
   const maintCost     = monthMaintenance.reduce((s, m) => s + (m.cost || 0), 0);
-  const netProfit     = totalRevenue - totalFuelCost - maintCost - totalSalariesPaid - totalTaxDeductions;
+  // نفس الدالة المشتركة اللي بيستخدمها الداشبورد وصفحة التقارير بالظبط،
+  // عشان "صافي الربح" في الـ PDF يتطابق مع نفس الرقم في الصفحتين لنفس الفترة.
+  const netProfit = calcNetProfit({
+    totalRevenue,
+    totalFuelCost,
+    totalMaintCost: maintCost,
+    totalSalariesPaid,
+    totalTaxDeductions,
+    totalSupplierPaidOut,
+  });
 
   const equip = [...new Set(monthJobs.map((j) => j.equipmentId))].map((id) => {
     const eq       = equipment.find((e) => e.id === id);
@@ -77,6 +87,7 @@ const buildMonthlySummaryHtml = ({ jobs, equipment, maintenance, drivers, fuelPr
           <tr><td style="font-weight:600">تكلفة الوقود</td><td>${formatCurrency(totalFuelCost)}</td></tr>
           <tr><td style="font-weight:600">تكاليف الصيانة</td><td>${formatCurrency(maintCost)}</td></tr>
           ${totalSalariesPaid ? `<tr><td style="font-weight:600">مرتبات الفريق</td><td>${formatCurrency(totalSalariesPaid)}</td></tr>` : ""}
+          ${totalSupplierPaidOut ? `<tr><td style="font-weight:600">الواصل للمورد</td><td>${formatCurrency(totalSupplierPaidOut)}</td></tr>` : ""}
           ${totalTaxDeductions ? `<tr><td style="font-weight:600">ضرائب وخصومات</td><td>${formatCurrency(totalTaxDeductions)}</td></tr>` : ""}
           <tr class="total-row"><td>صافي الربح</td><td style="color:${netProfit>=0?"#15803d":"#991b1b"}">${formatCurrency(netProfit)}</td></tr>
         </table>
