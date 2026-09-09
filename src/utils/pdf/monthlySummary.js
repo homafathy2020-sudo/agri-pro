@@ -27,7 +27,6 @@ const buildMonthlySummaryHtml = ({ jobs, equipment, maintenance, drivers, fuelPr
 
   const totalRevenue  = monthJobs.reduce((s, j) => s + calcRevenue(j.acres, j.pricePerAcre), 0);
   const totalAcres    = monthJobs.reduce((s, j) => s + (j.acres || 0), 0);
-  const totalFuel     = monthJobs.reduce((s, j) => s + (j.fuelUsed || 0), 0);
   const totalFuelCost = monthJobs.reduce((s, j) => s + calcFuelCost(j.fuelUsed, getJobFuelPrice(j, fuelPrice)), 0);
   const maintCost     = monthMaintenance.reduce((s, m) => s + (m.cost || 0), 0);
   const netProfit     = totalRevenue - totalFuelCost - maintCost - totalSalariesPaid - totalTaxDeductions;
