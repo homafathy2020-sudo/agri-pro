@@ -2,23 +2,33 @@
 import {
   collection, doc,
   addDoc, getDoc, getDocs, setDoc, deleteDoc,
-  query, orderBy, serverTimestamp, writeBatch,
+  query, orderBy, serverTimestamp, writeBatch, Timestamp,
 } from "firebase/firestore";
 import { db } from "../config/firebase";
-import { COLLECTIONS, MAX_BACKUPS_KEPT } from "../config/constants";
+import { COLLECTIONS, MAX_BACKUPS_KEPT, BACKUP_CHUNK_BYTES } from "../config/constants";
 
 const metaRef      = (userId) => doc(db, COLLECTIONS.BACKUPS, userId);
 const snapshotsCol = (userId) => collection(db, COLLECTIONS.BACKUPS, userId, "snapshots");
 const snapshotRef  = (userId, id) => doc(db, COLLECTIONS.BACKUPS, userId, "snapshots", id);
+const chunksCol    = (userId, id) => collection(db, COLLECTIONS.BACKUPS, userId, "snapshots", id, "chunks");
 
 // Data-bearing subcollections (under users/{uid}/...) included in every
 // backup/restore (settings handled separately below).
+//
+// ⚠️ أي subcollection بيانات جديدة تتضاف للتطبيق لازم تتضاف هنا كمان،
+// وإلا الباك أب هيفضل ياخدها (بتتبعت من DataContext/ProfileModal في
+// الـ `data` object) بس الاستعادة (restoreSnapshot) هتتجاهلها بالكامل من
+// غير أي تحذير — ده اللي كان حاصل فعليًا مع supplierInvoices/
+// supplierPayments قبل الإصلاح ده (كانت بتُنسخ في الباك أب لكن الاستعادة
+// كانت بتسيبها كما هي من غير ما ترجّعها).
 const BACKUP_COLLECTIONS = [
   ["equipment",           "equipment"],
   ["jobs",                "jobs"],
   ["drivers",             "drivers"],
   ["maintenance",         "maintenance"],
   ["payments",            "payments"],
+  ["supplierInvoices",    "supplierInvoices"],
+  ["supplierPayments",    "supplierPayments"],
   ["salaryEntries",       "salaryEntries"],
   ["attendance",          "attendance"],
   ["custodyTransactions", "custodyTransactions"],
@@ -30,6 +40,31 @@ const countsFor = (data) =>
     acc[key] = Array.isArray(data[key]) ? data[key].length : 0;
     return acc;
   }, {});
+
+// شكل الـ Timestamp بعد ما يعدي على JSON.stringify/JSON.parse (firebase
+// JS SDK v10 بيضيف toJSON() للـ Timestamp بيرجع الشكل ده). أي حقل بالشكل
+// ده معناه كان Firestore Timestamp فعلي قبل ما يتحول لنص JSON، ولازم
+// يرجع Timestamp تاني وقت الاستعادة، مش يفضل Object عادي جوه المستند.
+const isSerializedTimestamp = (v) =>
+  v && typeof v === "object" &&
+  typeof v.seconds === "number" &&
+  typeof v.nanoseconds === "number" &&
+  Object.keys(v).every((k) => k === "seconds" || k === "nanoseconds" || k === "type");
+
+// بيمشي جوه أي object/array متداخل ويرجّع كل الحقول اللي شكلها
+// isSerializedTimestamp لـ Firestore Timestamp حقيقي — بنستخدم القيمة
+// الأصلية (seconds/nanoseconds) نفسها مش وقت دلوقتي، عشان الاستعادة ترجّع
+// نفس التاريخ اللي كان موجود فعلاً (createdAt القديمة تفضل قديمة).
+const reviveTimestamps = (value) => {
+  if (Array.isArray(value)) return value.map(reviveTimestamps);
+  if (isSerializedTimestamp(value)) return new Timestamp(value.seconds, value.nanoseconds);
+  if (value && typeof value === "object") {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) out[k] = reviveTimestamps(v);
+    return out;
+  }
+  return value;
+};
 
 // Overwrite a single subcollection under users/{uid}/{subName} with the
 // given snapshot items: deletes any live doc not present in the snapshot,
@@ -47,7 +82,7 @@ const restoreCollection = async (subName, userId, items) => {
   items.forEach((item) => {
     const { id, userId: _drop, ...rest } = item; // userId no longer stored on the doc itself
     const ref = id ? doc(colRef, id) : doc(colRef);
-    ops.push({ type: "set", ref, data: rest });
+    ops.push({ type: "set", ref, data: reviveTimestamps(rest) });
   });
 
   for (let i = 0; i < ops.length; i += 450) {
@@ -58,6 +93,23 @@ const restoreCollection = async (subName, userId, items) => {
     });
     await batch.commit();
   }
+};
+
+// بيقسّم نص JSON طويل لقطع أصغر من BACKUP_CHUNK_BYTES بايت، من غير ما
+// يقطع أي حرف UTF-8 متعدد البايتات نص نص (زي الحروف العربية) — بنشفّر
+// النص كله لـ bytes مرة واحدة وبعدين نفكّه على أجزاء بـ TextDecoder في
+// وضع stream عشان يفضل فاكر أي بايتات ناقصة من حرف اتقطع على حدود القطعة.
+const splitIntoChunks = (str, maxBytes) => {
+  const bytes = new TextEncoder().encode(str);
+  if (bytes.length <= maxBytes) return [str];
+  const decoder = new TextDecoder();
+  const chunks = [];
+  for (let i = 0; i < bytes.length; i += maxBytes) {
+    chunks.push(decoder.decode(bytes.subarray(i, i + maxBytes), { stream: true }));
+  }
+  const tail = decoder.decode(); // flush أي بايتات متبقية من آخر حرف
+  if (tail) chunks[chunks.length - 1] += tail;
+  return chunks;
 };
 
 export const backupService = {
@@ -90,23 +142,52 @@ export const backupService = {
     });
   },
 
-  /** Full data payload for one snapshot. */
+  /** Full data payload for one snapshot (مقسّم على chunks لو كان كبير). */
   async getSnapshot(userId, snapshotId) {
     const snap = await getDoc(snapshotRef(userId, snapshotId));
     if (!snap.exists()) throw new Error("النسخة الاحتياطية غير موجودة");
-    return JSON.parse(snap.data().data);
+    const meta = snap.data();
+
+    if (!meta.chunked) return JSON.parse(meta.data);
+
+    const chunksSnap = await getDocs(
+      query(chunksCol(userId, snapshotId), orderBy("index", "asc"))
+    );
+    const jsonStr = chunksSnap.docs.map((d) => d.data().text).join("");
+    return JSON.parse(jsonStr);
   },
 
   /**
    * Save a full snapshot of the user's data, update the meta doc,
    * and prune older snapshots beyond MAX_BACKUPS_KEPT.
+   *
+   * لو الـ JSON اللي بيمثّل بيانات الشركة كبير وقريب من حد Firestore
+   * لكل مستند (~1 ميجابايت)، بيتقسّم على مستندات "chunks" فرعية متعددة
+   * بدل ما نحاول نكتبه كله في مستند واحد وممكن يفضل. ده بيرفع الحد
+   * الفعلي لحجم النسخة الاحتياطية بشكل كبير (كل chunk حده الخاص به)
+   * من غير ما يغيّر أي حاجة في شكل البيانات اللي بترجع من getSnapshot.
    */
   async createBackup(userId, data) {
+    const jsonStr = JSON.stringify(data);
+    const chunks = splitIntoChunks(jsonStr, BACKUP_CHUNK_BYTES);
+    const chunked = chunks.length > 1;
+
     const ref = await addDoc(snapshotsCol(userId), {
-      data:      JSON.stringify(data),
+      ...(chunked ? { chunked: true, chunkCount: chunks.length } : { data: jsonStr }),
       counts:    countsFor(data),
       createdAt: serverTimestamp(),
     });
+
+    if (chunked) {
+      for (let i = 0; i < chunks.length; i += 450) {
+        const batch = writeBatch(db);
+        chunks.slice(i, i + 450).forEach((text, offset) => {
+          const index = i + offset;
+          batch.set(doc(chunksCol(userId, ref.id), String(index)), { index, text });
+        });
+        await batch.commit();
+      }
+    }
 
     await setDoc(metaRef(userId), {
       userId,
@@ -116,9 +197,22 @@ export const backupService = {
 
     const all = await this.list(userId);
     const stale = all.slice(MAX_BACKUPS_KEPT);
-    await Promise.all(stale.map((b) => deleteDoc(snapshotRef(userId, b.id))));
+    await Promise.all(stale.map((b) => this.deleteSnapshot(userId, b)));
 
     return ref.id;
+  },
+
+  /** بيمسح مستند النسخة نفسه، وكل الـ chunks التابعة له لو كانت موجودة. */
+  async deleteSnapshot(userId, snapshotMeta) {
+    if (snapshotMeta.chunked) {
+      const chunksSnap = await getDocs(chunksCol(userId, snapshotMeta.id));
+      for (let i = 0; i < chunksSnap.docs.length; i += 450) {
+        const batch = writeBatch(db);
+        chunksSnap.docs.slice(i, i + 450).forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+      }
+    }
+    await deleteDoc(snapshotRef(userId, snapshotMeta.id));
   },
 
   /**
@@ -144,7 +238,7 @@ export const backupService = {
       await restoreCollection(subName, userId, snapshotData[key] || []);
     }
     if (snapshotData.settings) {
-      await setDoc(doc(db, "users", userId, "meta", "settings"), snapshotData.settings);
+      await setDoc(doc(db, "users", userId, "meta", "settings"), reviveTimestamps(snapshotData.settings));
     }
   },
 };
