@@ -1,7 +1,7 @@
 // src/contexts/DataContext.jsx
 import React, { createContext, useContext, useCallback, useReducer, useEffect, useState, useRef } from "react";
 import toast from "react-hot-toast";
-import { waitForPendingWrites, writeBatch, doc, collection, query, where, getDocs, getDocsFromCache, getDocFromCache, serverTimestamp } from "firebase/firestore";
+import { waitForPendingWrites, writeBatch, doc, collection, query, where, getDocs, serverTimestamp } from "firebase/firestore";
 import { db } from "../config/firebase";
 import { useAuth }              from "./AuthContext";
 import { equipmentService }    from "../services/equipmentService";
@@ -103,18 +103,6 @@ const reducer = (state, action) => {
     // of being wiped to an empty array — see loadFailed below for why this
     // matters: a failed read must never look like "your data got deleted".
     case "SET_LOADED": return { ...state, ...action.payload, loading: false };
-    // Cache-first instant paint (Phase 1 of the startup-performance design).
-    // Same merge shape as SET_LOADED (only overwrites fields that actually
-    // had cached data — see readCachePreview below), and it also flips
-    // `loading` to false so the UI paints immediately instead of the
-    // loading screen. IMPORTANT: this is never treated as confirmed data —
-    // it's superseded moments later by the real SET_LOADED dispatch from
-    // the unmodified getDocs() load further down, which is still the only
-    // thing that runs the driverCosts/fuelPrice migrations and the only
-    // thing that unlocks the automatic-backup effect (see
-    // hasAuthoritativeLoad below) — so a stale/partial cache preview can
-    // never trigger a backup of itself or be mistaken for a migrated state.
-    case "SET_CACHE_PREVIEW": return { ...state, ...action.payload, loading: false };
     default: return state;
   }
 };
@@ -146,105 +134,6 @@ const driverCostsMigratedKey = (uid) => `driverCostsMigrated:${uid}`;
 // do is anchor them to whatever the settings price is *right now* — from
 // that point on, changing the settings price never touches them again.
 const fuelPriceMigratedKey = (uid) => `fuelPriceBackfilled:${uid}`;
-
-// ── Cache-first instant paint (Phase 1 of the startup-performance design) ──
-// Reads ONLY from Firestore's already-enabled persistentLocalCache
-// (config/firebase.js) — zero network round trip, zero Firestore Read cost.
-// This NEVER replaces the real load below: the unchanged getDocs()-based
-// Promise.all further down in the load effect still runs exactly as it did
-// before this change, on every load, and its result (via SET_LOADED) is
-// still what the app treats as authoritative — it's what the migrations
-// key off, and (see hasAuthoritativeLoad) what the automatic-backup effect
-// waits for. This block's only job is to let the UI paint the last-known
-// -synced data instantly instead of a blank loading screen, while that
-// real load is still in flight.
-//
-// Deliberately excludes `driverCosts` (legacy migration source — must only
-// ever be read via the authoritative path, never previewed) and never
-// touches localStorage migration flags.
-const CACHE_PREVIEW_COLLECTIONS = [
-  // [state key, Firestore subcollection name, field to sort desc by]
-  ["equipment",        "equipment",            "createdAt"],
-  ["jobs",              "jobs",                "date"],
-  ["drivers",           "drivers",             "createdAt"],
-  ["maintenance",       "maintenance",         "date"],
-  ["payments",          "payments",            "date"],
-  ["supplierInvoices",  "supplierInvoices",    "date"],
-  ["supplierPayments",  "supplierPayments",    "date"],
-  ["salaryEntries",     "salaryEntries",       "date"],
-  ["attendance",        "attendance",          "date"],
-  ["custody",           "custodyTransactions", "date"],
-  ["taxDeductions",     "taxDeductions",       "date"],
-];
-
-// Same descending-by-field order each service's getAll() already produces
-// (Firestore orderBy(field,"desc") for some, a manual .sort() for others —
-// see each services/*.js) — reproduced here client-side only for cosmetic
-// list order in this early preview; no calculation reads or depends on
-// array order anywhere in the app.
-const sortDesc = (data, field) => [...data].sort((a, b) => {
-  const av = a[field], bv = b[field];
-  const an = av && typeof av.toMillis === "function" ? av.toMillis() : (av || "");
-  const bn = bv && typeof bv.toMillis === "function" ? bv.toMillis() : (bv || "");
-  return bn > an ? 1 : bn < an ? -1 : 0;
-});
-
-// Best-effort and read-only: never throws, never writes anything, never
-// touches migration flags. Returns null (meaning "show the normal loading
-// screen, exactly as before this change") whenever there isn't enough
-// cached data to safely trust:
-//  - SAFETY FIX (financial-accuracy bug found in Phase 1 review): if ANY
-//    single collection's cache read fails (results[i].ok === false), the
-//    ENTIRE preview is discarded — not just that one collection. Before
-//    this fix, a partial failure (e.g. jobs cached successfully but
-//    payments' cache read failed) would still show a preview where jobs
-//    displayed real revenue while payments silently defaulted to an empty
-//    array — an internally inconsistent financial picture (debt/remaining
-//    totals computed as if zero payments ever existed) shown with no
-//    indication anything was missing. This is strictly all-or-nothing now:
-//    every one of CACHE_PREVIEW_COLLECTIONS must have succeeded, or none
-//    of them are shown.
-//  - if EVERY operational collection's cache is empty, an empty cache
-//    (new device, cleared browser storage) must never be shown as "your
-//    data is empty", even for a moment — so we simply skip the preview.
-//  - if the cached `settings` doc specifically is missing, we also skip:
-//    OnboardingGate decides "show onboarding" purely from
-//    settings.onboardingCompleted, and an existing customer whose settings
-//    doc merely wasn't cached must never be flashed the onboarding flow.
-const readCachePreview = async (uid) => {
-  try {
-    const results = await Promise.all(
-      CACHE_PREVIEW_COLLECTIONS.map(([, sub]) =>
-        getDocsFromCache(collection(db, "users", uid, sub)).then(
-          (snap) => ({ ok: true, data: snap.docs.map((d) => ({ id: d.id, ...d.data() })) }),
-          () => ({ ok: false, data: [] })
-        )
-      )
-    );
-
-    let cachedSettings = null;
-    try {
-      const settingsSnap = await getDocFromCache(doc(db, "users", uid, "meta", "settings"));
-      if (settingsSnap.exists()) cachedSettings = settingsSnap.data();
-    } catch { /* no cached settings doc — handled by the guard below */ }
-
-    // All-or-nothing: every collection must have succeeded (not just have
-    // *some* succeed with data) — see the SAFETY FIX note above. A single
-    // failed collection must never leave that one field silently empty
-    // while others show real cached figures.
-    const allCollectionsOk = results.every((r) => r.ok);
-    const anyCollectionData = results.some((r) => r.data.length > 0);
-    if (!allCollectionsOk || !anyCollectionData || !cachedSettings) return null;
-
-    const payload = { settings: cachedSettings };
-    CACHE_PREVIEW_COLLECTIONS.forEach(([key, , field], i) => {
-      payload[key] = sortDesc(results[i].data, field);
-    });
-    return payload;
-  } catch {
-    return null;
-  }
-};
 
 const DataContext = createContext(null);
 
@@ -342,32 +231,12 @@ export const DataProvider = ({ children }) => {
   // same legacy jobs at once.
   const migratingFuelPriceRef = useRef(false);
 
-  // True only after THIS session's real, authoritative getDocs() load
-  // (SET_LOADED below) has completed at least once — deliberately separate
-  // from `state.loading`, which the cache-first preview above can now also
-  // clear early. The automatic-backup effect keys off this flag, not
-  // `state.loading`, specifically so a backup can never run against
-  // cache-only/unconfirmed data (see readCachePreview's doc comment).
-  const [hasAuthoritativeLoad, setHasAuthoritativeLoad] = useState(false);
-
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
     (async () => {
       try {
         dispatch({ type: "SET_LOADING", payload: true });
-
-        // Best-effort instant paint from the local cache — see
-        // readCachePreview's doc comment. Purely additive: if it finds
-        // nothing safe to show, this resolves to null and behavior below
-        // is byte-for-byte what it was before this block existed. Must be
-        // dispatched AFTER the SET_LOADING above (not before) so its
-        // loading:false is the one that actually reaches the UI, instead
-        // of being immediately overwritten back to true.
-        const cachePreview = await readCachePreview(user.uid);
-        if (!cancelled && cachePreview) {
-          dispatch({ type: "SET_CACHE_PREVIEW", payload: cachePreview });
-        }
 
         // Skip the legacy driverCosts read entirely once a previous load
         // on this device already confirmed it's fully drained (flag is
@@ -548,7 +417,6 @@ export const DataProvider = ({ children }) => {
         if (taxDeductionsR.ok) payload.taxDeductions = taxDeductionsR.data;
 
         dispatch({ type: "SET_LOADED", payload });
-        if (!cancelled) setHasAuthoritativeLoad(true);
 
         if (anyFailed) {
           toast.error("تعذر تحميل بعض البيانات — هيتم إعادة المحاولة تلقائيًا لما النت يرجع");
@@ -589,14 +457,12 @@ export const DataProvider = ({ children }) => {
 
   useEffect(() => {
     // Guard against backing up incomplete/stale data: only proceed once the
-    // user is authenticated, the REAL getDocs() load has finished
-    // (hasAuthoritativeLoad — not state.loading, which the cache-first
-    // preview above can now also clear early), and that load didn't leave
-    // any required collection unloaded (loadError). Without this, a
-    // failed/partial load, or a cache-only preview with state.loading
-    // already false, would still let a backup run and snapshot whatever
-    // partial/unconfirmed state happens to be in memory.
-    if (!user || !hasAuthoritativeLoad || loadError) return;
+    // user is authenticated, the current load has finished, and that load
+    // didn't leave any required collection unloaded (loadError). Without
+    // this, a failed/partial load (state.loading === false but some
+    // collections missing) would still let a backup run and snapshot
+    // whatever partial state happens to be in memory.
+    if (!user || state.loading || loadError) return;
     let cancelled = false;
     let runningNow = false;
 
@@ -667,7 +533,7 @@ export const DataProvider = ({ children }) => {
       clearInterval(interval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, hasAuthoritativeLoad, loadError, backupRetryTick]);
+  }, [user, state.loading, loadError, backupRetryTick]);
 
   // ── Mutations ─────────────────────────────────────────────────────────
   // IMPORTANT: none of these `await` the Firestore write before updating
