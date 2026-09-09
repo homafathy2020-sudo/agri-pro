@@ -56,8 +56,8 @@ export const useSalary = () => {
 
   /** Total salaries paid — used to deduct from overall profit */
   const totalSalariesPaid = useMemo(
-    () => calcTotalSalariesPaid(salaryEntries),
-    [salaryEntries]
+    () => calcTotalSalariesPaid(salaryEntries, drivers),
+    [salaryEntries, drivers]
   );
 
   /** Current month salary summary per driver */

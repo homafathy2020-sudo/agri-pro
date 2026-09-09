@@ -60,24 +60,39 @@ export const calcOutstandingAdvances = (allEntries, driverId) => {
 
 /**
  * Total salary paid to ALL drivers (for profit deduction).
- * Net cost = base + bonus - deductions - advanceRepayments
- * (same logic as calcMonthlySalary's "net"; advances themselves are excluded
- * because they're a receivable/debt, not an expense).
+ * Net cost = base + bonus - deductions - advanceRepayments, computed the
+ * SAME way as calcMonthlySalary (grouped per driver per month, applying
+ * each driver's default base salary when a month has no explicit BASE
+ * entry). Without this grouping, a driver whose base is never logged
+ * explicitly but who has a deduction/advance-repayment entry that month
+ * would contribute a bare negative number with nothing to net it against,
+ * which flips the sign of "مرتبات الفريق" and — because it's subtracted
+ * from profit — makes net profit look artificially higher.
+ *
+ * `drivers` is optional (defaults to []) for backward-compat with existing
+ * callers; without it, default-base fallback simply won't apply (same as
+ * calcMonthlySalary with defaultBase = 0).
  */
-export const calcTotalSalariesPaid = (allEntries) =>
-  allEntries.reduce((s, e) => {
-    const amount = Number(e.amount) || 0;
-    switch (e.type) {
-      case SALARY_ENTRY_TYPES.BASE:
-      case SALARY_ENTRY_TYPES.BONUS:
-        return s + amount;
-      case SALARY_ENTRY_TYPES.DEDUCTION:
-      case SALARY_ENTRY_TYPES.ADVANCE_REPAY:
-        return s - amount;
-      default:
-        return s;
-    }
-  }, 0);
+export const calcTotalSalariesPaid = (allEntries, drivers = []) => {
+  const driverById = new Map(drivers.map((d) => [d.id, d]));
+
+  // Group entries by driver + month, same unit calcMonthlySalary works on.
+  const groups = new Map();
+  allEntries.forEach((e) => {
+    const yearMonth = (e.date || "").slice(0, 7) || "_nodate";
+    const key = `${e.driverId}|${yearMonth}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(e);
+  });
+
+  let total = 0;
+  groups.forEach((entries, key) => {
+    const driverId = key.split("|")[0];
+    const defaultBase = driverById.get(driverId)?.salary || 0;
+    total += calcMonthlySalary(entries, defaultBase).net;
+  });
+  return total;
+};
 
 /**
  * Absence deduction per day based on base salary and working days.

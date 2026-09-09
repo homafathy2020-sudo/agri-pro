@@ -156,6 +156,36 @@ describe("calcTotalSalariesPaid", () => {
     // 3000 + 500 - 200 - 300 = 3000
     expect(calcTotalSalariesPaid(entries)).toBe(3000);
   });
+
+  test("applies each driver's default base salary when no BASE entry was logged that month (bug regression)", () => {
+    // d1's base salary is never logged as an explicit entry (relies on the
+    // driver's default salary), but a deduction was logged for them this
+    // month. Without grouping + default-base fallback, this used to sum to
+    // -300 for d1 alone, flipping the sign and inflating "net profit".
+    const entries = [
+      { driverId: "d1", type: SALARY_ENTRY_TYPES.DEDUCTION, amount: 300, date: "2026-06-05" },
+    ];
+    const drivers = [{ id: "d1", salary: 3000 }];
+    // 3000 (default base) - 300 (deduction) = 2700, never negative.
+    expect(calcTotalSalariesPaid(entries, drivers)).toBe(2700);
+  });
+
+  test("without a drivers list, falls back to raw entries (defaultBase 0) — same as before", () => {
+    const entries = [
+      { driverId: "d1", type: SALARY_ENTRY_TYPES.DEDUCTION, amount: 300, date: "2026-06-05" },
+    ];
+    expect(calcTotalSalariesPaid(entries)).toBe(-300);
+  });
+
+  test("keeps different drivers/months in separate buckets", () => {
+    const entries = [
+      { driverId: "d1", type: SALARY_ENTRY_TYPES.BASE, amount: 3000, date: "2026-05-01" },
+      { driverId: "d1", type: SALARY_ENTRY_TYPES.DEDUCTION, amount: 300, date: "2026-06-05" }, // different month, no BASE
+    ];
+    const drivers = [{ id: "d1", salary: 3000 }];
+    // May: 3000 (explicit BASE). June: 3000 (default) - 300 = 2700.
+    expect(calcTotalSalariesPaid(entries, drivers)).toBe(3000 + 2700);
+  });
 });
 
 // ─── calcDailyRate ────────────────────────────────────────────────────────────

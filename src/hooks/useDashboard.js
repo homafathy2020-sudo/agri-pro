@@ -31,8 +31,8 @@ export const useDashboard = () => {
   );
 
   const totalSalaries = useMemo(
-    () => calcTotalSalariesPaid(salaryEntries),
-    [salaryEntries]
+    () => calcTotalSalariesPaid(salaryEntries, drivers),
+    [salaryEntries, drivers]
   );
 
   const totalTaxDeductions = useMemo(

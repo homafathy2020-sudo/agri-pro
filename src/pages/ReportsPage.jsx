@@ -110,7 +110,7 @@ const Legend = ({ items }) => (
 const ReportsPage = () => {
   const { report: equipReport, loading: eLoading } = useEquipment();
   const { salaryEntries = [], equipment = [], jobs = [], drivers = [], maintenance = [], taxDeductions = [], settings } = useData();
-  const totalSalariesPaid = calcTotalSalariesPaid(salaryEntries);
+  const totalSalariesPaid = calcTotalSalariesPaid(salaryEntries, drivers);
   const totalTaxDeductions = calcTotalTaxDeductions(taxDeductions);
   const { report: driverReportAll, loading: dLoading } = useDrivers();
   // تقرير الأداء ده خاص بالعمليات الميدانية (أفدنة/عمليات/إيراد) — مالهاش
@@ -138,7 +138,8 @@ const ReportsPage = () => {
     const { year, month } = resolveMonth(downloadMonth);
     const monthPrefix = `${year}-${String(month).padStart(2, "0")}`;
     const salariesForPeriod = calcTotalSalariesPaid(
-      salaryEntries.filter((e) => (e.date || "").startsWith(monthPrefix))
+      salaryEntries.filter((e) => (e.date || "").startsWith(monthPrefix)),
+      drivers
     );
     const taxDeductionsForPeriod = taxDeductions
       .filter((t) => (t.date || "").startsWith(monthPrefix))
