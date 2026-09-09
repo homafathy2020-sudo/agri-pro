@@ -60,12 +60,24 @@ export const calcOutstandingAdvances = (allEntries, driverId) => {
 
 /**
  * Total salary paid to ALL drivers (for profit deduction).
- * Uses "base" + "bonus" entries only (not advances).
+ * Net cost = base + bonus - deductions - advanceRepayments
+ * (same logic as calcMonthlySalary's "net"; advances themselves are excluded
+ * because they're a receivable/debt, not an expense).
  */
 export const calcTotalSalariesPaid = (allEntries) =>
-  allEntries
-    .filter((e) => e.type === SALARY_ENTRY_TYPES.BASE || e.type === SALARY_ENTRY_TYPES.BONUS)
-    .reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  allEntries.reduce((s, e) => {
+    const amount = Number(e.amount) || 0;
+    switch (e.type) {
+      case SALARY_ENTRY_TYPES.BASE:
+      case SALARY_ENTRY_TYPES.BONUS:
+        return s + amount;
+      case SALARY_ENTRY_TYPES.DEDUCTION:
+      case SALARY_ENTRY_TYPES.ADVANCE_REPAY:
+        return s - amount;
+      default:
+        return s;
+    }
+  }, 0);
 
 /**
  * Absence deduction per day based on base salary and working days.

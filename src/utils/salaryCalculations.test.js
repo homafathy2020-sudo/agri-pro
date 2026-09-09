@@ -145,14 +145,16 @@ describe("calcOutstandingAdvances", () => {
 // ─── calcTotalSalariesPaid ────────────────────────────────────────────────────
 
 describe("calcTotalSalariesPaid", () => {
-  test("sums only BASE and BONUS entries across all drivers", () => {
+  test("nets BASE/BONUS against DEDUCTION/ADVANCE_REPAY; excludes ADVANCE", () => {
     const entries = [
       { driverId: "d1", type: SALARY_ENTRY_TYPES.BASE, amount: 3000 },
       { driverId: "d2", type: SALARY_ENTRY_TYPES.BONUS, amount: 500 },
-      { driverId: "d1", type: SALARY_ENTRY_TYPES.ADVANCE, amount: 1000 }, // excluded
-      { driverId: "d1", type: SALARY_ENTRY_TYPES.DEDUCTION, amount: 200 }, // excluded
+      { driverId: "d1", type: SALARY_ENTRY_TYPES.ADVANCE, amount: 1000 }, // excluded (debt, not expense)
+      { driverId: "d1", type: SALARY_ENTRY_TYPES.DEDUCTION, amount: 200 }, // now subtracted
+      { driverId: "d2", type: SALARY_ENTRY_TYPES.ADVANCE_REPAY, amount: 300 }, // now subtracted
     ];
-    expect(calcTotalSalariesPaid(entries)).toBe(3500);
+    // 3000 + 500 - 200 - 300 = 3000
+    expect(calcTotalSalariesPaid(entries)).toBe(3000);
   });
 });
 
