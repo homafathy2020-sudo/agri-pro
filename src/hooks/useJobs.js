@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import { useData } from "../contexts/DataContext";
 import {
-  aggregateJobs, calcRevenue, calcFuelCost,
+  aggregateJobs, calcRevenue, calcFuelCost, getJobFuelPrice,
   calcRemainingAmount, derivePaymentStatus, getJobPaidAmount,
 } from "../utils/calculations";
 
@@ -16,7 +16,7 @@ export const useJobs = () => {
 
   const enrichJob = (job) => {
     const revenue         = calcRevenue(job.acres, job.pricePerAcre);
-    const fuelCost        = calcFuelCost(job.fuelUsed, settings.fuelPrice);
+    const fuelCost        = calcFuelCost(job.fuelUsed, getJobFuelPrice(job, settings.fuelPrice));
     const profit           = revenue - fuelCost;
     const amountPaid       = getJobPaidAmount(job, payments);
     const remainingAmount = calcRemainingAmount(revenue, amountPaid);

@@ -2,7 +2,7 @@
 // Equipment Report. Extracted from the old single pdfGenerator.js — logic unchanged.
 
 import { formatCurrency, formatNumber, formatDate } from "../formatters";
-import { calcRevenue, calcFuelCost } from "../calculations";
+import { calcRevenue, calcFuelCost, getJobFuelPrice } from "../calculations";
 import { sortOilHistory, sortGreaseHistory } from "../serviceHistory";
 import { EQUIPMENT_CATEGORY } from "../../config/constants";
 import { escapeHtml, printWindow, downloadReportPdf } from "./core";
@@ -12,7 +12,7 @@ const buildEquipmentReportHtml = ({ equipment, jobs, maintenance, fuelPrice, dri
   const totalRevenue  = jobs.reduce((s, j) => s + calcRevenue(j.acres, j.pricePerAcre), 0);
   const totalAcres    = jobs.reduce((s, j) => s + (j.acres || 0), 0);
   const totalFuel     = jobs.reduce((s, j) => s + (j.fuelUsed || 0), 0);
-  const totalFuelCost = calcFuelCost(totalFuel, fuelPrice);
+  const totalFuelCost = jobs.reduce((s, j) => s + calcFuelCost(j.fuelUsed, getJobFuelPrice(j, fuelPrice)), 0);
   const maintCost     = maintenance.reduce((s, m) => s + (m.cost || 0), 0);
   const netProfit     = totalRevenue - totalFuelCost - maintCost;
 

@@ -2,7 +2,7 @@
 import { useMemo } from "react";
 import { useData } from "../contexts/DataContext";
 import {
-  calcRevenue, calcFuelCost,
+  calcRevenue, calcFuelCost, getJobFuelPrice,
   calcRemainingAmount, derivePaymentStatus, getJobPaidAmount,
 } from "../utils/calculations";
 
@@ -17,7 +17,7 @@ export const useEquipmentDetail = (equipmentId) => {
       .sort((a, b) => b.date.localeCompare(a.date))
       .map((job) => {
         const revenue         = calcRevenue(job.acres, job.pricePerAcre);
-        const fuelCost        = calcFuelCost(job.fuelUsed, settings.fuelPrice);
+        const fuelCost        = calcFuelCost(job.fuelUsed, getJobFuelPrice(job, settings.fuelPrice));
         const profit           = revenue - fuelCost;
         const amountPaid       = getJobPaidAmount(job, payments);
         const remainingAmount = calcRemainingAmount(revenue, amountPaid);

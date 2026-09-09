@@ -18,6 +18,15 @@ export const calcFuelCost = (fuelUsed, fuelPrice) =>
   (safeNum(fuelUsed)) * (safeNum(fuelPrice));
 
 /**
+ * Fuel price to use for a given job: the price stored ON the job at the
+ * time it was created (fuelPriceAtJob), same idea as pricePerAcre. Falls
+ * back to the current settings price only for legacy jobs saved before
+ * this field existed, so old jobs don't blow up with a missing price.
+ */
+export const getJobFuelPrice = (job, fallbackFuelPrice) =>
+  job.fuelPriceAtJob ?? fallbackFuelPrice;
+
+/**
  * Full net profit for a single job.
  * maintCostShare = maintenance cost attributed to this job (optional).
  */
@@ -89,7 +98,9 @@ export const aggregateJobs = (jobs, fuelPrice, payments = []) => {
   const totalRevenue  = jobs.reduce((s, j) => s + calcRevenue(j.acres, j.pricePerAcre), 0);
   const totalAcres    = jobs.reduce((s, j) => s + (safeNum(j.acres)), 0);
   const totalFuel     = jobs.reduce((s, j) => s + (safeNum(j.fuelUsed)), 0);
-  const totalFuelCost = calcFuelCost(totalFuel, fuelPrice);
+  const totalFuelCost = jobs.reduce(
+    (s, j) => s + calcFuelCost(j.fuelUsed, getJobFuelPrice(j, fuelPrice)), 0
+  );
   const netProfit     = totalRevenue - totalFuelCost;
 
   // Payment aggregates — derived from the payments collection (see

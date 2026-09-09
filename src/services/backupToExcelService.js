@@ -155,7 +155,7 @@ const convert = (backupData, meta = {}) => {
   const fuelPrice = num(settings.fuelPrice) || 12;
   const jobRows = jobs.map((j) => {
     const revenue = num(j.acres) * num(j.pricePerAcre);
-    const fuelCost = num(j.fuelUsed) * fuelPrice;
+    const fuelCost = num(j.fuelUsed) * (num(j.fuelPriceAtJob) || fuelPrice);
     const paidActual = paidByJobId[j.id] || 0;
     const remaining = revenue - paidActual;
     return {

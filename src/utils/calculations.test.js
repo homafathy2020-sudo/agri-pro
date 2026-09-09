@@ -163,6 +163,17 @@ describe("aggregateJobs", () => {
     expect(totals.totalRemaining).toBe(1000); // job b's full revenue still owed
   });
 
+  test("uses each job's own stored fuelPriceAtJob, not the current settings price", () => {
+    const historicalJobs = [
+      { id: "a", acres: 10, pricePerAcre: 100, fuelUsed: 5, fuelPriceAtJob: 10 }, // priced when fuel was 10/L
+      { id: "b", acres: 5, pricePerAcre: 200, fuelUsed: 3 }, // legacy job, no stored price yet
+    ];
+    // current settings price is now 20, but job "a" must stay locked at 10
+    const totals = aggregateJobs(historicalJobs, 20, []);
+    // 5*10 (job a, historical) + 3*20 (job b, legacy fallback) = 110
+    expect(totals.totalFuelCost).toBe(110);
+  });
+
   test("returns all-zero totals for an empty job list", () => {
     const totals = aggregateJobs([], 12, []);
     expect(totals).toEqual({

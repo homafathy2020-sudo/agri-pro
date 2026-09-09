@@ -74,6 +74,10 @@ const JobForm = ({ initial, equipment, drivers, fuelPrice, onSave, onClose }) =>
       acres:        Number(data.acres)        || 0,
       pricePerAcre: Number(data.pricePerAcre) || 0,
       fuelUsed:     Number(data.fuelUsed)     || 0,
+      // سعر اللتر بيتثبّت وقت إنشاء الشغلانة (زي pricePerAcre بالظبط) وميتغيّرش
+      // بعد كده حتى لو سعر الوقود في الإعدادات اتغيّر لاحقًا. عند التعديل،
+      // بنحافظ على السعر الأصلي المخزَّن (أو الحالي لو شغلانة قديمة من قبل الإصلاح).
+      fuelPriceAtJob: isEdit ? (initial.fuelPriceAtJob ?? fuelPrice) : fuelPrice,
       date:         data.date,
       notes:        data.notes,
       // على الإنشاء: قيمة أولية تُستخدم لعمل دفعة أولى تلقائياً (شوف JobsPage).
