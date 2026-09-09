@@ -128,6 +128,12 @@ const safeFetch = (promise) => promise.then(
 // account that hasn't finished migrating keeps getting checked exactly as
 // before until it's actually confirmed done.
 const driverCostsMigratedKey = (uid) => `driverCostsMigrated:${uid}`;
+// One-time backfill: freezes fuelPriceAtJob on jobs saved before that field
+// existed, so old jobs stop silently tracking the current settings price.
+// We don't know what the price actually was back then, so the best we can
+// do is anchor them to whatever the settings price is *right now* — from
+// that point on, changing the settings price never touches them again.
+const fuelPriceMigratedKey = (uid) => `fuelPriceBackfilled:${uid}`;
 
 const DataContext = createContext(null);
 
@@ -220,6 +226,10 @@ export const DataProvider = ({ children }) => {
   // work and both migrate it — producing a duplicate despite the
   // legacyDriverCostId guard, which only protects against *sequential* runs.
   const migratingDriverCostsRef = useRef(false);
+  // Same idea as migratingDriverCostsRef, but for the fuelPriceAtJob backfill
+  // below — guards against two overlapping loads both trying to stamp the
+  // same legacy jobs at once.
+  const migratingFuelPriceRef = useRef(false);
 
   useEffect(() => {
     if (!user) return;
@@ -347,9 +357,54 @@ export const DataProvider = ({ children }) => {
           localStorage.setItem(driverCostsMigratedKey(user.uid), "1");
         }
 
+        // One-time backfill: stamp fuelPriceAtJob onto any job saved before
+        // that field existed, using the current settings price as the
+        // anchor. Only attempted when both jobs and settings actually
+        // loaded — same reasoning as the driverCosts migration above.
+        let mergedJobs = jobsR.ok ? jobsR.data : undefined;
+        const fuelPriceAlreadyBackfilled =
+          localStorage.getItem(fuelPriceMigratedKey(user.uid)) === "1";
+        let fuelBackfillSucceededThisRound = false;
+        if (
+          !fuelPriceAlreadyBackfilled &&
+          jobsR.ok && settingsR.ok &&
+          !migratingFuelPriceRef.current
+        ) {
+          migratingFuelPriceRef.current = true;
+          try {
+            const currentFuelPrice = settingsR.data.fuelPrice ?? DEFAULT_FUEL_PRICE;
+            const legacyJobs = jobsR.data.filter(
+              (j) => j.fuelPriceAtJob === undefined || j.fuelPriceAtJob === null
+            );
+            if (legacyJobs.length > 0) {
+              const batch = writeBatch(db);
+              legacyJobs.forEach((j) => {
+                batch.update(doc(db, "users", user.uid, "jobs", j.id), {
+                  fuelPriceAtJob: currentFuelPrice,
+                });
+              });
+              await batch.commit();
+              const stampedIds = new Set(legacyJobs.map((j) => j.id));
+              mergedJobs = jobsR.data.map((j) =>
+                stampedIds.has(j.id) ? { ...j, fuelPriceAtJob: currentFuelPrice } : j
+              );
+            }
+            fuelBackfillSucceededThisRound = true;
+          } catch (backfillErr) {
+            // Non-fatal — legacy jobs just keep tracking the settings price
+            // until the next load tries again.
+            console.warn("fuelPriceAtJob backfill failed:", backfillErr);
+          } finally {
+            migratingFuelPriceRef.current = false;
+          }
+        }
+        if (!fuelPriceAlreadyBackfilled && jobsR.ok && settingsR.ok && fuelBackfillSucceededThisRound) {
+          localStorage.setItem(fuelPriceMigratedKey(user.uid), "1");
+        }
+
         const payload = {};
         if (equipmentR.ok)    payload.equipment    = equipmentR.data;
-        if (jobsR.ok)         payload.jobs         = jobsR.data;
+        if (mergedJobs !== undefined) payload.jobs  = mergedJobs;
         if (driversR.ok)      payload.drivers      = driversR.data;
         if (maintenanceR.ok)  payload.maintenance  = maintenanceR.data;
         if (settingsR.ok)     payload.settings     = settingsR.data;
