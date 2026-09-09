@@ -41,18 +41,19 @@ export const useDashboard = () => {
   );
 
   // الفاتورة بتدخل في صافي الربح على أساس نقدي (cash basis): اللي بيتخصم
-  // هو اللي اتدفع فعليًا للمورد لحد دلوقتي (totalPayable = المتبقي، يعني
-  // إجمالي الفاتورة ناقص أي دفعات)، مش إجمالي الفاتورة الأصلي. لو دفعت
-  // نص الفاتورة، نص التكلفة بس اللي بيتخصم من الربح — ونفس الرقم ده هو
-  // اللي بيظهر في تنبيه "مستحقات عليك للموردين" وفي "صافي وضعك المالي"،
-  // عشان الرقم يبقى واحد متسق في كل الصفحة مش رقمين مختلفين لنفس الحاجة.
+  // هو "الواصل للمورد" فعلاً لحد دلوقتي (totalPaidOut) — يعني الكاش اللي
+  // فعلاً خرج من جيبك. لو دفعت نص الفاتورة، نص التكلفة بس اللي بيتخصم من
+  // الربح، ولما تكمّل السداد يتخصم الباقي. ده عكس totalPayable (المتبقي
+  // غير المدفوع)، واللي معروض لوحده كـ"دين عليك" في تنبيه "مستحقات عليك
+  // للموردين" وفي "صافي وضعك المالي" — مينفعش يتخصم من الربح، لأن ده كان
+  // معناه إن سداد المورد بيزوّد ربحك الظاهري بدل ما يقلله (باگ سابق).
   const supplierStats = useMemo(
     () => aggregateSupplierInvoices(supplierInvoices, supplierPayments),
     [supplierInvoices, supplierPayments]
   );
-  const totalSupplierPayable = supplierStats.totalPayable;
+  const totalSupplierPaidOut = supplierStats.totalPaidOut;
 
-  const netProfit = totals.netProfit - totalMaintCost - totalSalaries - totalTaxDeductions - totalSupplierPayable;
+  const netProfit = totals.netProfit - totalMaintCost - totalSalaries - totalTaxDeductions - totalSupplierPaidOut;
 
   const margin = totals.totalRevenue > 0
     ? (netProfit / totals.totalRevenue) * 100
@@ -80,7 +81,7 @@ export const useDashboard = () => {
     totalMaintCost,
     totalSalaries,
     totalTaxDeductions,
-    totalSupplierPayable,
+    totalSupplierPaidOut,
     netProfit,
     margin,
     dailyRevenue,

@@ -244,11 +244,15 @@ export const calcSupplierRemaining = (invoiceAmount, amountPaid) =>
   Math.max(0, safeNum(invoiceAmount) - safeNum(amountPaid));
 
 /**
- * Aggregate stats across ALL supplier invoices — used for the dashboard's
- * "total payable" figure and for the net-profit calculation (cash basis:
- * only the unpaid remainder counts as a cost, so partial payments shrink
- * it immediately — see useDashboard.js for why this isn't accrual like
- * job revenue).
+ * Aggregate stats across ALL supplier invoices.
+ * - totalPaidOut: cash actually handed to suppliers so far — this is what
+ *   the dashboard deducts from net profit (cash basis: money that left
+ *   your pocket), so it grows as you pay invoices down.
+ * - totalPayable: what's still owed (unpaid remainder) — a separate "debt
+ *   you owe" figure shown on its own (see netPosition in DashboardPage.jsx
+ *   and "باقي عليك" in SuppliersPage.jsx). It must never be subtracted from
+ *   net profit itself — that would mean paying a supplier *raises* your
+ *   displayed profit, which is backwards.
  */
 export const aggregateSupplierInvoices = (supplierInvoices = [], supplierPayments = []) => {
   const paidByInvoiceId = buildPaidAmountsByInvoiceId(supplierPayments);

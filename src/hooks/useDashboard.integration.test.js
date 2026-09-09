@@ -30,12 +30,12 @@ function computeDashboardTotals({ jobs, payments, maintenance, salaryEntries, ta
   const totalSalaries = calcTotalSalariesPaid(salaryEntries);
   const totalTaxDeductions = calcTotalTaxDeductions(taxDeductions);
   const supplierStats = aggregateSupplierInvoices(supplierInvoices, supplierPayments);
-  const totalSupplierPayable = supplierStats.totalPayable;
+  const totalSupplierPaidOut = supplierStats.totalPaidOut;
 
-  const netProfit = totals.netProfit - totalMaintCost - totalSalaries - totalTaxDeductions - totalSupplierPayable;
+  const netProfit = totals.netProfit - totalMaintCost - totalSalaries - totalTaxDeductions - totalSupplierPaidOut;
   const margin = totals.totalRevenue > 0 ? (netProfit / totals.totalRevenue) * 100 : 0;
 
-  return { totals, totalMaintCost, totalSalaries, totalTaxDeductions, totalSupplierPayable, netProfit, margin };
+  return { totals, totalMaintCost, totalSalaries, totalTaxDeductions, totalSupplierPaidOut, netProfit, margin };
 }
 
 describe("dashboard pipeline: job creation -> payment -> debt/profit", () => {
@@ -83,7 +83,7 @@ describe("dashboard pipeline: job creation -> payment -> debt/profit", () => {
     expect(result.totals.totalRemaining).toBe(0);
   });
 
-  test("maintenance, salaries, tax and unpaid supplier invoices all reduce net profit together", () => {
+  test("maintenance, salaries, tax and cash paid to suppliers all reduce net profit together", () => {
     const jobs = [
       { id: "job1", acres: 10, pricePerAcre: 500, fuelUsed: 0, date: "2026-01-01" }, // revenue 5000
     ];
@@ -94,7 +94,7 @@ describe("dashboard pipeline: job creation -> payment -> debt/profit", () => {
     ];
     const taxDeductions = [{ amount: 300 }];
     const supplierInvoices = [{ id: "inv1", amount: 1000 }];
-    const supplierPayments = [{ supplierInvoiceId: "inv1", amount: 400 }]; // 600 still payable
+    const supplierPayments = [{ supplierInvoiceId: "inv1", amount: 400 }]; // 400 actually paid out so far, 600 still owed
 
     const result = computeDashboardTotals({
       jobs, payments: [], maintenance, salaryEntries, taxDeductions,
@@ -104,10 +104,14 @@ describe("dashboard pipeline: job creation -> payment -> debt/profit", () => {
     expect(result.totalMaintCost).toBe(400);
     expect(result.totalSalaries).toBe(1000); // advance excluded
     expect(result.totalTaxDeductions).toBe(300);
-    expect(result.totalSupplierPayable).toBe(600); // 1000 - 400 paid so far
+    // Cash basis: only the 400 that actually left the bank counts as a
+    // cost so far — the unpaid 600 is tracked separately as a debt, not
+    // deducted from profit (deducting it would mean paying the supplier
+    // *raises* displayed profit, which is backwards).
+    expect(result.totalSupplierPaidOut).toBe(400);
 
-    // 5000 revenue - 0 fuel - 400 maint - 1000 salaries - 300 tax - 600 supplier
-    expect(result.netProfit).toBe(5000 - 400 - 1000 - 300 - 600);
+    // 5000 revenue - 0 fuel - 400 maint - 1000 salaries - 300 tax - 400 supplier paid out
+    expect(result.netProfit).toBe(5000 - 400 - 1000 - 300 - 400);
   });
 
   test("fully covers everything with zero activity: no NaN, no crash", () => {

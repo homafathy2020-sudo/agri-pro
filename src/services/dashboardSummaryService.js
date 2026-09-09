@@ -19,7 +19,11 @@ import { db } from "../config/firebase";
 // Bump this if the set of fields or their meaning ever changes, so a
 // future reader can tell an old-shaped summary apart from a current one
 // instead of trusting a field that might not exist yet.
-export const DASHBOARD_SUMMARY_VERSION = 1;
+// v2: totalSupplierPayable (unpaid remainder) replaced with
+// totalSupplierPaidOut (cash actually paid to suppliers so far) — the old
+// field was being subtracted from net profit backwards (paying a supplier
+// used to raise the displayed profit instead of lowering it).
+export const DASHBOARD_SUMMARY_VERSION = 2;
 
 export const dashboardSummaryService = {
   /**
@@ -39,7 +43,7 @@ export const dashboardSummaryService = {
       totalMaintCost:       totals.totalMaintCost,
       totalSalariesPaid:    totals.totalSalariesPaid,
       totalTaxDeductions:   totals.totalTaxDeductions,
-      totalSupplierPayable: totals.totalSupplierPayable,
+      totalSupplierPaidOut: totals.totalSupplierPaidOut,
       netProfit:            totals.netProfit,
       margin:               totals.margin,
       computedAt:           serverTimestamp(),
