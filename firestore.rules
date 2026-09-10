@@ -44,6 +44,17 @@ service cloud.firestore {
 
       match /snapshots/{snapshotId} {
         allow read, write: if isSignedIn() && isOwner(userId);
+
+        // النسخ الاحتياطية الكبيرة (قربت من حد الـ 1MB لكل مستند في
+        // Firestore) بتتقسّم على مستندات "chunks" فرعية (backupService.js
+        // → createBackup/getSnapshot). بدون القاعدة دي، القاعدة الأعلى
+        // (بتاعة /snapshots/{snapshotId} نفسه) ما كانت تغطيش الـ
+        // subcollection دي خالص — Firestore rules ما بتنزلش تلقائيًا على
+        // subcollections من غير match صريح — يعني كل نسخة احتياطية كبيرة
+        // كانت هتفشل بـ permission-denied وقت الكتابة أو القراءة.
+        match /chunks/{chunkId} {
+          allow read, write: if isSignedIn() && isOwner(userId);
+        }
       }
     }
 

@@ -463,6 +463,19 @@ export const DataProvider = ({ children }) => {
     // collections missing) would still let a backup run and snapshot
     // whatever partial state happens to be in memory.
     if (!user || state.loading || loadError) return;
+    // ⚠️ FIX (audit finding A1): this effect's deps deliberately do NOT
+    // include `state` itself — re-creating the interval/listener on every
+    // single data change would be wasteful and pointless. That means
+    // `runIfDue` below must read `stateRef.current` (always fresh, updated
+    // by the effect at the top of this component) rather than `state`
+    // (frozen at whatever it was when THIS effect instance was created).
+    // Before this fix, `runIfDue` read `state.jobs`/`state.payments`/etc.
+    // directly — correct only for the first backup right after this effect
+    // (re)ran, then silently stale for the rest of that session: the hourly
+    // re-check and the `online` listener kept closing over that same old
+    // `state`, so any job/payment/etc. added afterward was invisible to
+    // every later automatic backup until the tab reloaded. No error was
+    // shown — the backup "succeeded", just against outdated data.
     let cancelled = false;
     let runningNow = false;
 
@@ -487,19 +500,24 @@ export const DataProvider = ({ children }) => {
           return;
         }
 
+        // stateRef.current, not `state` — see the FIX comment above this
+        // effect for why. This is the actual bug fix: reading the ref means
+        // every scheduled/retried run picks up whatever is currently in
+        // memory at the moment it actually executes, not a stale snapshot.
+        const current = stateRef.current;
         await backupService.createBackup(user.uid, {
-          equipment:     state.equipment,
-          jobs:          state.jobs,
-          drivers:       state.drivers,
-          maintenance:   state.maintenance,
-          payments:      state.payments,
-          supplierInvoices: state.supplierInvoices,
-          supplierPayments: state.supplierPayments,
-          salaryEntries: state.salaryEntries,
-          attendance:    state.attendance,
-          custodyTransactions: state.custody,
-          taxDeductions: state.taxDeductions,
-          settings:      state.settings,
+          equipment:     current.equipment,
+          jobs:          current.jobs,
+          drivers:       current.drivers,
+          maintenance:   current.maintenance,
+          payments:      current.payments,
+          supplierInvoices: current.supplierInvoices,
+          supplierPayments: current.supplierPayments,
+          salaryEntries: current.salaryEntries,
+          attendance:    current.attendance,
+          custodyTransactions: current.custody,
+          taxDeductions: current.taxDeductions,
+          settings:      current.settings,
         });
         localStorage.setItem(`lastBackupAt:${user.uid}`, String(Date.now()));
         if (!cancelled) {
