@@ -13,6 +13,7 @@ import LoadingScreen      from "../components/ui/LoadingScreen";
 import PrivacyToggle      from "../components/ui/PrivacyToggle";
 import {
   PlusIcon, DriverIcon, UserIcon, RevenueIcon, ClearIcon, CheckCircleIcon, WalletIcon,
+  AlertIcon, EditIcon,
 } from "../components/ui/Icons";
 import { formatCurrency, todayISO } from "../utils/formatters";
 import {
@@ -42,6 +43,10 @@ const DriversPage = () => {
   const [paying, setPaying]           = useState(false);
   const [cancelTarget, setCancelTarget] = useState(null); // driver currently having their payment cancelled
   const [cancelling, setCancelling]     = useState(false);
+  // (audit finding B2) member with dependent history the user just tried to
+  // delete — { drv, counts } | null. Blocks the delete outright instead of
+  // just warning and still allowing it (see handleDeleteDriver below).
+  const [blockedDeleteTarget, setBlockedDeleteTarget] = useState(null);
 
   // أعضاء التبويب الحالي بس (السائقين، أو الإداريين والمحاسبين)
   const tabReport = useMemo(
@@ -120,28 +125,25 @@ const DriversPage = () => {
     setModal(null);
   };
 
+  // (audit finding B2, hardened per explicit decision) Previously this only
+  // warned about jobs/salaryEntries/attendance and still let the delete go
+  // through — leaving those relations, plus equipment assignment and
+  // custody history (never even counted before), permanently pointing at a
+  // dead driver id. Now: ANY dependent record blocks the delete outright.
+  // Deactivating (status: "inactive") is the only path for a member with
+  // history — it hides them from active lists while keeping every
+  // reference to them intact and recoverable.
   const handleDeleteDriver = async (drv) => {
     const counts = getDriverDependencyCounts(drv.id);
-    const hasHistory = counts.jobs > 0 || counts.salaryEntries > 0 || counts.attendance > 0;
+    const hasHistory = counts.jobs > 0 || counts.salaryEntries > 0 || counts.attendance > 0
+      || counts.equipment > 0 || counts.custody > 0;
 
-    const message = hasHistory ? (
-      <>
-        <p className="mb-2">
-          <span className="font-bold text-gray-200">{drv.name}</span> عليه سجلات مرتبطة:
-        </p>
-        <ul className="list-disc list-inside text-gray-300 mb-2 space-y-0.5">
-          {counts.jobs > 0 && <li>{counts.jobs} عملية</li>}
-          {counts.salaryEntries > 0 && <li>{counts.salaryEntries} قيد راتب</li>}
-          {counts.attendance > 0 && <li>{counts.attendance} سجل حضور</li>}
-        </ul>
-        <p>
-          حذفه هيسيب السجلات دي من غير عضو مرتبط بيها. لو سايب الشغل بس عايز تحتفظ بتاريخه،
-          الأفضل تغيّر حالته لـ "غير نشط" من زرار التعديل بدل الحذف.
-        </p>
-      </>
-    ) : "هل تريد حذف هذا العضو؟";
+    if (hasHistory) {
+      setBlockedDeleteTarget({ drv, counts });
+      return;
+    }
 
-    const ok = await confirm(drv.id, message);
+    const ok = await confirm(drv.id, "هل تريد حذف هذا العضو؟");
     if (ok) deleteDriver(drv.id);
   };
 
@@ -297,6 +299,44 @@ const DriversPage = () => {
 
       <ConfirmDialog open={confirmState.open} onClose={confirmState.reject}
         onConfirm={confirmState.accept} message={confirmState.message}/>
+
+      {/* (audit finding B2) Delete blocked — dependent history exists */}
+      <Modal open={!!blockedDeleteTarget} onClose={() => setBlockedDeleteTarget(null)}
+        title="مينفعش يتمسح" size="sm">
+        {blockedDeleteTarget && (
+          <>
+            <div className="bg-amber-900/20 border border-amber-800/40 rounded-xl px-4 py-3 flex gap-3 mb-4">
+              <AlertIcon size={18} className="text-amber-400 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-300 leading-relaxed">
+                <span className="font-bold text-amber-200">{blockedDeleteTarget.drv.name}</span> عليه سجلات
+                مرتبطة، فمينفعش يتمسح نهائيًا — الحذف كان هيسيب السجلات دي من غير عضو مرتبط بيها.
+              </p>
+            </div>
+            <ul className="list-disc list-inside text-gray-300 text-sm mb-4 space-y-0.5">
+              {blockedDeleteTarget.counts.jobs > 0 && <li>{blockedDeleteTarget.counts.jobs} عملية شغل</li>}
+              {blockedDeleteTarget.counts.salaryEntries > 0 && <li>{blockedDeleteTarget.counts.salaryEntries} قيد راتب</li>}
+              {blockedDeleteTarget.counts.attendance > 0 && <li>{blockedDeleteTarget.counts.attendance} سجل حضور</li>}
+              {blockedDeleteTarget.counts.equipment > 0 && <li>{blockedDeleteTarget.counts.equipment} معدة معيّنله حاليًا</li>}
+              {blockedDeleteTarget.counts.custody > 0 && <li>{blockedDeleteTarget.counts.custody} سجل عهدة</li>}
+            </ul>
+            <p className="text-sm text-gray-400 mb-6 leading-relaxed">
+              لو سايب الشغل بس عايز تحتفظ بتاريخه، غيّر حالته لـ "غير نشط" بدل الحذف — بيختفي من القوائم
+              النشطة وكل سجلاته وتقاريره تفضل زي ما هي بالظبط.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <Button variant="ghost" size="sm" onClick={() => setBlockedDeleteTarget(null)}>إغلاق</Button>
+              <Button variant="primary" size="sm" icon={<EditIcon size={14} />}
+                onClick={() => {
+                  const drv = blockedDeleteTarget.drv;
+                  setBlockedDeleteTarget(null);
+                  setModal({ mode: "edit", data: drv });
+                }}>
+                تغيير الحالة لـ "غير نشط"
+              </Button>
+            </div>
+          </>
+        )}
+      </Modal>
 
       {/* Quick "pay salary" confirmation */}
       <Modal open={!!payTarget} onClose={() => !paying && setPayTarget(null)} title="صرف الراتب" size="sm">

@@ -13,11 +13,14 @@ import ConfirmDialog    from "../components/ui/ConfirmDialog";
 import Button           from "../components/ui/Button";
 import { EmptyState }   from "../components/ui/Card";
 import LoadingScreen    from "../components/ui/LoadingScreen";
-import { PlusIcon, TractorIcon, LinkIcon } from "../components/ui/Icons";
+import { PlusIcon, TractorIcon, LinkIcon, AlertIcon, EditIcon } from "../components/ui/Icons";
 import { EQUIPMENT_CATEGORY, TEAM_ROLE } from "../config/constants";
 
 const EquipmentPage = () => {
-  const { report, loading, addEquipment, updateEquipment, deleteEquipment } = useEquipment();
+  const {
+    report, loading, addEquipment, updateEquipment, deleteEquipment,
+    getEquipmentDependencyCounts,
+  } = useEquipment();
   const { report: driverReport } = useDrivers();
   // إسناد المعدات لسائقين بس — الإداريين والمحاسبين مش بيقودوا معدات.
   // getDriver() فاضلة بتدوّر في كل الفريق عشان لو فيه بيانات قديمة تفضل بتتعرض صح.
@@ -25,6 +28,10 @@ const EquipmentPage = () => {
   const { addJob, fuelPrice }    = useJobs();
   const { confirm, confirmState } = useConfirm();
   const [modal, setModal] = useState(null);
+  // (audit finding B1) equipment with dependent history the user just tried
+  // to delete — { eq, counts } | null. Blocks the delete outright instead
+  // of the previous bare unconditional confirm.
+  const [blockedDeleteTarget, setBlockedDeleteTarget] = useState(null);
 
   const baseList = useMemo(
     () => report.filter((eq) => (eq.category || EQUIPMENT_CATEGORY.BASE) === EQUIPMENT_CATEGORY.BASE),
@@ -49,7 +56,23 @@ const EquipmentPage = () => {
     setModal(null);
   };
 
+  // (audit finding B1, hardened per explicit decision) Previously this was
+  // a bare unconditional confirm — no dependency check at all. Deleting
+  // equipment while jobs/maintenance/custody records (or attachments
+  // mounted on it) still referenced its id left those permanently pointing
+  // at a dead id (orphaned), silently breaking per-equipment reporting.
+  // Now: ANY dependent record blocks the delete outright. Deactivating
+  // (status: "inactive") is the only path for equipment with history.
   const handleDelete = async (id) => {
+    const eq = report.find((e) => e.id === id);
+    const counts = getEquipmentDependencyCounts(id);
+    const hasHistory = counts.jobs > 0 || counts.maintenance > 0 || counts.custody > 0 || counts.attachments > 0;
+
+    if (hasHistory) {
+      setBlockedDeleteTarget({ eq, counts });
+      return;
+    }
+
     const ok = await confirm(id);
     if (ok) deleteEquipment(id);
   };
@@ -163,6 +186,43 @@ const EquipmentPage = () => {
 
       <ConfirmDialog open={confirmState.open} onClose={confirmState.reject}
         onConfirm={confirmState.accept} message="هل تريد حذف هذه المعدة؟"/>
+
+      {/* (audit finding B1) Delete blocked — dependent history exists */}
+      <Modal open={!!blockedDeleteTarget} onClose={() => setBlockedDeleteTarget(null)}
+        title="مينفعش تتمسح" size="sm">
+        {blockedDeleteTarget && (
+          <>
+            <div className="bg-amber-900/20 border border-amber-800/40 rounded-xl px-4 py-3 flex gap-3 mb-4">
+              <AlertIcon size={18} className="text-amber-400 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-300 leading-relaxed">
+                <span className="font-bold text-amber-200">{blockedDeleteTarget.eq?.name || "المعدة"}</span> عليها
+                سجلات مرتبطة، فمينفعش تتمسح نهائيًا — الحذف كان هيسيب السجلات دي من غير معدة مرتبطة بيها.
+              </p>
+            </div>
+            <ul className="list-disc list-inside text-gray-300 text-sm mb-4 space-y-0.5">
+              {blockedDeleteTarget.counts.jobs > 0 && <li>{blockedDeleteTarget.counts.jobs} عملية شغل</li>}
+              {blockedDeleteTarget.counts.maintenance > 0 && <li>{blockedDeleteTarget.counts.maintenance} سجل صيانة</li>}
+              {blockedDeleteTarget.counts.custody > 0 && <li>{blockedDeleteTarget.counts.custody} سجل عهدة</li>}
+              {blockedDeleteTarget.counts.attachments > 0 && <li>{blockedDeleteTarget.counts.attachments} ملحق متعلّق عليها</li>}
+            </ul>
+            <p className="text-sm text-gray-400 mb-6 leading-relaxed">
+              لو مسحتهاش من الاستخدام بس عايز تحتفظ بتاريخها، غيّر حالتها لـ "متوقفة" بدل الحذف — بتختفي من
+              القوائم النشطة وكل سجلاتها وتقاريرها تفضل زي ما هي بالظبط.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <Button variant="ghost" size="sm" onClick={() => setBlockedDeleteTarget(null)}>إغلاق</Button>
+              <Button variant="primary" size="sm" icon={<EditIcon size={14} />}
+                onClick={() => {
+                  const eq = blockedDeleteTarget.eq;
+                  setBlockedDeleteTarget(null);
+                  setModal({ mode: "edit", data: eq });
+                }}>
+                تغيير الحالة لـ "متوقفة"
+              </Button>
+            </div>
+          </>
+        )}
+      </Modal>
     </div>
   );
 };

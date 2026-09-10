@@ -13,7 +13,7 @@ const getCurrentMonth = () => {
 export const useDrivers = () => {
   const {
     drivers, jobs, payments, settings,
-    salaryEntries = [], attendance = [], equipment = [],
+    salaryEntries = [], attendance = [], equipment = [], custody = [],
     loading, addDriver, updateDriver, deleteDriver,
   } = useData();
 
@@ -48,12 +48,22 @@ export const useDrivers = () => {
 
   const getById = (id) => drivers.find((d) => d.id === id);
 
-  /** Counts of records tied to a driver — used to warn before deleting. */
+  // (audit finding B2) Counts of every record tied to a driver — used to
+  // BLOCK deletion outright when any exist, not just warn about a partial
+  // list before still allowing it. Previously this omitted `equipment`
+  // (a driver currently assigned to a piece of equipment) and `custody`
+  // (custody expense history) entirely, so deleting a driver assigned to
+  // equipment or with custody records silently orphaned those references
+  // with zero warning even in the "careful" path. Deactivating (status:
+  // "inactive", already supported by DriverForm) is always available as the
+  // non-destructive alternative.
   const getDriverDependencyCounts = useCallback((driverId) => ({
     jobs:          jobs.filter((j) => j.driverId === driverId).length,
     salaryEntries: salaryEntries.filter((e) => e.driverId === driverId).length,
     attendance:    attendance.filter((a) => a.driverId === driverId).length,
-  }), [jobs, salaryEntries, attendance]);
+    equipment:     equipment.filter((eq) => eq.driverId === driverId).length,
+    custody:       custody.filter((c) => c.driverId === driverId).length,
+  }), [jobs, salaryEntries, attendance, equipment, custody]);
 
   return {
     drivers,
