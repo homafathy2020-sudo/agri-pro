@@ -14,21 +14,301 @@ service cloud.firestore {
       ];
     }
 
+    // ─── Field-level validation helpers ──────────────────────────────────
+    // كل شرط هنا بالشكل "لو الحقل مش موجود في المستند، عدّي — لو موجود،
+    // لازم يبقى من النوع والمدى الصح". لازم يتكتب inline بالظبط بالشكل ده
+    // (!('key' in data) || <check>) — مش عن طريق دالة wrapper بتاخد الشرط
+    // كباراميتر، لأن Firestore Rules بتقيّم باراميترات الدوال قبل ما تناديها
+    // (مش زي && و|| اللي بيقفوا عند أول نتيجة حاسمة) — يعني لو الحقل مش
+    // موجود، أي محاولة توصل لقيمته (data.key) هتفشل بخطأ تقييم قبل حتى ما
+    // تدخل الدالة، وده هيرفض أي كتابة جزئية (زي تحديث حالة سائق بس، أو
+    // استعادة نسخة احتياطية) من غير أي داعي.
+    //
+    // الهدف مش قفل شكل المستند بالكامل (hasOnly) — ده كان هيكسر أول حقل
+    // جديد يتضاف للفورم بعدين من غير ما حد يفتكر يحدّث الملف ده، وهيكسر
+    // استعادة نسخ احتياطية قديمة من شكل بيانات أقدم. الهدف إن أي حقل
+    // بيتكتب فعلاً يبقى من النوع الصح ومنطقي القيمة — مش نص طويل عشوائي،
+    // مش رقم سالب لمبلغ، مش نوع بيانات غلط تماماً — حتى لو حد نادى الـ
+    // Firestore SDK مباشرة بدل الواجهة.
+    //
+    // الحد الأقصى للمبالغ (1,000,000,000) نفس MAX_MONEY_VALUE في
+    // src/config/constants/backup.js بالظبط — نفس الرقم من غير ما يتكرر
+    // بقيمة مختلفة بالغلط.
+    function isMoney(v) {
+      return v is number && v >= 0 && v <= 1000000000;
+    }
+    // صافي الربح ممكن يكون سالب (خسارة) — نفس السقف، من غير ما نمنع
+    // القيم السالبة المنطقية.
+    function isSignedMoney(v) {
+      return v is number && v >= -1000000000 && v <= 1000000000;
+    }
+    // أرقام غير مالية لكن لازلت محتاجة سقف منطقي (لترات وقود...) — نفس
+    // السقف كحماية عامة ضد قيم عبثية، مش لأنه له معنى مالي مباشر.
+    function isNum(v) {
+      return v is number && v >= 0 && v <= 1000000000;
+    }
+    function isShortStr(v) {
+      return v is string && v.size() <= 300;
+    }
+    function isLongStr(v) {
+      return v is string && v.size() <= 3000;
+    }
+    // "YYYY-MM-DD" بالظبط — كل مكان في التطبيق (فلترة الشهر في الداشبورد،
+    // التقارير، تصدير PDF) بيعتمد على prefix الشهر من الشكل ده. تاريخ بشكل
+    // غلط مش بس "بيانات وسخة" — بيكسر فلترة الشهر في كل الأماكن دي بصمت.
+    function isDateStr(v) {
+      return v is string && v.matches('^\\d{4}-\\d{2}-\\d{2}$');
+    }
+
+    // ─── Per-collection validation ───────────────────────────────────────
+    // كل دالة هنا بتتأكد من الحقول الموجودة فعلاً في المستند المكتوب —
+    // مش بتفرض شكل ثابت للمستند بالكامل (شوف الشرح فوق). الحقول المطلوبة
+    // فعلياً وقت الإنشاء (زي amount) بتتحقق منها بشرط منفصل في الـ match
+    // block نفسه (allow create)، مش هنا.
+
+    function isValidJob(data) {
+      return
+        (!('acres' in data)          || (data.acres is number && data.acres > 0 && data.acres <= 1000000000)) &&
+        (!('pricePerAcre' in data)   || isMoney(data.pricePerAcre)) &&
+        (!('fuelUsed' in data)       || isNum(data.fuelUsed)) &&
+        (!('fuelPriceAtJob' in data) || isMoney(data.fuelPriceAtJob)) &&
+        (!('amountPaid' in data)     || isMoney(data.amountPaid)) &&
+        (!('date' in data)           || isDateStr(data.date)) &&
+        (!('client' in data)         || isShortStr(data.client)) &&
+        (!('workType' in data)       || isShortStr(data.workType)) &&
+        (!('notes' in data)          || isLongStr(data.notes)) &&
+        (!('equipmentId' in data)    || isShortStr(data.equipmentId)) &&
+        (!('driverId' in data)       || isShortStr(data.driverId));
+    }
+
+    function isValidPayment(data) {
+      return
+        (!('amount' in data) || (data.amount is number && data.amount > 0 && data.amount <= 1000000000)) &&
+        (!('jobId' in data)  || isShortStr(data.jobId)) &&
+        (!('date' in data)   || isDateStr(data.date)) &&
+        (!('notes' in data)  || isLongStr(data.notes));
+    }
+
+    function isValidMaintenance(data) {
+      return
+        (!('cost' in data)        || isMoney(data.cost)) &&
+        (!('equipmentId' in data) || isShortStr(data.equipmentId)) &&
+        (!('type' in data)        || isShortStr(data.type)) &&
+        (!('date' in data)        || isDateStr(data.date)) &&
+        (!('notes' in data)       || isLongStr(data.notes));
+    }
+
+    function isValidSalaryEntry(data) {
+      return
+        (!('amount' in data)   || isMoney(data.amount)) &&
+        (!('type' in data)     || data.type in ['base', 'bonus', 'deduction', 'advance', 'advance_repay']) &&
+        (!('driverId' in data) || isShortStr(data.driverId)) &&
+        (!('reason' in data)   || isShortStr(data.reason)) &&
+        (!('date' in data)     || isDateStr(data.date)) &&
+        (!('notes' in data)    || isLongStr(data.notes)) &&
+        (!('paid' in data)     || data.paid is bool);
+    }
+
+    function isValidCustodyTransaction(data) {
+      return
+        (!('amount' in data)      || (data.amount is number && data.amount > 0 && data.amount <= 1000000000)) &&
+        (!('type' in data)        || data.type in ['deposit', 'expense']) &&
+        (!('category' in data)    || data.category in ['equipment', 'driver', 'other']) &&
+        (!('equipmentId' in data) || isShortStr(data.equipmentId)) &&
+        (!('driverId' in data)    || isShortStr(data.driverId)) &&
+        (!('otherLabel' in data)  || isShortStr(data.otherLabel)) &&
+        (!('source' in data)      || isShortStr(data.source)) &&
+        (!('date' in data)        || isDateStr(data.date)) &&
+        (!('notes' in data)       || isLongStr(data.notes));
+    }
+
+    function isValidTaxDeduction(data) {
+      return
+        (!('amount' in data)     || (data.amount is number && data.amount > 0 && data.amount <= 1000000000)) &&
+        (!('type' in data)       || data.type in ['tax', 'gov_fee', 'fine', 'other']) &&
+        (!('otherLabel' in data) || isShortStr(data.otherLabel)) &&
+        (!('date' in data)       || isDateStr(data.date)) &&
+        (!('notes' in data)      || isLongStr(data.notes));
+    }
+
+    function isValidSupplierInvoice(data) {
+      return
+        (!('amount' in data)       || (data.amount is number && data.amount > 0 && data.amount <= 1000000000)) &&
+        (!('supplierName' in data) || isShortStr(data.supplierName)) &&
+        (!('description' in data)  || isLongStr(data.description)) &&
+        (!('date' in data)         || isDateStr(data.date)) &&
+        (!('notes' in data)        || isLongStr(data.notes));
+    }
+
+    function isValidSupplierPayment(data) {
+      return
+        (!('amount' in data)            || (data.amount is number && data.amount > 0 && data.amount <= 1000000000)) &&
+        (!('supplierInvoiceId' in data) || isShortStr(data.supplierInvoiceId)) &&
+        (!('date' in data)              || isDateStr(data.date)) &&
+        (!('notes' in data)             || isLongStr(data.notes));
+    }
+
+    function isValidEquipment(data) {
+      return
+        (!('fuelRate' in data)          || isMoney(data.fuelRate)) &&
+        (!('category' in data)          || data.category in ['base', 'attachment']) &&
+        (!('status' in data)            || data.status in ['active', 'maintenance', 'inactive']) &&
+        (!('name' in data)              || isShortStr(data.name)) &&
+        (!('type' in data)              || isShortStr(data.type)) &&
+        (!('driverId' in data)          || isShortStr(data.driverId)) &&
+        (!('customDriverName' in data)  || isShortStr(data.customDriverName)) &&
+        (!('parentEquipmentId' in data) || isShortStr(data.parentEquipmentId)) &&
+        (!('customParentName' in data)  || isShortStr(data.customParentName));
+    }
+
+    function isValidDriver(data) {
+      return
+        (!('salary' in data)   || isMoney(data.salary)) &&
+        (!('status' in data)   || data.status in ['active', 'inactive']) &&
+        (!('role' in data)     || data.role in ['driver', 'staff']) &&
+        (!('name' in data)     || isShortStr(data.name)) &&
+        (!('phone' in data)    || isShortStr(data.phone)) &&
+        (!('position' in data) || isShortStr(data.position));
+    }
+
+    function isValidAttendance(data) {
+      return
+        (!('status' in data)   || data.status in ['present', 'absent', 'late', 'half']) &&
+        (!('date' in data)     || isDateStr(data.date)) &&
+        (!('driverId' in data) || isShortStr(data.driverId)) &&
+        (!('notes' in data)    || isLongStr(data.notes));
+    }
+
+    // legacy — لسه موجودة بس عشان عملية الترحيل التلقائي لنظام الرواتب
+    // الجديد (شوف driverCostService.js وDataContext.jsx)، مش بتتضاف لها
+    // بيانات جديدة من أي فورم. فحص خفيف بس عشان مايتكسرش أثناء الترحيل.
+    function isValidDriverCost(data) {
+      return (!('amount' in data) || isMoney(data.amount));
+    }
+
+    function isValidSettings(data) {
+      return (!('fuelPrice' in data) || isMoney(data.fuelPrice));
+    }
+
+    // تجريبي، write-only، مفيش حاجة في التطبيق بتقراه لسه (شوف
+    // dashboardSummaryService.js) — بنتأكد من نوع القيم المالية زيها زي
+    // أي حقل مالي تاني طالما بيتكتب فعلاً.
+    function isValidDashboardSummary(data) {
+      return
+        (!('totalRevenue' in data)         || isMoney(data.totalRevenue)) &&
+        (!('totalFuelCost' in data)        || isMoney(data.totalFuelCost)) &&
+        (!('totalPaid' in data)            || isMoney(data.totalPaid)) &&
+        (!('totalRemaining' in data)       || isMoney(data.totalRemaining)) &&
+        (!('totalMaintCost' in data)       || isMoney(data.totalMaintCost)) &&
+        (!('totalSalariesPaid' in data)    || isMoney(data.totalSalariesPaid)) &&
+        (!('totalTaxDeductions' in data)   || isMoney(data.totalTaxDeductions)) &&
+        (!('totalSupplierPaidOut' in data) || isMoney(data.totalSupplierPaidOut)) &&
+        (!('netProfit' in data)            || isSignedMoney(data.netProfit));
+    }
+
     // كل بيانات الشركة (معدات، شغل، سائقين، صيانة، مدفوعات، رواتب،
     // حضور، عهدة، إعدادات...) بقت جوه users/{uid}/... بدل collections
     // منفصلة على المستوى الأعلى فيها حقل userId. الفايدة: مفيش أي حاجة
     // ممكن تُقرأ أو تتكتب من غير ما تكون جوه مسار المستخدم نفسه أصلاً —
     // العزل بقى في بنية المسار مش في شرط بيتكرر يدوي في كل collection.
-    // قاعدة واحدة عامة بتغطي أي subcollection جديدة تتضاف تحت مستخدم
-    // من غير ما نرجع نعدّل الملف ده تاني.
     match /users/{uid} {
-      allow get:            if isSignedIn() && (isOwner(uid) || isAdmin());
-      allow list:            if isSignedIn() && isAdmin();
-      allow create, update: if isSignedIn() && isOwner(uid);
-      allow delete:          if false;
+      allow get:             if isSignedIn() && (isOwner(uid) || isAdmin());
+      allow list:             if isSignedIn() && isAdmin();
+      allow create, update:  if isSignedIn() && isOwner(uid);
+      allow delete:           if false;
 
+      // القراءة لسه عامة على أي subcollection جديدة تتضاف تحت مستخدم من
+      // غير ما نرجع نعدّل الملف ده تاني — العزل (مين يشوف بيانات مين) لسه
+      // معتمد بالكامل على المسار زي ما هو، ومحتاجش فحص حقول لأنها قراءة.
+      //
+      // الكتابة اتشالت من هنا ومقسّمة تحت كل subcollection تحت — كانت
+      // قاعدة واحدة عامة (allow read, write) بتسمح بأي حقل بأي قيمة طالما
+      // صاحب الحساب هو اللي بيكتب؛ دلوقتي كل نوع بيانات له فحص لصحة حقوله
+      // المالية (مبلغ سالب، نوع بيانات غلط، نص طويل جداً...) بدل ما يتسحب
+      // كامل على "هو صاحب الحساب" بس.
       match /{document=**} {
-        allow read, write: if isSignedIn() && isOwner(uid);
+        allow read: if isSignedIn() && isOwner(uid);
+      }
+
+      match /equipment/{id} {
+        allow create, update: if isSignedIn() && isOwner(uid) && isValidEquipment(request.resource.data);
+        allow delete:          if isSignedIn() && isOwner(uid);
+      }
+
+      match /jobs/{id} {
+        allow create: if isSignedIn() && isOwner(uid) && 'acres' in request.resource.data && isValidJob(request.resource.data);
+        allow update: if isSignedIn() && isOwner(uid) && isValidJob(request.resource.data);
+        allow delete: if isSignedIn() && isOwner(uid);
+      }
+
+      match /drivers/{id} {
+        allow create, update: if isSignedIn() && isOwner(uid) && isValidDriver(request.resource.data);
+        allow delete:          if isSignedIn() && isOwner(uid);
+      }
+
+      match /maintenance/{id} {
+        allow create: if isSignedIn() && isOwner(uid) && 'cost' in request.resource.data && isValidMaintenance(request.resource.data);
+        allow update: if isSignedIn() && isOwner(uid) && isValidMaintenance(request.resource.data);
+        allow delete: if isSignedIn() && isOwner(uid);
+      }
+
+      match /payments/{id} {
+        allow create: if isSignedIn() && isOwner(uid) && 'amount' in request.resource.data && isValidPayment(request.resource.data);
+        allow update: if isSignedIn() && isOwner(uid) && isValidPayment(request.resource.data);
+        allow delete: if isSignedIn() && isOwner(uid);
+      }
+
+      match /supplierInvoices/{id} {
+        allow create: if isSignedIn() && isOwner(uid) && 'amount' in request.resource.data && isValidSupplierInvoice(request.resource.data);
+        allow update: if isSignedIn() && isOwner(uid) && isValidSupplierInvoice(request.resource.data);
+        allow delete: if isSignedIn() && isOwner(uid);
+      }
+
+      match /supplierPayments/{id} {
+        allow create: if isSignedIn() && isOwner(uid) && 'amount' in request.resource.data && isValidSupplierPayment(request.resource.data);
+        allow update: if isSignedIn() && isOwner(uid) && isValidSupplierPayment(request.resource.data);
+        allow delete: if isSignedIn() && isOwner(uid);
+      }
+
+      match /salaryEntries/{id} {
+        allow create: if isSignedIn() && isOwner(uid) && 'amount' in request.resource.data && isValidSalaryEntry(request.resource.data);
+        allow update: if isSignedIn() && isOwner(uid) && isValidSalaryEntry(request.resource.data);
+        allow delete: if isSignedIn() && isOwner(uid);
+      }
+
+      match /custodyTransactions/{id} {
+        allow create: if isSignedIn() && isOwner(uid) && 'amount' in request.resource.data && isValidCustodyTransaction(request.resource.data);
+        allow update: if isSignedIn() && isOwner(uid) && isValidCustodyTransaction(request.resource.data);
+        allow delete: if isSignedIn() && isOwner(uid);
+      }
+
+      match /taxDeductions/{id} {
+        allow create: if isSignedIn() && isOwner(uid) && 'amount' in request.resource.data && isValidTaxDeduction(request.resource.data);
+        allow update: if isSignedIn() && isOwner(uid) && isValidTaxDeduction(request.resource.data);
+        allow delete: if isSignedIn() && isOwner(uid);
+      }
+
+      match /attendance/{id} {
+        allow create, update: if isSignedIn() && isOwner(uid) && isValidAttendance(request.resource.data);
+        allow delete:          if isSignedIn() && isOwner(uid);
+      }
+
+      // legacy — لسه موجودة بس عشان عملية الترحيل التلقائي لنظام الرواتب
+      // الجديد (شوف driverCostService.js وDataContext.jsx)، مش بتتضاف لها
+      // بيانات جديدة من أي فورم.
+      match /driverCosts/{id} {
+        allow create, update: if isSignedIn() && isOwner(uid) && isValidDriverCost(request.resource.data);
+        allow delete:          if isSignedIn() && isOwner(uid);
+      }
+
+      match /meta/settings {
+        allow create, update: if isSignedIn() && isOwner(uid) && isValidSettings(request.resource.data);
+        allow delete:          if isSignedIn() && isOwner(uid);
+      }
+
+      match /summary/dashboard {
+        allow create, update: if isSignedIn() && isOwner(uid) && isValidDashboardSummary(request.resource.data);
+        allow delete:          if isSignedIn() && isOwner(uid);
       }
     }
 
