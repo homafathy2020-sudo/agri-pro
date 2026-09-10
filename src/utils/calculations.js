@@ -284,6 +284,19 @@ export const calcNetProfit = ({
 } = {}) =>
   totalRevenue - totalFuelCost - totalMaintCost - totalSalariesPaid - totalTaxDeductions - totalSupplierPaidOut;
 
+/**
+ * Percentage change from `previous` to `current`. Returns null when there's
+ * no baseline to compare against (previous === 0) — showing "+∞%" or a bare
+ * "0%" in that case would be misleading, so callers should hide the change
+ * indicator entirely rather than render a null result.
+ */
+export const calcPercentChange = (current, previous) => {
+  const c = safeNum(current);
+  const p = safeNum(previous);
+  if (p === 0) return null;
+  return ((c - p) / Math.abs(p)) * 100;
+};
+
 // ─── Payment instalments ──────────────────────────────────────────────────────
 
 /**

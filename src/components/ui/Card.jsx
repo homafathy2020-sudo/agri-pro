@@ -2,6 +2,8 @@
 import React from "react";
 import clsx from "clsx";
 import { usePrivacy } from "../../contexts/PrivacyContext";
+import { ArrowUpCircleIcon, ArrowDownCircleIcon } from "./Icons";
+import { formatPercent } from "../../utils/formatters";
 
 export const Card = ({ children, className, hover = false, ...props }) => (
   <div className={clsx(
@@ -143,17 +145,41 @@ export const Divider = ({ className }) => (
   <hr className={clsx("border-0 border-t border-white/8", className)} />
 );
 
-export const SummaryRow = ({ label, value, valueColor = "text-gray-200", bold = false, sensitive = false }) => {
+// Small "+12% / -4% عن الشهر اللي فات" pill. `changeInvert` flips which
+// direction counts as "good" — for cost rows (fuel, maintenance, salaries…)
+// a drop is the good direction, unlike revenue/profit where a rise is.
+const ChangeBadge = ({ change, invert = false }) => {
+  if (typeof change !== "number" || !Number.isFinite(change)) return null;
+  const isUp = change > 0;
+  const isFlat = change === 0;
+  const isGood = isFlat ? null : (invert ? !isUp : isUp);
+  const colorClass = isFlat
+    ? "bg-gray-800 text-gray-400"
+    : isGood
+      ? "bg-green-900/30 text-green-400"
+      : "bg-red-900/30 text-red-400";
+  return (
+    <span className={clsx("inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0", colorClass)}>
+      {!isFlat && (isUp ? <ArrowUpCircleIcon size={10}/> : <ArrowDownCircleIcon size={10}/>)}
+      {formatPercent(Math.abs(change), 0)}
+    </span>
+  );
+};
+
+export const SummaryRow = ({ label, value, valueColor = "text-gray-200", bold = false, sensitive = false, change, changeInvert = false }) => {
   const { isPrivate } = usePrivacy();
   const hidden = sensitive && isPrivate;
   return (
     <div className="flex items-center justify-between py-2.5 border-b border-white/8 last:border-0">
       <span className="text-sm text-gray-400">{label}</span>
-      <span
-        className={clsx("text-sm font-bold transition-[filter] duration-300", valueColor, bold && "text-base")}
-        style={{ filter: hidden ? "blur(6px)" : "none", userSelect: hidden ? "none" : "auto" }}
-      >
-        {value}
+      <span className="flex items-center gap-2">
+        <span
+          className={clsx("text-sm font-bold transition-[filter] duration-300", valueColor, bold && "text-base")}
+          style={{ filter: hidden ? "blur(6px)" : "none", userSelect: hidden ? "none" : "auto" }}
+        >
+          {value}
+        </span>
+        <ChangeBadge change={change} invert={changeInvert}/>
       </span>
     </div>
   );

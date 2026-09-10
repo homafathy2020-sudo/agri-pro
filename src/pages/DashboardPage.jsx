@@ -84,6 +84,7 @@ const DashboardPage = () => {
     recentJobs,
     equipment, drivers, payments,
     fuelPrice, loading,
+    monthlyComparison,
   } = useDashboard();
 
   const { clients, totalDebt } = useClients();
@@ -243,17 +244,24 @@ const DashboardPage = () => {
 
         {/* Financial summary */}
         <Card>
-          <CardHeader title="الملخص المالي"/>
+          <CardHeader title="الملخص المالي" subtitle="الشهر الحالي مقابل الشهر السابق"/>
           <CardBody>
-            <SummaryRow label="إجمالي الإيراد"  value={formatCurrency(totalRevenue)}         valueColor="text-amber-400" sensitive/>
-            <SummaryRow label="تكلفة الوقود"    value={formatCurrency(totals.totalFuelCost)} valueColor="text-red-400" sensitive/>
-            <SummaryRow label="تكاليف الصيانة"  value={formatCurrency(totalMaintCost)}  valueColor="text-red-400" sensitive/>
-            <SummaryRow label="مرتبات الفريق" value={formatCurrency(totalSalaries||0)} valueColor="text-red-400" sensitive/>
-            <SummaryRow label="الواصل للمورد" value={formatCurrency(totalSupplierPaidOut||0)} valueColor="text-red-400" sensitive/>
-            <SummaryRow label="ضرائب وخصومات"   value={formatCurrency(totalTaxDeductions||0)} valueColor="text-red-400" sensitive/>
+            <SummaryRow label="إجمالي الإيراد"  value={formatCurrency(totalRevenue)}         valueColor="text-amber-400" sensitive
+              change={monthlyComparison.revenue.change}/>
+            <SummaryRow label="تكلفة الوقود"    value={formatCurrency(totals.totalFuelCost)} valueColor="text-red-400" sensitive
+              change={monthlyComparison.fuelCost.change} changeInvert/>
+            <SummaryRow label="تكاليف الصيانة"  value={formatCurrency(totalMaintCost)}  valueColor="text-red-400" sensitive
+              change={monthlyComparison.maintCost.change} changeInvert/>
+            <SummaryRow label="مرتبات الفريق" value={formatCurrency(totalSalaries||0)} valueColor="text-red-400" sensitive
+              change={monthlyComparison.salaries.change} changeInvert/>
+            <SummaryRow label="الواصل للمورد" value={formatCurrency(totalSupplierPaidOut||0)} valueColor="text-red-400" sensitive
+              change={monthlyComparison.supplierPaid.change} changeInvert/>
+            <SummaryRow label="ضرائب وخصومات"   value={formatCurrency(totalTaxDeductions||0)} valueColor="text-red-400" sensitive
+              change={monthlyComparison.taxDeductions.change} changeInvert/>
             <div className="border-t border-white/8 mt-2 pt-2">
               <SummaryRow label="صافي الربح" value={formatCurrency(netProfit)}
-                valueColor={netProfit>=0?"text-green-400":"text-red-400"} bold sensitive/>
+                valueColor={netProfit>=0?"text-green-400":"text-red-400"} bold sensitive
+                change={monthlyComparison.netProfit.change}/>
             </div>
             {totalRevenue > 0 && (
               <div className="mt-4">

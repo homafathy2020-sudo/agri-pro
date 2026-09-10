@@ -8,9 +8,53 @@ import {
   buildEquipmentReport,
   aggregateSupplierInvoices,
   calcNetProfit,
+  calcPercentChange,
 } from "../utils/calculations";
 import { calcTotalSalariesPaid } from "../utils/salaryCalculations";
 import { calcTotalTaxDeductions } from "../utils/taxCalculations";
+
+// ─── Month-over-month comparison ───────────────────────────────────────────
+// "current month" / "previous month" here mean exactly what ReportsPage's
+// monthly PDF download already means for the same labels (full calendar
+// month, matched by the "YYYY-MM" prefix on each record's `date`) — so a
+// figure never means two different things in two places. Note this is
+// month-to-date vs. a full previous month, same tradeoff ReportsPage
+// already accepts: early in the month the % swing will look large simply
+// because fewer days have posted yet.
+const monthPrefixOf = (date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+
+/**
+ * Same six cash-basis figures calcNetProfit/aggregateSupplierInvoices
+ * already define as the single source of truth, scoped to one month.
+ * Pure function (all data passed in) so it doesn't depend on hook timing.
+ */
+const buildMonthFinancials = (monthPrefix, {
+  jobs, maintenance, salaryEntries, taxDeductions,
+  supplierInvoices, supplierPayments, drivers, fuelPrice, payments,
+}) => {
+  const inMonth = (d) => (d?.date || "").startsWith(monthPrefix);
+
+  const { totalRevenue, totalFuelCost } = aggregateJobs(jobs.filter(inMonth), fuelPrice, payments);
+  const totalMaintCost = maintenance
+    .filter(inMonth)
+    .reduce((s, m) => s + (Number(m.cost) || 0), 0);
+  const totalSalariesPaid = calcTotalSalariesPaid(salaryEntries.filter(inMonth), drivers);
+  const totalTaxDeductions = calcTotalTaxDeductions(taxDeductions.filter(inMonth));
+  // Cash basis, scoped by payment date (not invoice date) — same idea as
+  // ReportsPage's supplierPaidOutForPeriod.
+  const totalSupplierPaidOut = aggregateSupplierInvoices(
+    supplierInvoices,
+    supplierPayments.filter(inMonth)
+  ).totalPaidOut;
+
+  const netProfit = calcNetProfit({
+    totalRevenue, totalFuelCost, totalMaintCost,
+    totalSalariesPaid, totalTaxDeductions, totalSupplierPaidOut,
+  });
+
+  return { totalRevenue, totalFuelCost, totalMaintCost, totalSalariesPaid, totalTaxDeductions, totalSupplierPaidOut, netProfit };
+};
 
 export const useDashboard = () => {
   const {
@@ -84,6 +128,26 @@ export const useDashboard = () => {
 
   const miniRevenue = dailyRevenue.map((d) => d.revenue);
 
+  // "الملخص المالي" row-by-row vs. last month — same six cash-basis figures
+  // as netProfit above, just scoped to two months instead of all-time.
+  const monthlyComparison = useMemo(() => {
+    const now = new Date();
+    const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const ctx = { jobs, maintenance, salaryEntries, taxDeductions, supplierInvoices, supplierPayments, drivers, fuelPrice, payments };
+    const current  = buildMonthFinancials(monthPrefixOf(now), ctx);
+    const previous = buildMonthFinancials(monthPrefixOf(prevMonthDate), ctx);
+    const pair = (curr, prev) => ({ current: curr, change: calcPercentChange(curr, prev) });
+    return {
+      revenue:       pair(current.totalRevenue, previous.totalRevenue),
+      fuelCost:      pair(current.totalFuelCost, previous.totalFuelCost),
+      maintCost:     pair(current.totalMaintCost, previous.totalMaintCost),
+      salaries:      pair(current.totalSalariesPaid, previous.totalSalariesPaid),
+      supplierPaid:  pair(current.totalSupplierPaidOut, previous.totalSupplierPaidOut),
+      taxDeductions: pair(current.totalTaxDeductions, previous.totalTaxDeductions),
+      netProfit:     pair(current.netProfit, previous.netProfit),
+    };
+  }, [jobs, maintenance, salaryEntries, taxDeductions, supplierInvoices, supplierPayments, drivers, fuelPrice, payments]);
+
   return {
     totals,
     totalMaintCost,
@@ -98,6 +162,7 @@ export const useDashboard = () => {
     bestEquipment,
     recentJobs,
     miniRevenue,
+    monthlyComparison,
     equipment,
     drivers,
     payments,
