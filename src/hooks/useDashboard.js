@@ -35,7 +35,7 @@ const buildMonthFinancials = (monthPrefix, {
 }) => {
   const inMonth = (d) => (d?.date || "").startsWith(monthPrefix);
 
-  const { totalRevenue, totalFuelCost } = aggregateJobs(jobs.filter(inMonth), fuelPrice, payments);
+  const { totalRevenue, totalFuelCost, totalAcres, totalFuel } = aggregateJobs(jobs.filter(inMonth), fuelPrice, payments);
   const totalMaintCost = maintenance
     .filter(inMonth)
     .reduce((s, m) => s + (Number(m.cost) || 0), 0);
@@ -53,7 +53,7 @@ const buildMonthFinancials = (monthPrefix, {
     totalSalariesPaid, totalTaxDeductions, totalSupplierPaidOut,
   });
 
-  return { totalRevenue, totalFuelCost, totalMaintCost, totalSalariesPaid, totalTaxDeductions, totalSupplierPaidOut, netProfit };
+  return { totalRevenue, totalFuelCost, totalMaintCost, totalSalariesPaid, totalTaxDeductions, totalSupplierPaidOut, netProfit, totalAcres, totalFuel };
 };
 
 export const useDashboard = () => {
@@ -145,6 +145,8 @@ export const useDashboard = () => {
       supplierPaid:  pair(current.totalSupplierPaidOut, previous.totalSupplierPaidOut),
       taxDeductions: pair(current.totalTaxDeductions, previous.totalTaxDeductions),
       netProfit:     pair(current.netProfit, previous.netProfit),
+      acres:         pair(current.totalAcres, previous.totalAcres),
+      fuel:          pair(current.totalFuel, previous.totalFuel),
     };
   }, [jobs, maintenance, salaryEntries, taxDeductions, supplierInvoices, supplierPayments, drivers, fuelPrice, payments]);
 

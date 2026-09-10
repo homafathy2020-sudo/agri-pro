@@ -116,8 +116,10 @@ const DashboardPage = () => {
         <StatCard icon={<RevenueIcon size={26}/>} label="إجمالي الإيرادات" value={formatCurrency(totalRevenue)} color="amber" sensitive
           change={monthlyComparison.revenue.change}/>
         <StatCard icon={<RevenueIcon size={26}/>} label="تم تحصيله" value={formatCurrency(totalCollected)} color="green" sensitive/>
-        <StatCard icon={<AcreIcon size={26}/>} label="إجمالي الأفدنة" value={formatNumber(totalAcres)} color="blue" sensitive/>
-        <StatCard icon={<FuelIcon size={26}/>} label="إجمالي الوقود" value={`${formatNumber(totalFuel)} ل`} color="orange" sensitive/>
+        <StatCard icon={<AcreIcon size={26}/>} label="إجمالي الأفدنة" value={formatNumber(totalAcres)} color="blue" sensitive
+          change={monthlyComparison.acres.change}/>
+        <StatCard icon={<FuelIcon size={26}/>} label="إجمالي الوقود" value={`${formatNumber(totalFuel)} ل`} color="orange" sensitive
+          change={monthlyComparison.fuel.change}/>
         <StatCard icon={<ProfitIcon size={26}/>} label="صافي الربح" value={formatCurrency(netProfit)} color={netProfit>=0?"purple":"red"} sensitive
           change={monthlyComparison.netProfit.change}/>
       </div>
