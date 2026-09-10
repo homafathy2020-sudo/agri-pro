@@ -35,6 +35,12 @@ const RestoreModal = ({ open, onClose }) => {
   const [confirmText, setConfirmText] = useState("");
   const [busy, setBusy] = useState(false);
   const [busyLabel, setBusyLabel] = useState("");
+  // null = no failure yet. Otherwise: { isPartialFailure, completedKeys,
+  // totalKeys, safetyBackupId } — see handleRestore/handleRecoverFromSafety
+  // below. A partial failure gets its own persistent screen (not just a
+  // toast, which disappears) because it's the one outcome where staying
+  // silent about exactly what happened could cost the user real data.
+  const [restoreError, setRestoreError] = useState(null);
 
   const currentCounts = {
     equipment:     data.equipment?.length     || 0,
@@ -67,6 +73,7 @@ const RestoreModal = ({ open, onClose }) => {
     if (open) {
       setSelected(null);
       setConfirmText("");
+      setRestoreError(null);
       loadList();
     }
   }, [open, loadList]);
@@ -76,36 +83,85 @@ const RestoreModal = ({ open, onClose }) => {
     onClose();
   };
 
+  const currentDataPayload = () => ({
+    equipment:     data.equipment,
+    jobs:          data.jobs,
+    drivers:       data.drivers,
+    maintenance:   data.maintenance,
+    payments:      data.payments,
+    supplierInvoices: data.supplierInvoices,
+    supplierPayments: data.supplierPayments,
+    salaryEntries: data.salaryEntries,
+    attendance:    data.attendance,
+    custodyTransactions: data.custody,
+    taxDeductions: data.taxDeductions,
+    settings:      data.settings,
+  });
+
   const handleRestore = async () => {
     if (!selected || confirmText !== CONFIRM_WORD) return;
     setBusy(true);
+    setRestoreError(null);
+    let safetyBackupId = null;
     try {
       setBusyLabel("جاري أخذ نسخة أمان من وضعك الحالي...");
-      await backupService.createBackup(user.uid, {
-        equipment:     data.equipment,
-        jobs:          data.jobs,
-        drivers:       data.drivers,
-        maintenance:   data.maintenance,
-        payments:      data.payments,
-        supplierInvoices: data.supplierInvoices,
-        supplierPayments: data.supplierPayments,
-        salaryEntries: data.salaryEntries,
-        attendance:    data.attendance,
-        custodyTransactions: data.custody,
-        taxDeductions: data.taxDeductions,
-        settings:      data.settings,
-      });
+      safetyBackupId = await backupService.createBackup(user.uid, currentDataPayload());
 
       setBusyLabel("جاري تحميل النسخة المطلوبة...");
       const snapshotData = await backupService.getSnapshot(user.uid, selected.id);
 
       setBusyLabel("جاري استرجاع البيانات...");
-      await backupService.restoreSnapshot(user.uid, snapshotData);
+      await backupService.restoreSnapshot(user.uid, snapshotData, {
+        onProgress: ({ completedKeys, totalKeys }) =>
+          setBusyLabel(`جاري استرجاع البيانات... (${completedKeys.length}/${totalKeys})`),
+      });
 
       toast.success("تم الاسترجاع بنجاح، جاري إعادة تحميل البرنامج...");
       setTimeout(() => window.location.reload(), 1200);
     } catch (err) {
-      toast.error("تعذر إتمام الاسترجاع — بياناتك الحالية لم تتأثر بالكامل، برجاء المحاولة تانية");
+      // isPartialFailure/completedKeys/totalKeys only exist on errors thrown
+      // by restoreSnapshot itself (see backupService.js) — an error from
+      // createBackup (the safety backup) or getSnapshot above means restore
+      // never started at all, so the user's live data is untouched either
+      // way; err.isPartialFailure is simply undefined/false in that case,
+      // which correctly falls into the "nothing changed" branch below.
+      setRestoreError({
+        isPartialFailure: !!err.isPartialFailure,
+        completedKeys: err.completedKeys || [],
+        totalKeys: err.totalKeys || Object.keys(COUNT_LABELS).length,
+        safetyBackupId,
+      });
+      setBusy(false);
+      setBusyLabel("");
+    }
+  };
+
+  // One-click recovery for the partial-failure case: restore the safety
+  // snapshot taken seconds ago, right before this attempt — putting the
+  // account back to exactly where it was before anything went wrong. This
+  // is itself a normal restoreSnapshot call (same function, same
+  // guarantees), so if IT also fails partway, the same explicit
+  // partial-failure reporting applies again rather than silently retrying.
+  const handleRecoverFromSafety = async () => {
+    if (!restoreError?.safetyBackupId) return;
+    setBusy(true);
+    setBusyLabel("جاري الرجوع لوضعك قبل محاولة الاسترجاع...");
+    try {
+      const safetyData = await backupService.getSnapshot(user.uid, restoreError.safetyBackupId);
+      await backupService.restoreSnapshot(user.uid, safetyData, {
+        onProgress: ({ completedKeys, totalKeys }) =>
+          setBusyLabel(`جاري الرجوع لوضعك قبل المحاولة... (${completedKeys.length}/${totalKeys})`),
+      });
+      toast.success("تم الرجوع لوضعك قبل محاولة الاسترجاع، جاري إعادة تحميل البرنامج...");
+      setTimeout(() => window.location.reload(), 1200);
+    } catch (err) {
+      setRestoreError({
+        isPartialFailure: !!err.isPartialFailure,
+        completedKeys: err.completedKeys || [],
+        totalKeys: err.totalKeys || Object.keys(COUNT_LABELS).length,
+        safetyBackupId: restoreError.safetyBackupId,
+        recoveryAlsoFailed: true,
+      });
       setBusy(false);
       setBusyLabel("");
     }
@@ -118,6 +174,73 @@ const RestoreModal = ({ open, onClose }) => {
           <span className="w-10 h-10 border-[3px] border-brand-500 border-t-transparent rounded-full animate-spin" />
           <p className="text-sm font-semibold text-gray-300">{busyLabel}</p>
           <p className="text-xs text-gray-500">من فضلك متقفلش البرنامج لحد ما تخلص العملية</p>
+        </div>
+      ) : restoreError ? (
+        // ── Explicit failure state — never phrased as "restore succeeded",
+        // and never lumps a partial failure in with a clean no-op failure.
+        <div className="space-y-4">
+          {restoreError.isPartialFailure ? (
+            <>
+              <div className="bg-red-900/20 border border-red-800/40 rounded-xl px-4 py-3 flex gap-3">
+                <AlertIcon size={18} className="text-red-400 flex-shrink-0 mt-0.5" />
+                <div className="text-xs text-red-300 leading-relaxed space-y-1">
+                  <p className="font-bold text-red-200">
+                    الاسترجاع توقف في المنتصف ولم يكتمل
+                  </p>
+                  <p>
+                    تم استرجاع {restoreError.completedKeys.length} من {restoreError.totalKeys} مجموعة بيانات
+                    قبل ما العملية تتوقف — يعني بياناتك الحالية دلوقتي خليط بين القديم والنسخة اللي كنت
+                    بتسترجعها، مش وضعك الأصلي ومش النسخة المطلوبة بالكامل.
+                  </p>
+                </div>
+              </div>
+
+              {restoreError.safetyBackupId && !restoreError.recoveryAlsoFailed && (
+                <div className="bg-surface-2 border border-white/8 rounded-xl px-4 py-3 space-y-3">
+                  <p className="text-xs text-gray-300 leading-relaxed">
+                    أخدنا نسخة أمان من وضعك <span className="font-bold text-gray-100">قبل ما نبدأ المحاولة دي</span> —
+                    تقدر ترجع لها دلوقتي علشان تنهي حالة الخليط دي وترجع لوضعك الأصلي.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="danger"
+                    className="w-full"
+                    icon={<RestoreIcon size={16} />}
+                    onClick={handleRecoverFromSafety}
+                  >
+                    ارجع لوضعك قبل المحاولة دي (نسخة الأمان)
+                  </Button>
+                </div>
+              )}
+
+              {restoreError.recoveryAlsoFailed && (
+                <div className="bg-red-900/20 border border-red-800/40 rounded-xl px-4 py-3">
+                  <p className="text-xs text-red-300 leading-relaxed">
+                    محاولة الرجوع لنسخة الأمان فشلت هي كمان (استرجعت {restoreError.completedKeys.length} من{" "}
+                    {restoreError.totalKeys}). متقفلش الشاشة دي — كلم الدعم الفني دلوقتي وابعتله نفس الرقمين
+                    دول، وخليك متصل بالإنترنت وسيب البرنامج مفتوح لحد ما يتأكد من حالة بياناتك.
+                  </p>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="bg-red-900/20 border border-red-800/40 rounded-xl px-4 py-3 flex gap-3">
+              <AlertIcon size={18} className="text-red-400 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-red-300 leading-relaxed">
+                تعذر إتمام الاسترجاع قبل أي تعديل فعلي — بياناتك الحالية <span className="font-bold">لم تتأثر إطلاقًا</span>،
+                برجاء التأكد من الاتصال بالإنترنت والمحاولة تاني.
+              </p>
+            </div>
+          )}
+
+          <Button
+            type="button"
+            variant="secondary"
+            className="w-full"
+            onClick={() => { setRestoreError(null); setSelected(null); setConfirmText(""); loadList(); }}
+          >
+            رجوع لقائمة النسخ الاحتياطية
+          </Button>
         </div>
       ) : !selected ? (
         // ── Step 1: choose a snapshot ──────────────────────

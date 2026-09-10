@@ -218,8 +218,31 @@ export const backupService = {
   /**
    * Overwrite the user's live data with a snapshot's data.
    * Caller is responsible for taking a fresh "safety" backup first.
+   *
+   * ⚠️ (audit finding E3) restoreSnapshot writes each collection in its own
+   * sequential step (restoreCollection itself is already atomic per
+   * collection via writeBatch — see above — but the *whole* restore across
+   * all ~11 collections is not one atomic operation; Firestore has no way to
+   * batch a write this large atomically). If the network drops, the tab
+   * closes, or a permission error happens partway through, some collections
+   * are already fully restored to the old snapshot's data and the rest are
+   * still whatever they were before — a genuine mixed state, not "nothing
+   * happened" and not "fully restored" either.
+   *
+   * Before this fix, every failure here surfaced identically to the caller
+   * (a plain Error), so the UI could only ever say a single generic "لم
+   * تتأثر بالكامل" message — which is actively WRONG the moment even one
+   * collection has already been overwritten. Now the thrown error carries
+   * enough information (`isPartialFailure`, `completedKeys`, `totalKeys`)
+   * for the UI to tell the two situations apart and say something true in
+   * each case, per the "never say restore succeeded when it didn't, and
+   * never be vague about partial" requirement.
+   *
+   * `onProgress` (optional) is called after each collection finishes, with
+   * `{ completedKeys, totalKeys, justCompleted }` — lets the UI show live
+   * progress instead of one opaque spinner for the whole operation.
    */
-  async restoreSnapshot(userId, snapshotData) {
+  async restoreSnapshot(userId, snapshotData, { onProgress } = {}) {
     // Validate every required collection up front, before any write touches
     // Firestore. Without this, a missing/invalid collection (e.g. `null`
     // instead of an array) would fall through to `|| []` below and silently
@@ -234,11 +257,36 @@ export const backupService = {
       throw new Error("بيانات الاسترجاع ناقصة أو غير صالحة، تم إلغاء العملية قبل أي تعديل");
     }
 
-    for (const [key, subName] of BACKUP_COLLECTIONS) {
-      await restoreCollection(subName, userId, snapshotData[key] || []);
+    // +1 for the trailing "settings" step (only really a step when the
+    // snapshot actually carries settings — see below).
+    const totalKeys = BACKUP_COLLECTIONS.length + (snapshotData.settings ? 1 : 0);
+    const completedKeys = [];
+
+    try {
+      for (const [key, subName] of BACKUP_COLLECTIONS) {
+        await restoreCollection(subName, userId, snapshotData[key] || []);
+        completedKeys.push(key);
+        onProgress?.({ completedKeys: [...completedKeys], totalKeys, justCompleted: key });
+      }
+      if (snapshotData.settings) {
+        await setDoc(doc(db, "users", userId, "meta", "settings"), reviveTimestamps(snapshotData.settings));
+        completedKeys.push("settings");
+        onProgress?.({ completedKeys: [...completedKeys], totalKeys, justCompleted: "settings" });
+      }
+    } catch (err) {
+      const isPartialFailure = completedKeys.length > 0;
+      const wrapped = new Error(
+        isPartialFailure
+          ? `توقف الاسترجاع في المنتصف بعد ${completedKeys.length} من ${totalKeys} مجموعات بيانات — بياناتك الحالية بقت خليط بين القديم والجديد`
+          : "فشل الاسترجاع قبل أي تعديل فعلي على بياناتك الحالية"
+      );
+      wrapped.isPartialFailure = isPartialFailure;
+      wrapped.completedKeys = completedKeys;
+      wrapped.totalKeys = totalKeys;
+      wrapped.cause = err;
+      throw wrapped;
     }
-    if (snapshotData.settings) {
-      await setDoc(doc(db, "users", userId, "meta", "settings"), reviveTimestamps(snapshotData.settings));
-    }
+
+    return { completedKeys, totalKeys };
   },
 };
