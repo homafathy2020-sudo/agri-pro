@@ -44,6 +44,27 @@ export const Badge = ({ children, variant = "gray", className }) => (
   )}>{children}</span>
 );
 
+// Small "+12% / -4% عن الشهر اللي فات" pill. `changeInvert` flips which
+// direction counts as "good" — for cost rows (fuel, maintenance, salaries…)
+// a drop is the good direction, unlike revenue/profit where a rise is.
+const ChangeBadge = ({ change, invert = false }) => {
+  if (typeof change !== "number" || !Number.isFinite(change)) return null;
+  const isUp = change > 0;
+  const isFlat = change === 0;
+  const isGood = isFlat ? null : (invert ? !isUp : isUp);
+  const colorClass = isFlat
+    ? "bg-gray-800 text-gray-400"
+    : isGood
+      ? "bg-green-900/30 text-green-400"
+      : "bg-red-900/30 text-red-400";
+  return (
+    <span className={clsx("inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0", colorClass)}>
+      {!isFlat && (isUp ? <ArrowUpCircleIcon size={10}/> : <ArrowDownCircleIcon size={10}/>)}
+      {formatPercent(Math.abs(change), 0)}
+    </span>
+  );
+};
+
 // ── StatCard ──────────────────────────────────────────────
 const STAT_ACCENTS = {
   green:  {
@@ -90,7 +111,7 @@ const STAT_ACCENTS = {
   },
 };
 
-export const StatCard = ({ icon, label, value, color = "green", sensitive = false }) => {
+export const StatCard = ({ icon, label, value, color = "green", sensitive = false, change, changeInvert = false }) => {
   const accent = STAT_ACCENTS[color] || STAT_ACCENTS.green;
   const { isPrivate } = usePrivacy();
   const hidden = sensitive && isPrivate;
@@ -123,6 +144,9 @@ export const StatCard = ({ icon, label, value, color = "green", sensitive = fals
 
       {/* Label */}
       <div className="text-xs text-gray-400 font-semibold">{label}</div>
+
+      {/* Change vs. last month */}
+      <ChangeBadge change={change} invert={changeInvert}/>
     </div>
   );
 };
@@ -144,27 +168,6 @@ export const EmptyState = ({ icon, title, description, action }) => (
 export const Divider = ({ className }) => (
   <hr className={clsx("border-0 border-t border-white/8", className)} />
 );
-
-// Small "+12% / -4% عن الشهر اللي فات" pill. `changeInvert` flips which
-// direction counts as "good" — for cost rows (fuel, maintenance, salaries…)
-// a drop is the good direction, unlike revenue/profit where a rise is.
-const ChangeBadge = ({ change, invert = false }) => {
-  if (typeof change !== "number" || !Number.isFinite(change)) return null;
-  const isUp = change > 0;
-  const isFlat = change === 0;
-  const isGood = isFlat ? null : (invert ? !isUp : isUp);
-  const colorClass = isFlat
-    ? "bg-gray-800 text-gray-400"
-    : isGood
-      ? "bg-green-900/30 text-green-400"
-      : "bg-red-900/30 text-red-400";
-  return (
-    <span className={clsx("inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0", colorClass)}>
-      {!isFlat && (isUp ? <ArrowUpCircleIcon size={10}/> : <ArrowDownCircleIcon size={10}/>)}
-      {formatPercent(Math.abs(change), 0)}
-    </span>
-  );
-};
 
 export const SummaryRow = ({ label, value, valueColor = "text-gray-200", bold = false, sensitive = false, change, changeInvert = false }) => {
   const { isPrivate } = usePrivacy();

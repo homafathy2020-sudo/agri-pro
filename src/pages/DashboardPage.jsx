@@ -113,11 +113,13 @@ const DashboardPage = () => {
 
       {/* ── KPI Cards ──────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 lg:gap-4">
-        <StatCard icon={<RevenueIcon size={26}/>} label="إجمالي الإيرادات" value={formatCurrency(totalRevenue)} color="amber" sensitive/>
+        <StatCard icon={<RevenueIcon size={26}/>} label="إجمالي الإيرادات" value={formatCurrency(totalRevenue)} color="amber" sensitive
+          change={monthlyComparison.revenue.change}/>
         <StatCard icon={<RevenueIcon size={26}/>} label="تم تحصيله" value={formatCurrency(totalCollected)} color="green" sensitive/>
         <StatCard icon={<AcreIcon size={26}/>} label="إجمالي الأفدنة" value={formatNumber(totalAcres)} color="blue" sensitive/>
         <StatCard icon={<FuelIcon size={26}/>} label="إجمالي الوقود" value={`${formatNumber(totalFuel)} ل`} color="orange" sensitive/>
-        <StatCard icon={<ProfitIcon size={26}/>} label="صافي الربح" value={formatCurrency(netProfit)} color={netProfit>=0?"purple":"red"} sensitive/>
+        <StatCard icon={<ProfitIcon size={26}/>} label="صافي الربح" value={formatCurrency(netProfit)} color={netProfit>=0?"purple":"red"} sensitive
+          change={monthlyComparison.netProfit.change}/>
       </div>
 
       {/* ── Debt alert ─────────────────────────────────────── */}
@@ -244,24 +246,17 @@ const DashboardPage = () => {
 
         {/* Financial summary */}
         <Card>
-          <CardHeader title="الملخص المالي" subtitle="الشهر الحالي مقابل الشهر السابق"/>
+          <CardHeader title="الملخص المالي"/>
           <CardBody>
-            <SummaryRow label="إجمالي الإيراد"  value={formatCurrency(totalRevenue)}         valueColor="text-amber-400" sensitive
-              change={monthlyComparison.revenue.change}/>
-            <SummaryRow label="تكلفة الوقود"    value={formatCurrency(totals.totalFuelCost)} valueColor="text-red-400" sensitive
-              change={monthlyComparison.fuelCost.change} changeInvert/>
-            <SummaryRow label="تكاليف الصيانة"  value={formatCurrency(totalMaintCost)}  valueColor="text-red-400" sensitive
-              change={monthlyComparison.maintCost.change} changeInvert/>
-            <SummaryRow label="مرتبات الفريق" value={formatCurrency(totalSalaries||0)} valueColor="text-red-400" sensitive
-              change={monthlyComparison.salaries.change} changeInvert/>
-            <SummaryRow label="الواصل للمورد" value={formatCurrency(totalSupplierPaidOut||0)} valueColor="text-red-400" sensitive
-              change={monthlyComparison.supplierPaid.change} changeInvert/>
-            <SummaryRow label="ضرائب وخصومات"   value={formatCurrency(totalTaxDeductions||0)} valueColor="text-red-400" sensitive
-              change={monthlyComparison.taxDeductions.change} changeInvert/>
+            <SummaryRow label="إجمالي الإيراد"  value={formatCurrency(totalRevenue)}         valueColor="text-amber-400" sensitive/>
+            <SummaryRow label="تكلفة الوقود"    value={formatCurrency(totals.totalFuelCost)} valueColor="text-red-400" sensitive/>
+            <SummaryRow label="تكاليف الصيانة"  value={formatCurrency(totalMaintCost)}  valueColor="text-red-400" sensitive/>
+            <SummaryRow label="مرتبات الفريق" value={formatCurrency(totalSalaries||0)} valueColor="text-red-400" sensitive/>
+            <SummaryRow label="الواصل للمورد" value={formatCurrency(totalSupplierPaidOut||0)} valueColor="text-red-400" sensitive/>
+            <SummaryRow label="ضرائب وخصومات"   value={formatCurrency(totalTaxDeductions||0)} valueColor="text-red-400" sensitive/>
             <div className="border-t border-white/8 mt-2 pt-2">
               <SummaryRow label="صافي الربح" value={formatCurrency(netProfit)}
-                valueColor={netProfit>=0?"text-green-400":"text-red-400"} bold sensitive
-                change={monthlyComparison.netProfit.change}/>
+                valueColor={netProfit>=0?"text-green-400":"text-red-400"} bold sensitive/>
             </div>
             {totalRevenue > 0 && (
               <div className="mt-4">
