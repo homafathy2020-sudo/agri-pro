@@ -4,7 +4,9 @@ import { useData } from "../contexts/DataContext";
 import { useAuth } from "../contexts/AuthContext";
 import { checkOverdueDebts } from "../utils/calculations";
 import { findDuplicateSalaryEntries } from "../utils/findDuplicateSalaryEntries";
+import { findOrphanedPayments, findOrphanedSupplierPayments } from "../utils/findOrphanedPayments";
 import { calcCustodyBalance } from "../utils/custodyCalculations";
+import { formatCurrency } from "../utils/formatters";
 import { useAdminMessages } from "./useAdminMessages";
 
 // حالة "مقروء" و"محذوف" لكل تنبيه متخزنة محلياً على الجهاز (زي فكرة
@@ -25,7 +27,10 @@ const saveSet = (key, set) => localStorage.setItem(key, JSON.stringify([...set])
  * and action info, plus helpers to mark-read / delete (single or bulk).
  */
 export const useNotifications = () => {
-  const { jobs, payments, settings, custody, salaryEntries = [], drivers = [], loading } = useData();
+  const {
+    jobs, payments, settings, custody, salaryEntries = [], drivers = [],
+    supplierInvoices = [], supplierPayments = [], loading,
+  } = useData();
   const { user } = useAuth();
   const { messages: adminMessages, loading: adminLoading, dismiss } = useAdminMessages();
 
@@ -72,6 +77,19 @@ export const useNotifications = () => {
     });
     return byDriver;
   }, [salaryDuplicateReport]);
+
+  // (audit finding B4/F3) Payments/supplierPayments whose job/invoice no
+  // longer exists — see utils/findOrphanedPayments.js for the full
+  // background. Detection only, computed purely from data already loaded
+  // by the app (no extra Firestore reads); nothing here deletes or
+  // changes anything. Expected to be empty in the overwhelming majority
+  // of sessions — it only ever finds something after a genuine offline
+  // cross-device race on the same job/invoice.
+  const orphanedPayments = useMemo(() => findOrphanedPayments(jobs, payments), [jobs, payments]);
+  const orphanedSupplierPayments = useMemo(
+    () => findOrphanedSupplierPayments(supplierInvoices, supplierPayments),
+    [supplierInvoices, supplierPayments]
+  );
 
   const notifications = useMemo(() => {
     const list = [];
@@ -126,6 +144,34 @@ export const useNotifications = () => {
       });
     });
 
+    // Orphaned payments/supplierPayments (audit finding B4/F3) — job or
+    // supplier invoice no longer exists for this payment, almost always
+    // caused by an offline edit race between two devices. Reported for
+    // manual review; the app has no automatic delete for these (unlike
+    // the duplicate-salary-entry case above) since the data itself is
+    // still a real payment that was actually received — a human decision,
+    // not something safe to script.
+    orphanedPayments.forEach((p) => {
+      list.push({
+        id:       `orphan-payment-${p.id}`,
+        type:     "orphaned_payment",
+        severity: "medium",
+        title:    "دفعة بدون عملية مرتبطة",
+        body:     `دفعة بمبلغ ${formatCurrency(p.amount)} مش مرتبطة بأي عملية حالية (العملية اتمسحت بعد ما الدفعة دي اتسجلت من جهاز تاني). راجعها يدويًا.`,
+        date:     p.date || null,
+      });
+    });
+    orphanedSupplierPayments.forEach((p) => {
+      list.push({
+        id:       `orphan-supplier-payment-${p.id}`,
+        type:     "orphaned_payment",
+        severity: "medium",
+        title:    "دفعة مورد بدون فاتورة مرتبطة",
+        body:     `دفعة بمبلغ ${formatCurrency(p.amount)} مش مرتبطة بأي فاتورة مورد حالية (الفاتورة اتمسحت بعد ما الدفعة دي اتسجلت من جهاز تاني). راجعها يدويًا.`,
+        date:     p.date || null,
+      });
+    });
+
     // Admin broadcast/targeted messages — دايماً فوق كل حاجة تانية،
     // بترتيبها هي بالتاريخ (الأحدث الأول)، مش متدمجة مع ترتيب severity
     // بتاع باقي التنبيهات عشان تفضل واضحة إنها من الإدارة.
@@ -150,7 +196,7 @@ export const useNotifications = () => {
     return [...adminItems, ...sorted]
       .filter((n) => !hiddenSet.has(n.id))
       .map((n) => ({ ...n, read: readSet.has(n.id) }));
-  }, [debtAlerts, custody, custodyBalance, latestCustodyDate, salaryDuplicatesByDriver, drivers, adminMessages, dismiss, readSet, hiddenSet]);
+  }, [debtAlerts, custody, custodyBalance, latestCustodyDate, salaryDuplicatesByDriver, drivers, orphanedPayments, orphanedSupplierPayments, adminMessages, dismiss, readSet, hiddenSet]);
 
   const bump = () => setVersion((v) => v + 1);
 

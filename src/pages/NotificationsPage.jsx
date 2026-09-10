@@ -32,6 +32,7 @@ const SEVERITY_STYLE = {
 const TYPE_ICONS = {
   debt_overdue:      DriverIcon,
   custody_overdrawn: WalletIcon,
+  orphaned_payment:  WalletIcon,
   admin_message:     MegaphoneIcon,
 };
 
