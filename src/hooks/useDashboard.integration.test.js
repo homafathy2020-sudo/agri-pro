@@ -23,11 +23,31 @@ import { calcTotalSalariesPaid } from "../utils/salaryCalculations";
 import { calcTotalTaxDeductions } from "../utils/taxCalculations";
 import { SALARY_ENTRY_TYPES } from "../config/constants";
 
-/** Re-run of the exact netProfit formula from useDashboard.js. */
-function computeDashboardTotals({ jobs, payments, maintenance, salaryEntries, taxDeductions, supplierInvoices, supplierPayments, fuelPrice }) {
+/**
+ * Re-run of the exact netProfit formula from useDashboard.js.
+ *
+ * ⚠️ (audit finding C1, fixed) `drivers` is required here, same as
+ * useDashboard.js's `calcTotalSalariesPaid(salaryEntries, drivers)` call —
+ * it is NOT cosmetic. It supplies each driver's configured base salary as a
+ * fallback whenever a given month has no explicit BASE-type salaryEntry
+ * (see salaryCalculations.js's calcMonthlySalary/calcTotalSalariesPaid for
+ * the full rationale — that fallback was itself a prior bug fix, added so
+ * "مرتبات الفريق" doesn't silently read too low, and net profit
+ * artificially high, for a driver whose base salary is on file but hasn't
+ * been logged as a discrete entry that month).
+ *
+ * Before this fix, this function called calcTotalSalariesPaid with only ONE
+ * argument, so it silently never exercised that fallback path — meaning a
+ * future regression that broke the real `drivers` argument in
+ * useDashboard.js would have passed this whole suite undetected. `drivers`
+ * defaults to [] (same behavior as before) so existing calls below that
+ * pass no drivers still work identically; the new test further down is what
+ * actually exercises the fallback.
+ */
+function computeDashboardTotals({ jobs, payments, maintenance, salaryEntries, drivers = [], taxDeductions, supplierInvoices, supplierPayments, fuelPrice }) {
   const totals = aggregateJobs(jobs, fuelPrice, payments);
   const totalMaintCost = maintenance.reduce((s, m) => s + (Number(m.cost) || 0), 0);
-  const totalSalaries = calcTotalSalariesPaid(salaryEntries);
+  const totalSalaries = calcTotalSalariesPaid(salaryEntries, drivers);
   const totalTaxDeductions = calcTotalTaxDeductions(taxDeductions);
   const supplierStats = aggregateSupplierInvoices(supplierInvoices, supplierPayments);
   const totalSupplierPaidOut = supplierStats.totalPaidOut;
@@ -121,5 +141,40 @@ describe("dashboard pipeline: job creation -> payment -> debt/profit", () => {
     });
     expect(result.netProfit).toBe(0);
     expect(result.margin).toBe(0); // guarded against division by zero
+  });
+
+  // (audit finding C1) This is the scenario the other tests in this file
+  // never exercised: a driver with a configured base salary but no explicit
+  // BASE-type salaryEntry logged for the month. See the JSDoc on
+  // computeDashboardTotals above for the full rationale.
+  test("a driver's configured base salary is used as fallback when no BASE entry is logged that month", () => {
+    const jobs = [
+      { id: "job1", acres: 10, pricePerAcre: 500, fuelUsed: 0, date: "2026-02-01" }, // revenue 5000
+    ];
+    const drivers = [{ id: "d1", name: "سائق تجريبي", salary: 3000 }];
+    // No BASE entry for d1 this month — only a deduction. calcMonthlySalary
+    // must fall back to the driver's configured `salary` (3000) as the base.
+    const salaryEntries = [
+      { driverId: "d1", type: SALARY_ENTRY_TYPES.DEDUCTION, amount: 200, date: "2026-02-05" },
+    ];
+
+    const result = computeDashboardTotals({
+      jobs, payments: [], maintenance: [], salaryEntries, drivers, taxDeductions: [],
+      supplierInvoices: [], supplierPayments: [], fuelPrice: 15,
+    });
+
+    // base(3000, from the driver fallback) + bonuses(0) - deductions(200) - advanceRepayments(0) = 2800
+    expect(result.totalSalaries).toBe(2800);
+    expect(result.netProfit).toBe(5000 - 2800);
+
+    // Without `drivers` correctly wired through to calcTotalSalariesPaid,
+    // there is no default base to fall back to: base stays 0 and the lone
+    // deduction alone makes totalSalaries negative (-200), which makes net
+    // profit look artificially HIGHER (5000 - (-200) = 5200) instead of
+    // correctly lower. These are the assertions that would have caught the
+    // original bug — a future regression that drops the `drivers` argument
+    // anywhere in this chain fails right here.
+    expect(result.totalSalaries).not.toBe(-200);
+    expect(result.netProfit).not.toBe(5000 - -200);
   });
 });
