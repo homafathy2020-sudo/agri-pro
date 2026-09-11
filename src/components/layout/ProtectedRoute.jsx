@@ -5,6 +5,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import LoadingScreen from "../ui/LoadingScreen";
 import { DataProvider } from "../../contexts/DataContext";
 import OnboardingGate from "./OnboardingGate";
+import EmailVerificationGate from "./EmailVerificationGate";
 import LandingPage from "../../pages/LandingPage";
 
 /**
@@ -27,10 +28,15 @@ const ProtectedRoute = ({ children }) => {
     return <Navigate to="/auth" replace />;
   }
 
+  // EmailVerificationGate قبل DataProvider عن قصد: لو بريد المستخدم مش
+  // متحقق منه، التطبيق ميحملش أي بيانات Firestore خاصة بيه أصلًا — مش بس
+  // يمنعه بصريًا من الوصول للشاشة.
   return (
-    <DataProvider>
-      <OnboardingGate>{children}</OnboardingGate>
-    </DataProvider>
+    <EmailVerificationGate>
+      <DataProvider>
+        <OnboardingGate>{children}</OnboardingGate>
+      </DataProvider>
+    </EmailVerificationGate>
   );
 };
 

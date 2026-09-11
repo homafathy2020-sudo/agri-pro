@@ -33,6 +33,7 @@ import AdminBillingRequestsPage from "./pages/AdminBillingRequestsPage";
 import AdminErrorsPage        from "./pages/AdminErrorsPage";
 import AdminMessagesPage      from "./pages/AdminMessagesPage";
 import AdminBackupToExcelPage from "./pages/AdminBackupToExcelPage";
+import AdminDataIntegrityPage from "./pages/AdminDataIntegrityPage";
 
 const App = () => (
   <ErrorBoundary>
@@ -64,6 +65,7 @@ const App = () => (
           <Route path="admin/errors" element={<AdminRoute><AdminErrorsPage /></AdminRoute>} />
           <Route path="admin/messages" element={<AdminRoute><AdminMessagesPage /></AdminRoute>} />
           <Route path="admin/backup-to-excel" element={<AdminRoute><AdminBackupToExcelPage /></AdminRoute>} />
+          <Route path="admin/data-integrity" element={<AdminRoute><AdminDataIntegrityPage /></AdminRoute>} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

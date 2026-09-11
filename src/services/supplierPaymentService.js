@@ -7,7 +7,7 @@
 import {
   collection, doc,
   setDoc, updateDoc, deleteDoc,
-  getDocs, query, where,
+  getDocs, onSnapshot, query, where,
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../config/firebase";
@@ -20,6 +20,19 @@ export const supplierPaymentService = {
     return snap.docs
       .map((d) => ({ id: d.id, ...d.data() }))
       .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  },
+
+  // Live-subscribe — see paymentService.js for why the sort is client-side.
+  subscribe(userId, onData, onError) {
+    return onSnapshot(
+      col(userId),
+      (snap) => onData(
+        snap.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => (b.date || "").localeCompare(a.date || ""))
+      ),
+      onError
+    );
   },
 
   async getByInvoice(userId, supplierInvoiceId) {

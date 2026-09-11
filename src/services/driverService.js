@@ -2,7 +2,7 @@
 import {
   collection, doc,
   setDoc, updateDoc, deleteDoc,
-  getDocs, query, orderBy,
+  getDocs, onSnapshot, query, orderBy,
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../config/firebase";
@@ -14,6 +14,16 @@ export const driverService = {
     const q = query(col(userId), orderBy("createdAt", "desc"));
     const snap = await getDocs(q);
     return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  },
+
+  // Live-subscribe — see equipmentService.js for the full contract.
+  subscribe(userId, onData, onError) {
+    const q = query(col(userId), orderBy("createdAt", "desc"));
+    return onSnapshot(
+      q,
+      (snap) => onData(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      onError
+    );
   },
 
   // Returns { id, promise } — see equipmentService.js for why.

@@ -4,7 +4,7 @@ import { useForm, useWatch, Controller } from "react-hook-form";
 import { Input, Select, Textarea, NumberInput } from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 import { SummaryRow } from "../../components/ui/Card";
-import { WORK_TYPES, MAX_MONEY_VALUE } from "../../config/constants";
+import { WORK_TYPES, MAX_MONEY_VALUE, DEFAULT_FUEL_PRICE } from "../../config/constants";
 import { calcRevenue, calcFuelCost, calcRemainingAmount } from "../../utils/calculations";
 import { formatCurrency, todayISO } from "../../utils/formatters";
 
@@ -77,7 +77,13 @@ const JobForm = ({ initial, equipment, drivers, fuelPrice, onSave, onClose }) =>
       // سعر اللتر بيتثبّت وقت إنشاء الشغلانة (زي pricePerAcre بالظبط) وميتغيّرش
       // بعد كده حتى لو سعر الوقود في الإعدادات اتغيّر لاحقًا. عند التعديل،
       // بنحافظ على السعر الأصلي المخزَّن (أو الحالي لو شغلانة قديمة من قبل الإصلاح).
-      fuelPriceAtJob: isEdit ? (initial.fuelPriceAtJob ?? fuelPrice) : fuelPrice,
+      //
+      // `?? DEFAULT_FUEL_PRICE` الأخيرة دي شبكة أمان إضافية بس (الإصلاح
+      // الحقيقي في settingsService.js) — بتمنع setDoc() يفشل بالكامل
+      // بـ "Unsupported field value: undefined" لو fuelPrice وصل هنا
+      // undefined لأي سبب غير متوقع، بدل ما تفشل العملية كلها وميتسجّلش
+      // أي حاجة (زي ما كان بيحصل فعلياً قبل الإصلاح ده).
+      fuelPriceAtJob: (isEdit ? (initial.fuelPriceAtJob ?? fuelPrice) : fuelPrice) ?? DEFAULT_FUEL_PRICE,
       date:         data.date,
       notes:        data.notes,
       // على الإنشاء: قيمة أولية تُستخدم لعمل دفعة أولى تلقائياً (شوف JobsPage).

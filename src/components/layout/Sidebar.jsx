@@ -8,11 +8,12 @@ import { useEntitlement } from "../../hooks/useEntitlement";
 import { useNotifications } from "../../hooks/useNotifications";
 import { formatInputNumber, parseInputNumber } from "../../utils/formatters";
 import { ADMIN_UIDS, MAX_MONEY_VALUE } from "../../config/constants";
+import { FOCUS_FUEL_PRICE_EVENT, FUEL_PRICE_SAVED_EVENT } from "../../utils/uiEvents";
 import ProfileModal from "../../features/profile/ProfileModal";
 import {
   HomeIcon, TractorIcon, ClipboardIcon,
   DriverIcon, WrenchIcon, ChartIcon,
-  FuelIcon, LogoutIcon, AlertIcon, WalletIcon, ShieldIcon, BugIcon, MegaphoneIcon, DownloadIcon, ReceiptIcon, TruckIcon,
+  FuelIcon, LogoutIcon, AlertIcon, WalletIcon, ShieldIcon, BugIcon, MegaphoneIcon, DownloadIcon, ReceiptIcon, TruckIcon, SearchIcon,
   StarIcon,
 } from "../ui/Icons";
 
@@ -60,8 +61,44 @@ const Sidebar = ({ onClose }) => {
 
   const handleSaveFuel = () => {
     const val = Number(parseInputNumber(fuelDisplay));
-    if (val > 0 && val <= MAX_MONEY_VALUE) saveSettings({ fuelPrice: val });
+    if (val > 0 && val <= MAX_MONEY_VALUE) {
+      saveSettings({ fuelPrice: val });
+      // audit roadmap Phase 7: بلّغ أي بانر تعريفي مرتبط (زي بانر "سعر
+      // الوقود" في DashboardPage.jsx) إن المستخدم خلاص حفظ السعر، عشان
+      // يقفل نفسه تلقائي بدل ما يستنى قفل يدوي بعد ما الهدف اتحقق.
+      window.dispatchEvent(new CustomEvent(FUEL_PRICE_SAVED_EVENT));
+    }
   };
+
+  // audit roadmap Phase 7: بانر "سعر الوقود" في الداشبورد بيبعت الحدث ده
+  // (بدل ما يعمل navigate لصفحة مش موجودة — حقل سعر الوقود جوه القائمة
+  // الجانبية نفسها، مش صفحة منفصلة) عشان يوجّه المستخدم للحقل هنا فعلياً
+  // (سكرول + focus + هايلايت مؤقت)، بدل ما يسيبه يدوّر عليه بنفسه.
+  //
+  // Sidebar.jsx بيترندر مرتين في نفس الوقت (نسخة ديسكتوب دايماً ظاهرة،
+  // ونسخة الدرج بتاع الموبايل جوه AppLayout.jsx) — الاتنين بيستقبلوا نفس
+  // الحدث، فبنتأكد إن اللي بيرد فعلياً هو بس النسخة الظاهرة فعلاً على
+  // الشاشة (offsetWidth > 0)، مش الاتنين مع بعض.
+  const fuelInputRef = React.useRef(null);
+  const [fuelHighlight, setFuelHighlight] = React.useState(false);
+
+  React.useEffect(() => {
+    const handler = () => {
+      // تأخير بسيط عشان لو درج الموبايل لسه بيتفتح (AppLayout.jsx بيسمع
+      // نفس الحدث ده كمان ويفتحه)، الـ transition بتاعه يخلص الأول قبل
+      // ما نحسب offsetWidth — من غيره ممكن نلاقي 0 لسه وهو بيتحرك.
+      setTimeout(() => {
+        const el = fuelInputRef.current;
+        if (!el || el.offsetWidth === 0) return; // النسخة التانية (مش الظاهرة)
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.focus();
+        setFuelHighlight(true);
+        setTimeout(() => setFuelHighlight(false), 2200);
+      }, 350);
+    };
+    window.addEventListener(FOCUS_FUEL_PRICE_EVENT, handler);
+    return () => window.removeEventListener(FOCUS_FUEL_PRICE_EVENT, handler);
+  }, []);
 
   return (
     <aside className="flex flex-col h-full bg-surface border-l border-white/8 w-64 select-none">
@@ -84,7 +121,9 @@ const Sidebar = ({ onClose }) => {
             onClick={onClose}
             className={({ isActive }) =>
               clsx(
-                "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150",
+                // (تجديد بصري خفيف) group بس عشان الأيقونة تكبّر شوية وقت
+                // الـ hover — CSS transform بسيط، بدون أي مكتبة حركة إضافية.
+                "group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150",
                 isActive
                   ? "bg-gradient-to-l from-brand-900/60 to-brand-900/20 text-brand-300 border border-brand-800/50 shadow-sm"
                   : "text-gray-400 hover:text-gray-200 hover:bg-white/5"
@@ -93,7 +132,7 @@ const Sidebar = ({ onClose }) => {
           >
             {({ isActive }) => (
               <>
-                <Icon size={18} className={isActive ? "text-brand-400" : "text-gray-500"} />
+                <Icon size={18} className={clsx("transition-transform duration-150 group-hover:scale-110", isActive ? "text-brand-400" : "text-gray-500")} />
                 <span className="flex-1">{label}</span>
                 {badge && totalCount > 0 && (
                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center text-white ${highCount > 0 ? "bg-red-500" : "bg-amber-500"}`}>
@@ -185,19 +224,42 @@ const Sidebar = ({ onClose }) => {
                 </>
               )}
             </NavLink>
+            <NavLink
+              to="/admin/data-integrity"
+              onClick={onClose}
+              className={({ isActive }) =>
+                clsx(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150",
+                  isActive
+                    ? "bg-gradient-to-l from-purple-900/60 to-purple-900/20 text-purple-300 border border-purple-800/50 shadow-sm"
+                    : "text-gray-400 hover:text-gray-200 hover:bg-white/5"
+                )
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <SearchIcon size={18} className={isActive ? "text-purple-400" : "text-gray-500"} />
+                  <span className="flex-1">فحص تكامل البيانات</span>
+                </>
+              )}
+            </NavLink>
           </>
         )}
       </nav>
 
       {/* Fuel Price */}
       <div className="px-4 pb-3 border-t border-white/8 pt-4">
-        <div className="bg-surface-2 rounded-xl p-3 border border-white/8">
+        <div className={clsx(
+          "bg-surface-2 rounded-xl p-3 border transition-all duration-300",
+          fuelHighlight ? "border-amber-500 ring-2 ring-amber-500/40" : "border-white/8"
+        )}>
           <div className="flex items-center gap-2 mb-2">
             <FuelIcon size={14} className="text-gray-500" />
             <p className="text-[11px] text-gray-500 font-semibold">سعر اللتر (ج.م)</p>
           </div>
           <div className="flex gap-2">
             <input
+              ref={fuelInputRef}
               inputMode="decimal"
               value={fuelDisplay}
               onChange={handleFuelChange}

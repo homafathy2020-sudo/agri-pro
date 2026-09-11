@@ -347,6 +347,14 @@ export const MegaphoneIcon = (p) => <Icon {...p} d={[
 
 export const SendIcon = (p) => <Icon {...p} d={["M22 2L11 13", "M22 2l-7 20-4-9-9-4 20-7z"]} />;
 
+// audit finding F-003/Phase 5: تقرير فحص تكامل البيانات (أدمن).
+export const SearchIcon = (p) => (
+  <svg width={p.size||20} height={p.size||20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={p.className}>
+    <circle cx="11" cy="11" r="7"/>
+    <path d="M21 21l-4.35-4.35"/>
+  </svg>
+);
+
 export const ExternalLinkIcon = (p) => <Icon {...p} d={[
   "M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6",
   "M15 3h6v6",

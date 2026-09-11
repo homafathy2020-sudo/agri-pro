@@ -2,7 +2,7 @@
 import {
   collection, doc,
   setDoc, updateDoc, deleteDoc,
-  getDocs, query, orderBy,
+  getDocs, onSnapshot, query, orderBy,
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../config/firebase";
@@ -19,6 +19,24 @@ export const equipmentService = {
     const q = query(col(userId), orderBy("createdAt", "desc"));
     const snap = await getDocs(q);
     return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  },
+
+  /**
+   * Live-subscribe to all equipment for a farm (userId scope). Calls
+   * `onData(list)` on the initial snapshot and again on every subsequent
+   * change (including local optimistic writes served from cache before
+   * the server confirms them). `onError` is called on a terminal listener
+   * error (e.g. permission-denied) — the listener itself dies at that
+   * point, exactly like a normal Firestore onSnapshot. Returns the
+   * unsubscribe function.
+   */
+  subscribe(userId, onData, onError) {
+    const q = query(col(userId), orderBy("createdAt", "desc"));
+    return onSnapshot(
+      q,
+      (snap) => onData(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      onError
+    );
   },
 
   /**

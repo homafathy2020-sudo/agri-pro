@@ -5,6 +5,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { EyeIcon, EyeOffIcon } from "../components/ui/Icons";
 import toast from "react-hot-toast";
+import { checkLoginLock, recordFailedLogin, clearLoginAttempts, formatRemaining } from "../utils/loginAttemptGuard";
 
 const AuthPage = () => {
   const { login, register: registerUser, resetPassword } = useAuth();
@@ -35,14 +36,24 @@ const AuthPage = () => {
   };
 
   const onSubmit = async (data) => {
+    // audit finding F-023: طبقة تهدئة إضافية من جانب المتصفح قبل أي محاولة
+    // دخول جديدة — راجع تعليق loginAttemptGuard.js لتفاصيل حدودها.
+    if (mode === "login") {
+      const { locked, remainingMs } = checkLoginLock(data.email);
+      if (locked) {
+        toast.error(`محاولات كتير غلط، حاول تاني بعد ${formatRemaining(remainingMs)}`);
+        return;
+      }
+    }
     try {
       if (mode === "login") {
         await login(data.email, data.password);
+        clearLoginAttempts(data.email);
         toast.success("مرحباً بك!");
         navigate("/");
       } else if (mode === "register") {
         await registerUser(data.email, data.password, data.displayName);
-        toast.success("تم إنشاء الحساب بنجاح!");
+        toast.success("تم إنشاء الحساب بنجاح! تحقق من بريدك الإلكتروني لتفعيل حسابك بالكامل", { duration: 5000 });
         navigate("/");
       } else {
         try {
@@ -59,6 +70,9 @@ const AuthPage = () => {
         reset();
       }
     } catch (err) {
+      // نسجّل المحاولة الفاشلة بس في وضع الدخول (مش التسجيل ولا استعادة
+      // كلمة المرور) — دي هي حالة تخمين الباسورد اللي الطبقة دي مصممة لها.
+      if (mode === "login") recordFailedLogin(data.email);
       toast.error(authErrorMsgs[err.code] ?? "حدث خطأ، حاول مرة أخرى");
     }
   };

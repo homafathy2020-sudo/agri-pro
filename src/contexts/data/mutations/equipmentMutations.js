@@ -1,0 +1,81 @@
+// src/contexts/data/mutations/equipmentMutations.js
+//
+// عمليات المعدات وصيانتها — منقولة هنا حرفيًا من DataContext.jsx (نفس
+// نمط optimistic update + rollback عند فشل الكتابة بالظبط) من غير أي
+// تغيير في السلوك. IMPORTANT: زي الملف الأصلي، الكتابة الفعلية لـ
+// Firestore متعملهاش await قبل ما نحدّث الحالة المحلية — البيانات فعلاً
+// آمنة في طابور Firestore المحلي، وtrackWrite() هو اللي بيتابع نجاح
+// الكتابة في الخلفية.
+import { useCallback } from "react";
+import toast from "react-hot-toast";
+import { equipmentService } from "../../../services/equipmentService";
+import { maintenanceService } from "../../../services/maintenanceService";
+
+export function useEquipmentMutations({ user, dispatch, stateRef, trackWrite }) {
+  const addEquipment = useCallback(async (d) => {
+    const { id, promise } = equipmentService.add(user.uid, d);
+    dispatch({ type: "ADD_EQUIPMENT", payload: { id, ...d } });
+    trackWrite(promise, {
+      rollback: () => dispatch({ type: "DELETE_EQUIPMENT", payload: id }),
+      errorMessage: "تعذر حفظ المعدة، تم التراجع عن الإضافة",
+    });
+    toast.success("تم إضافة المعدة");
+    return id;
+  }, [user, dispatch, trackWrite]);
+
+  const updateEquipment = useCallback(async (id, d) => {
+    const previous = stateRef.current.equipment.find((e) => e.id === id);
+    dispatch({ type: "UPDATE_EQUIPMENT", payload: { id, ...d } });
+    trackWrite(equipmentService.update(user.uid, id, d), {
+      rollback: () => previous && dispatch({ type: "UPDATE_EQUIPMENT", payload: previous }),
+      errorMessage: "تعذر حفظ تعديل المعدة، تم التراجع عن التعديل",
+    });
+    toast.success("تم تحديث المعدة");
+  }, [user, dispatch, stateRef, trackWrite]);
+
+  const deleteEquipment = useCallback(async (id) => {
+    const previous = stateRef.current.equipment.find((e) => e.id === id);
+    dispatch({ type: "DELETE_EQUIPMENT", payload: id });
+    trackWrite(equipmentService.remove(user.uid, id), {
+      rollback: () => previous && dispatch({ type: "ADD_EQUIPMENT", payload: previous }),
+      errorMessage: "تعذر حذف المعدة، تم استرجاعها",
+    });
+    toast.success("تم حذف المعدة");
+  }, [user, dispatch, stateRef, trackWrite]);
+
+  const addMaintenance = useCallback(async (d) => {
+    const { id, promise } = maintenanceService.add(user.uid, d);
+    dispatch({ type: "ADD_MAINTENANCE", payload: { id, ...d } });
+    trackWrite(promise, {
+      rollback: () => dispatch({ type: "DELETE_MAINTENANCE", payload: id }),
+      errorMessage: "تعذر حفظ سجل الصيانة، تم التراجع عن الإضافة",
+    });
+    toast.success("تم تسجيل الصيانة");
+    return id;
+  }, [user, dispatch, trackWrite]);
+
+  const updateMaintenance = useCallback(async (id, d) => {
+    const previous = stateRef.current.maintenance.find((m) => m.id === id);
+    dispatch({ type: "UPDATE_MAINTENANCE", payload: { id, ...d } });
+    trackWrite(maintenanceService.update(user.uid, id, d), {
+      rollback: () => previous && dispatch({ type: "UPDATE_MAINTENANCE", payload: previous }),
+      errorMessage: "تعذر حفظ تعديل الصيانة، تم التراجع عن التعديل",
+    });
+    toast.success("تم تحديث الصيانة");
+  }, [user, dispatch, stateRef, trackWrite]);
+
+  const deleteMaintenance = useCallback(async (id) => {
+    const previous = stateRef.current.maintenance.find((m) => m.id === id);
+    dispatch({ type: "DELETE_MAINTENANCE", payload: id });
+    trackWrite(maintenanceService.remove(user.uid, id), {
+      rollback: () => previous && dispatch({ type: "ADD_MAINTENANCE", payload: previous }),
+      errorMessage: "تعذر حذف سجل الصيانة، تم استرجاعه",
+    });
+    toast.success("تم حذف الصيانة");
+  }, [user, dispatch, stateRef, trackWrite]);
+
+  return {
+    addEquipment, updateEquipment, deleteEquipment,
+    addMaintenance, updateMaintenance, deleteMaintenance,
+  };
+}

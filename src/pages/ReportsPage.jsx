@@ -13,6 +13,7 @@ import { EmptyState } from "../components/ui/Card";
 import { ChartCard } from "../components/ui/ChartCard";
 import LoadingScreen       from "../components/ui/LoadingScreen";
 import DownloadReportButton from "../components/ui/DownloadReportButton";
+import FeatureIntroBanner   from "../components/common/FeatureIntroBanner";
 import { TractorIcon, DriverIcon, ChartIcon, RevenueIcon, AcreIcon, FuelIcon, ReceiptIcon } from "../components/ui/Icons";
 import { formatCurrency, formatNumber } from "../utils/formatters";
 import { TEAM_ROLE } from "../config/constants";
@@ -229,6 +230,12 @@ const ReportsPage = () => {
 
   return (
     <div className="p-4 lg:p-6 max-w-6xl mx-auto" dir="rtl">
+
+      <FeatureIntroBanner
+        id="reports"
+        title="التقارير"
+        description="هنا تقدر تقارن أداء كل معدة وكل سائق على حدة (إيراد، وقود، صيانة)، وتنزّل ملخص شهري أو سنوي بصيغة PDF جاهز للطباعة أو الإرسال — من زرار «تحميل تقرير» تحت."
+      />
 
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3 mb-6">

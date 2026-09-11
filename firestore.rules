@@ -215,7 +215,14 @@ service cloud.firestore {
       allow get:             if isSignedIn() && (isOwner(uid) || isAdmin());
       allow list:             if isSignedIn() && isAdmin();
       allow create, update:  if isSignedIn() && isOwner(uid);
-      allow delete:           if false;
+      // كانت if false (منع كامل) — اتغيّرت عشان مسار "حذف الحساب نهائيًا"
+      // (audit finding F-006 / AuthContext.jsx → deleteAccount) يقدر يمسح
+      // آخر أثر لحساب المستخدم فعليًا، مش بس بياناته الفرعية. القرار اتاخد
+      // بوعي إن ده معناه الأدمن مش هيلاقي أي سجل تاريخي (إيميل/اسم/تاريخ
+      // إنشاء) عن حساب اتحذف بالطريقة دي بعد كده — لو احتجتوا سجل تدقيق
+      // يفضل حتى بعد الحذف مستقبلاً (audit log)، ده قرار منتج منفصل يحتاج
+      // مراجعة تانية.
+      allow delete:           if isSignedIn() && isOwner(uid);
 
       // القراءة لسه عامة على أي subcollection جديدة تتضاف تحت مستخدم من
       // غير ما نرجع نعدّل الملف ده تاني — العزل (مين يشوف بيانات مين) لسه
@@ -226,8 +233,19 @@ service cloud.firestore {
       // صاحب الحساب هو اللي بيكتب؛ دلوقتي كل نوع بيانات له فحص لصحة حقوله
       // المالية (مبلغ سالب، نوع بيانات غلط، نص طويل جداً...) بدل ما يتسحب
       // كامل على "هو صاحب الحساب" بس.
+      //
+      // audit finding F-003 (Phase 5): `|| isAdmin()` اتضافت هنا (كانت
+      // owner بس). قبل كده الأدمن ما كانش يقدر يقرا محتوى أي subcollection
+      // بتاعة أي شركة (jobs/payments/salaryEntries...) — بس بروفايلها
+      // الأساسي (users/{uid} نفسه) وmetadata الباك أب (backups/{userId}).
+      // ده كان بيمنع تقرير فحص تكامل البيانات المجمّع (dataIntegrityReport)
+      // من الأدمن يشوف أي حاجة فعلياً. نفس نمط isOwner(uid) || isAdmin()
+      // المستخدم بالفعل فوق في get() على users/{uid} وفي backups/{userId}
+      // — قراءة بس، ومقصورة على الأدمن (isAdmin() بتتأكد من UID محدد سلفاً
+      // في constants). الاختبار المقابل في scripts/testFirestoreRules.js
+      // (مجموعة admin-vs-user) اتحدّث من assertFails لـ assertSucceeds.
       match /{document=**} {
-        allow read: if isSignedIn() && isOwner(uid);
+        allow read: if isSignedIn() && (isOwner(uid) || isAdmin());
       }
 
       match /equipment/{id} {

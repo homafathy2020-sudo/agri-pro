@@ -2,7 +2,7 @@
 import {
   collection, doc,
   setDoc, updateDoc, deleteDoc,
-  getDocs, serverTimestamp,
+  getDocs, onSnapshot, serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../config/firebase";
 
@@ -14,6 +14,19 @@ export const attendanceService = {
     return snap.docs
       .map((d) => ({ id: d.id, ...d.data() }))
       .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  },
+
+  // Live-subscribe — see paymentService.js for why the sort is client-side.
+  subscribe(userId, onData, onError) {
+    return onSnapshot(
+      col(userId),
+      (snap) => onData(
+        snap.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => (b.date || "").localeCompare(a.date || ""))
+      ),
+      onError
+    );
   },
 
   // Returns { id, promise } — see equipmentService.js for why.

@@ -7,13 +7,16 @@ import {
   signOut,
   updateProfile,
   sendPasswordResetEmail,
+  sendEmailVerification,
   reauthenticateWithCredential,
+  deleteUser,
   EmailAuthProvider,
 } from "firebase/auth";
 import { serverTimestamp } from "firebase/firestore";
 import { auth } from "../config/firebase";
 import { userProfileService } from "../services/userProfileService";
 import { billingService } from "../services/billingService";
+import { backupService } from "../services/backupService";
 
 const AuthContext = createContext(null);
 
@@ -71,7 +74,41 @@ export const AuthProvider = ({ children }) => {
     // برضو: لو فشلت (مثلاً أوف لاين وقت التسجيل)، الشركة تفضل في حالة
     // "لسه ما اخترتش باقة" وتقدر تشترك يدويًا زي أي وقت تاني.
     billingService.startTrial(cred.user.uid).catch(() => {});
+    // إرسال رابط تحقق البريد الإلكتروني — best-effort زي touch فوق، ما
+    // بيوقفش التسجيل لو فشل (أوف لاين، أو حد الإرسال اليومي من Firebase).
+    // audit finding F-005: قبل كده مكانش فيه أي تحقق من ملكية البريد
+    // الإلكتروني المُدخل وقت التسجيل.
+    // ملحوظة تشخيصية مؤقتة: بنسجّل كود الخطأ في الـ console (F12 -> Console)
+    // بدل ما نبلعه بصمت زي الأول، عشان لو الإرسال فشل نعرف السبب الحقيقي
+    // (auth/too-many-requests، auth/network-request-failed، إلخ) بدل ما
+    // نفضل نخمّن.
+    sendEmailVerification(cred.user).catch((err) => {
+      console.warn("[auth] sendEmailVerification failed:", err?.code, err?.message);
+    });
     return cred;
+  };
+
+  // بيعيد إرسال رابط التحقق للمستخدم الحالي (لو لسه محتاج تحقق). بيرمي
+  // نفس أخطاء Firebase العادية (زي auth/too-many-requests) عشان الواجهة
+  // تعرضها للمستخدم.
+  const resendVerificationEmail = () => {
+    if (!auth.currentUser) {
+      return Promise.reject(new Error("لا يوجد مستخدم مسجل دخول"));
+    }
+    return sendEmailVerification(auth.currentUser);
+  };
+
+  // Firebase مبيحدّثش user.emailVerified تلقائيًا في الجلسة الحالية بعد ما
+  // المستخدم يضغط على رابط التحقق في إيميله (بيفتح في تاب/جهاز تاني عادة).
+  // الدالة دي بتعمل reload لبيانات المستخدم من السيرفر وتحدّث الحالة محليًا
+  // عشان البانر يختفي فورًا من غير ما يحتاج المستخدم يعمل logout/login.
+  const refreshEmailVerified = async () => {
+    if (!auth.currentUser) return false;
+    await auth.currentUser.reload();
+    // auth.currentUser هو نفس الكائن بعد reload، لكن React miss بيحصله
+    // update لأنه نفس المرجع — بننسخه في state جديد عشان يتاح إعادة render.
+    setUser({ ...auth.currentUser });
+    return auth.currentUser.emailVerified;
   };
 
   const logout = () => signOut(auth);
@@ -90,8 +127,31 @@ export const AuthProvider = ({ children }) => {
     return reauthenticateWithCredential(auth.currentUser, cred);
   };
 
+  // audit finding F-006: قبل الدالة دي، مكانش فيه أي مسار في التطبيق يقدر
+  // المستخدم بيه يحذف حسابه نهائيًا. بتتطلب كلمة المرور (إعادة تأكيد إجبارية
+  // قبل إجراء لا يمكن التراجع عنه)، وبتمسح بيانات Firestore الأول وهو لسه
+  // مسجل دخول (لازم يكون كده عشان قواعد الأمان محتاجة isOwner(uid))، وبعدين
+  // بتمسح حساب الـ Auth نفسه. `onProgress` اختيارية عشان الواجهة تقدر تعرض
+  // تقدم فعلي بدل سبينر واحد غامض لعملية ممكن تاخد شوية ثواني.
+  //
+  // الحذف كامل فعلًا: backupService.wipeAllData بتمسح كل الـ subcollections
+  // + مستند users/{uid} الجذري نفسه (بعد تعديل firestore.rules عمدًا للسماح
+  // بذلك) — مفيش أي أثر لحساب اتحذف بالطريقة دي بيفضل قابل للقراءة بعد كده.
+  const deleteAccount = async (password, { onProgress } = {}) => {
+    if (!auth.currentUser) {
+      return Promise.reject(new Error("لا يوجد مستخدم مسجل دخول"));
+    }
+    await reauthenticate(password);
+    const uid = auth.currentUser.uid;
+    await backupService.wipeAllData(uid, { onProgress });
+    await deleteUser(auth.currentUser);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, resetPassword, reauthenticate }}>
+    <AuthContext.Provider value={{
+      user, loading, login, register, logout, resetPassword, reauthenticate,
+      resendVerificationEmail, refreshEmailVerified, deleteAccount,
+    }}>
       {children}
     </AuthContext.Provider>
   );

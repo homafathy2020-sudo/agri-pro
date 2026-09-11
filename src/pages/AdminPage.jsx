@@ -1,11 +1,13 @@
 // src/pages/AdminPage.jsx
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
-import { useAdminUsers } from "../hooks/useAdminUsers";
-import { useAdminBackups } from "../hooks/useAdminBackups";
+import { useAdminUsersPaged } from "../hooks/useAdminUsersPaged";
 import { useAdminBroadcast } from "../hooks/useAdminBroadcast";
 import { useAdminBilling } from "../hooks/useAdminBilling";
 import { useConfirm } from "../hooks/useConfirm";
+import { userProfileService } from "../services/userProfileService";
+import { backupService } from "../services/backupService";
 import { Card, EmptyState, Badge } from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
@@ -15,7 +17,7 @@ import EntitlementEditorModal from "../features/admin/EntitlementEditorModal";
 import { computeLicenseState, LICENSE_STATE_LABELS } from "../utils/licenseState";
 import { formatDateTime } from "../utils/formatters";
 import {
-  ShieldIcon, UsersGroupIcon, RestoreIcon, ClearIcon, ExternalLinkIcon, AlertIcon, SendIcon,
+  ShieldIcon, UsersGroupIcon, RestoreIcon, ClearIcon, ExternalLinkIcon, AlertIcon, SendIcon, SearchIcon,
   WalletIcon, ClockIcon,
 } from "../components/ui/Icons";
 
@@ -58,11 +60,10 @@ const USAGE_LINKS = [
   },
 ];
 
-const SearchIcon = (p) => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" {...p}>
-    <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-  </svg>
-);
+// (Phase 5) SearchIcon كانت متعرّفة محلياً هنا بس — اتنقلت لـ
+// components/ui/Icons.jsx (نفس الشكل بالظبط) عشان AdminDataIntegrityPage.jsx
+// وSidebar.jsx يقدروا يستخدموها هي كمان، بدل ما يتكرر تعريفها في مكان
+// تاني. الاستيراد فوق بيجيبها من هناك دلوقتي.
 
 // حساب بيتعتبر "نشط" لو آخر نشاط ليه خلال آخر 30 يوم (lastActiveAt بيتحدّث
 // كل 6 ساعات كحد أقصى وقت الاستخدام الفعلي — راجع AuthContext).
@@ -75,23 +76,81 @@ const isActive = (lastActiveAt) => {
 };
 
 const AdminPage = () => {
-  const { users, count, loading, error, reload } = useAdminUsers();
-  const { backups, loading: backupsLoading } = useAdminBackups();
+  // audit finding F-019 (Phase 4): الوضع الافتراضي (من غير بحث) مرقّم
+  // صفحات — مش بيجيب كل شركة في النظام في كل فتحة صفحة. لما الأدمن يكتب
+  // في مربع البحث، بندخل "وضع البحث" اللي بيجيب كل الشركات مرة واحدة
+  // بس (زي السلوك القديم بالظبط) — تكلفة مقبولة لأنها بفعل صريح ونادر
+  // من الأدمن نفسه، مش تلقائية في كل فتحة صفحة.
+  const paged = useAdminUsersPaged();
   const { send: sendReminder, sending } = useAdminBroadcast();
   const billing = useAdminBilling();
   const { confirm, confirmState } = useConfirm();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [managingCompany, setManagingCompany] = useState(null);
+  const isSearching = query.trim().length > 0;
+
+  // إجمالي عدد الشركات الحقيقي — عبر getCountFromServer (قراءة عدّ رخيصة
+  // جداً، من غير ما تنزّل بيانات أي شركة للمتصفح)، مش users.length اللي
+  // بقت بس بتمثّل حجم الصفحة المحمّلة دلوقتي بعد الترقيم.
+  const [totalCount, setTotalCount] = useState(null);
+  useEffect(() => {
+    userProfileService.getCount().then(setTotalCount).catch(() => {});
+  }, []);
+
+  // بيانات النسخ الاحتياطية للصفحة المعروضة حالياً بس (مش كل الشركات) —
+  // بتتحمّل من جديد كل ما قائمة الـ uids المعروضة تتغيّر (صفحة جديدة اتحمّلت).
+  const [pageBackups, setPageBackups] = useState({});
+  const [pageBackupsLoading, setPageBackupsLoading] = useState(true);
+  useEffect(() => {
+    if (isSearching || paged.users.length === 0) return;
+    let cancelled = false;
+    setPageBackupsLoading(true);
+    backupService.getMetaFor(paged.users.map((u) => u.uid))
+      .then((map) => { if (!cancelled) setPageBackups((prev) => ({ ...prev, ...map })); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setPageBackupsLoading(false); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paged.users, isSearching]);
+
+  // وضع البحث: تحميل كل الشركات + metadata كل النسخ الاحتياطية مرة
+  // واحدة بس أول ما الأدمن يكتب أي حرف (زي getAll()/getAllMeta() القديمة
+  // بالظبط) — بعد كده الفلترة على كل حرف جديد بتتم محلياً على النتيجة
+  // المحمّلة خلاص، من غير أي قراءة إضافية من Firestore. useAdminBackups.js
+  // القديمة اتشالت من هنا نهائياً (كانت بتجيب كل النسخ الاحتياطية تلقائياً
+  // عند فتح الصفحة أياً كان وضع البحث — بالظبط المشكلة اللي F-019 بتتكلم
+  // عنها) بدل ما تتحول لتحميل عند الطلب زي هنا.
+  const [searchAllUsers, setSearchAllUsers] = useState(null);
+  const [searchAllBackups, setSearchAllBackups] = useState({});
+  const [searchLoading, setSearchLoading] = useState(false);
+  useEffect(() => {
+    if (!isSearching || searchAllUsers !== null || searchLoading) return;
+    setSearchLoading(true);
+    Promise.all([userProfileService.getAll(), backupService.getAllMeta()])
+      .then(([users, backups]) => { setSearchAllUsers(users); setSearchAllBackups(backups); })
+      .catch(() => toast.error("تعذر تحميل كل الشركات للبحث"))
+      .finally(() => setSearchLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSearching, searchAllUsers]);
 
   const filtered = useMemo(() => {
+    if (!isSearching) return paged.users;
     const q = query.trim().toLowerCase();
-    if (!q) return users;
-    return users.filter((u) =>
+    return (searchAllUsers || []).filter((u) =>
       (u.displayName || "").toLowerCase().includes(q) ||
       (u.email || "").toLowerCase().includes(q)
     );
-  }, [users, query]);
+  }, [isSearching, searchAllUsers, paged.users, query]);
+
+  const backupsMap = isSearching ? searchAllBackups : pageBackups;
+  const backupsLoading = isSearching ? searchLoading : pageBackupsLoading;
+
+  const handleReload = () => {
+    paged.reload();
+    setSearchAllUsers(null);
+    userProfileService.getCount().then(setTotalCount).catch(() => {});
+  };
 
   const handleRemind = async (uid) => {
     const ok = await confirm(uid);
@@ -99,7 +158,9 @@ const AdminPage = () => {
     sendReminder({ ...BACKUP_REMINDER, targetUserId: uid });
   };
 
-  if (loading) return <LoadingScreen message="جاري تحميل الحسابات..." />;
+  if (paged.loading) return <LoadingScreen message="جاري تحميل الحسابات..." />;
+
+  const { error } = paged;
 
   if (error) {
     return (
@@ -108,7 +169,7 @@ const AdminPage = () => {
           icon={<ShieldIcon size={48} className="text-red-500 mx-auto mb-2" />}
           title="تعذر تحميل الحسابات"
           description="تأكد إن الـ UID بتاعك مضاف صح في isAdmin() جوه firestore.rules، وإن الـ rules متنشورة"
-          action={<Button variant="secondary" icon={<RestoreIcon size={16} />} onClick={reload}>إعادة المحاولة</Button>}
+          action={<Button variant="secondary" icon={<RestoreIcon size={16} />} onClick={handleReload}>إعادة المحاولة</Button>}
         />
       </div>
     );
@@ -121,7 +182,7 @@ const AdminPage = () => {
           <ShieldIcon size={22} className="text-brand-400" />
           حسابات الشركات
         </h1>
-        <Button variant="secondary" icon={<RestoreIcon size={16} />} onClick={reload}>
+        <Button variant="secondary" icon={<RestoreIcon size={16} />} onClick={handleReload}>
           تحديث
         </Button>
       </div>
@@ -130,7 +191,7 @@ const AdminPage = () => {
         <Card className="px-5 py-3 flex items-center gap-3">
           <UsersGroupIcon size={20} className="text-brand-400" />
           <div>
-            <p className="text-lg font-extrabold text-gray-100 leading-none">{count}</p>
+            <p className="text-lg font-extrabold text-gray-100 leading-none">{totalCount ?? "…"}</p>
             <p className="text-xs text-gray-500 mt-1">إجمالي الحسابات</p>
           </div>
         </Card>
@@ -174,7 +235,7 @@ const AdminPage = () => {
       <div className="mb-5 flex items-center gap-4 flex-wrap">
         <div className="flex-1 min-w-[220px] relative">
           <span className="absolute inset-y-0 right-3.5 flex items-center text-gray-500 pointer-events-none">
-            <SearchIcon />
+            <SearchIcon size={16} />
           </span>
           <Input
             value={query}
@@ -194,6 +255,10 @@ const AdminPage = () => {
           )}
         </div>
       </div>
+
+      {isSearching && searchLoading && (
+        <p className="text-xs text-gray-500 mb-3">بيدوّر في كل الشركات...</p>
+      )}
 
       {filtered.length === 0 ? (
         <EmptyState
@@ -245,13 +310,13 @@ const AdminPage = () => {
                   <td className="px-4 py-3 whitespace-nowrap">
                     {backupsLoading ? (
                       <span className="text-gray-600">...</span>
-                    ) : isBackupStale(backups[u.uid]?.lastBackupAt) ? (
+                    ) : isBackupStale(backupsMap[u.uid]?.lastBackupAt) ? (
                       <span className="inline-flex items-center gap-1.5 text-red-400 font-semibold">
                         <AlertIcon size={14} />
-                        {backups[u.uid]?.lastBackupAt ? formatDateTime(backups[u.uid].lastBackupAt) : "معملش باك أب"}
+                        {backupsMap[u.uid]?.lastBackupAt ? formatDateTime(backupsMap[u.uid].lastBackupAt) : "معملش باك أب"}
                       </span>
                     ) : (
-                      <span className="text-gray-400">{formatDateTime(backups[u.uid].lastBackupAt)}</span>
+                      <span className="text-gray-400">{formatDateTime(backupsMap[u.uid].lastBackupAt)}</span>
                     )}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
@@ -286,6 +351,17 @@ const AdminPage = () => {
             </tbody>
           </table>
         </Card>
+      )}
+
+      {/* الزرار ده بيظهر بس في الوضع الافتراضي (من غير بحث) — وضع البحث
+          أصلاً بيجيب كل الشركات المطابقة دفعة واحدة، مفيش "صفحة تانية"
+          فيه. audit finding F-019. */}
+      {!isSearching && paged.hasMore && (
+        <div className="flex justify-center mt-5">
+          <Button variant="secondary" loading={paged.loadingMore} onClick={paged.loadMore}>
+            تحميل المزيد
+          </Button>
+        </div>
       )}
 
       {managingCompany && (

@@ -15,8 +15,10 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^3.0.1",
     "autoprefixer": "^10.4.17",
     "firebase-admin": "^14.3.0",
+    "playwright": "^1.63.0",
     "postcss": "^8.4.35",
     "react-scripts": "5.0.1",
     "tailwindcss": "^3.4.1",
@@ -29,7 +31,8 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
-    "test": "react-scripts test"
+    "test": "react-scripts test",
+    "test:rules": "npx firebase-tools@latest emulators:exec --only firestore \"node scripts/testFirestoreRules.js\""
   },
   "eslintConfig": {
     "extends": [

@@ -118,7 +118,11 @@ export const StatCard = ({ icon, label, value, color = "green", sensitive = fals
 
   return (
     <div className={clsx(
+      // (تجديد بصري خفيف) hover lift بسيط بـ CSS transform/shadow بس —
+      // مفيش أي مكتبة animation جديدة، فمش بيضيف أي وزن على حجم الباندل،
+      // وسلس (GPU-accelerated transform) بدل ما يأثر على أي layout تاني.
       "relative bg-surface border rounded-2xl p-5 overflow-hidden flex flex-col items-center text-center gap-3",
+      "transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20",
       accent.border
     )}>
       {/* Top gradient bar */}

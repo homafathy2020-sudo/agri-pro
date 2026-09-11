@@ -6,12 +6,24 @@ import TopBar       from "./TopBar";
 import BottomNav    from "./BottomNav";
 import OfflineBanner from "../ui/OfflineBanner";
 import SubscriptionStatusBanner from "./SubscriptionStatusBanner";
+import { FOCUS_FUEL_PRICE_EVENT } from "../../utils/uiEvents";
 
 const AppLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { pathname } = useLocation();
 
   useEffect(() => { setSidebarOpen(false); }, [pathname]);
+
+  // audit roadmap Phase 7: على الموبايل حقل سعر الوقود مش ظاهر إلا لو
+  // درج القائمة الجانبية مفتوح — فبانر "سعر الوقود" (شوف DashboardPage.jsx)
+  // بيبعت نفس الحدث ده كمان عشان الدرج يتفتح تلقائي قبل ما Sidebar.jsx
+  // يعمل focus/scroll للحقل نفسه. على الديسكتوب القائمة ظاهرة دايماً،
+  // فده مجرد setState من غير أي تأثير فعلي.
+  useEffect(() => {
+    const handler = () => setSidebarOpen(true);
+    window.addEventListener(FOCUS_FUEL_PRICE_EVENT, handler);
+    return () => window.removeEventListener(FOCUS_FUEL_PRICE_EVENT, handler);
+  }, []);
 
   return (
     <div className="flex h-screen bg-dark overflow-hidden font-arabic" dir="rtl">

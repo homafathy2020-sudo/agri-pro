@@ -4,7 +4,7 @@
 import {
   collection, doc,
   setDoc, updateDoc, deleteDoc,
-  getDocs, serverTimestamp,
+  getDocs, onSnapshot, serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../config/firebase";
 
@@ -16,6 +16,23 @@ export const driverCostService = {
     return snap.docs
       .map((d) => ({ id: d.id, ...d.data() }))
       .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  },
+
+  // Live-subscribe — see paymentService.js for why the sort is client-side.
+  // NOTE: useDataLoader.js deliberately skips calling this once a device
+  // has already confirmed (via driverCostsMigratedKey) that this legacy
+  // collection is fully drained, to avoid leaving a permanently-idle
+  // listener open on an empty collection forever.
+  subscribe(userId, onData, onError) {
+    return onSnapshot(
+      col(userId),
+      (snap) => onData(
+        snap.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => (b.date || "").localeCompare(a.date || ""))
+      ),
+      onError
+    );
   },
 
   add(userId, data) {

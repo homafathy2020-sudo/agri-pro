@@ -17,6 +17,10 @@ import LoadingScreen     from "../components/ui/LoadingScreen";
 import PrivacyToggle     from "../components/ui/PrivacyToggle";
 import Sensitive         from "../components/ui/Sensitive";
 import JobCard           from "../features/jobs/JobCard";
+import OnboardingChecklist from "../components/dashboard/OnboardingChecklist";
+import FeatureIntroBanner from "../components/common/FeatureIntroBanner";
+import Button             from "../components/ui/Button";
+import { FOCUS_FUEL_PRICE_EVENT, FUEL_PRICE_SAVED_EVENT } from "../utils/uiEvents";
 import {
   RevenueIcon, AcreIcon, FuelIcon, ProfitIcon,
   TractorIcon, DriverIcon, ClipboardIcon, ChartIcon,
@@ -110,6 +114,32 @@ const DashboardPage = () => {
 
       {/* ── Privacy toggle ───────────────────────────────────── */}
       <PrivacyToggle />
+
+      {/* ── أول خطوات (audit roadmap Phase 7) — بتختفي لوحدها أول ما
+          المستخدم يكمّل خطواتها أو يقفلها بنفسه. ─────────────────── */}
+      <OnboardingChecklist />
+
+      {/* ── تنبيه سعر الوقود (audit roadmap Phase 7) — سعر الوقود بيتحدد
+          من القائمة الجانبية مش صفحة منفصلة، فالزرار هنا بيوجّه المستخدم
+          للحقل فعلياً (سكرول + focus + هايلايت) بدل ما يسيبه يدوّر عليه.
+          شوف utils/uiEvents.js وSidebar.jsx/AppLayout.jsx للآلية الكاملة. */}
+      <FeatureIntroBanner
+        id="fuel-price"
+        title="سعر الوقود"
+        description="سعر لتر السولار بيتحدد من القائمة الجانبية، وبيتثبّت تلقائي على كل عملية شغل جديدة تسجّلها بعد كده (حتى لو غيّرت السعر لاحقًا، العمليات القديمة بتفضل بسعرها الأصلي). لازم تحدّثه لو السعر الحقيقي عندك مختلف."
+        dismissOnEvent={FUEL_PRICE_SAVED_EVENT}
+        action={
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            icon={<FuelIcon size={15} />}
+            onClick={() => window.dispatchEvent(new CustomEvent(FOCUS_FUEL_PRICE_EVENT))}
+          >
+            غيّر سعر الوقود
+          </Button>
+        }
+      />
 
       {/* ── KPI Cards ──────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 lg:gap-4">
@@ -247,7 +277,7 @@ const DashboardPage = () => {
         )}
 
         {/* Financial summary */}
-        <Card>
+        <Card hover>
           <CardHeader title="الملخص المالي"/>
           <CardBody>
             <SummaryRow label="إجمالي الإيراد"  value={formatCurrency(totalRevenue)}         valueColor="text-amber-400" sensitive/>
@@ -293,7 +323,7 @@ const DashboardPage = () => {
 
       {/* ── Top Debtors ───────────────────────────────────── */}
       {topDebtors.length > 0 && (
-        <Card>
+        <Card hover>
           <CardHeader title="أكبر المديونيات"
             actions={
               <button onClick={() => navigate("/clients")}
@@ -470,7 +500,7 @@ const DashboardPage = () => {
 
       {/* ── Recent jobs ───────────────────────────────────── */}
       {recentJobs.length > 0 && (
-        <Card>
+        <Card hover>
           <CardHeader title="أحدث العمليات"/>
           <CardBody className="space-y-3">
             {recentJobs.map((job) => {

@@ -10,6 +10,7 @@ import Button          from "../components/ui/Button";
 import DownloadReportButton from "../components/ui/DownloadReportButton";
 import { Card, StatCard, EmptyState, SummaryRow } from "../components/ui/Card";
 import LoadingScreen   from "../components/ui/LoadingScreen";
+import FeatureIntroBanner from "../components/common/FeatureIntroBanner";
 import {
   WalletIcon, ArrowUpCircleIcon, ArrowDownCircleIcon,
   TrashIcon, EditIcon, CalendarIcon, AlertIcon, TractorIcon, DriverIcon,
@@ -96,6 +97,12 @@ const CustodyPage = () => {
 
   return (
     <div className="p-4 lg:p-6 max-w-4xl mx-auto" dir="rtl">
+
+      <FeatureIntroBanner
+        id="custody"
+        title="العهدة"
+        description="العهدة هي المبالغ اللي بتسلّمها لمعدة أو سائق مقدّماً (بنزين، مصاريف تشغيل...)، ومصاريفه بتُخصم منها أول بأول. الرصيد هنا بيوريك كام فاضل معاه، وبيبان بالأحمر لو المصاريف عدّت المبلغ المُسلَّم."
+      />
 
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>

@@ -132,6 +132,28 @@ export const backupService = {
     return map;
   },
 
+  /**
+   * audit finding F-019 (Phase 4): metadata النسخ الاحتياطية لمجموعة
+   * UIDs بعينها بس — تستخدم مع الصفحة المعروضة حالياً في لوحة الأدمن
+   * (userProfileService.getPage)، بدل getAllMeta() اللي بتجيب كل شركة
+   * في النظام دفعة واحدة. getAllMeta() فضلت موجودة زي ما هي — لسه
+   * مستخدمة لما الأدمن يبحث فعلياً (نتيجة بحث ممكن تلمس أي شركة، مش
+   * بس الصفحة المعروضة).
+   *
+   * قراءات متوازية (Promise.all) لكل uid على حدة، مش استعلام "in" واحد
+   * — عشان يفضل صح مهما كان حجم الصفحة، من غير قلق على حدود Firestore
+   * لعدد قيم الـ "in" المسموحة.
+   */
+  async getMetaFor(userIds) {
+    const results = await Promise.all(
+      userIds.map(async (uid) => {
+        const snap = await getDoc(metaRef(uid));
+        return [uid, snap.exists() ? snap.data() : null];
+      })
+    );
+    return Object.fromEntries(results.filter(([, v]) => v !== null));
+  },
+
   /** Snapshot list (without the heavy `data` payload), newest first. */
   async list(userId) {
     const q = query(snapshotsCol(userId), orderBy("createdAt", "desc"));
@@ -288,5 +310,54 @@ export const backupService = {
     }
 
     return { completedKeys, totalKeys };
+  },
+
+  /**
+   * يمسح كل أثر لبيانات المستخدم نهائيًا: كل الـ subcollections المذكورة في
+   * BACKUP_COLLECTIONS + مستند الإعدادات (settings) + كل النسخ الاحتياطية
+   * (snapshots/chunks) ومستند الـ meta بتاعها + مستند users/{uid} الجذري
+   * نفسه (الإيميل/الاسم/تواريخ الإنشاء وآخر نشاط، المستخدم من شاشة الأدمن).
+   * بيعيد استخدام نفس restoreCollection اللي بيمسح أي مستند مش موجود في
+   * القائمة الجديدة — وهنا القائمة الجديدة فاضية دايمًا، فكل حاجة بتتمسح فعليًا.
+   *
+   * audit finding F-006: مُستخدمة في مسار حذف الحساب — لازم تتنفذ والمستخدم
+   * لسه مسجل دخول (قبل استدعاء deleteUser)، لأن قواعد Firestore كلها
+   * مبنية على isOwner(uid) واللي بيحتاج جلسة مصادقة سارية.
+   *
+   * مستند users/{uid} الجذري كان ممنوع حذفه بالكامل (`allow delete: if
+   * false` في firestore.rules) — القاعدة اتغيّرت عمدًا عشان الحذف هنا
+   * يبقى كامل فعلًا. مفيش أي أثر لحساب اتحذف بالطريقة دي بيفضل قابل
+   * للقراءة من التطبيق بعد كده (لا للمستخدم ولا للأدمن).
+   */
+  async wipeAllData(userId, { onProgress } = {}) {
+    const totalSteps = BACKUP_COLLECTIONS.length + 3; // + settings + backups + account doc
+
+    let done = 0;
+
+    for (const [, subName] of BACKUP_COLLECTIONS) {
+      await restoreCollection(subName, userId, []);
+      done++;
+      onProgress?.({ done, total: totalSteps, step: subName });
+    }
+
+    await deleteDoc(doc(db, "users", userId, "meta", "settings")).catch(() => {});
+    done++;
+    onProgress?.({ done, total: totalSteps, step: "settings" });
+
+    const snapshots = await this.list(userId).catch(() => []);
+    for (const snap of snapshots) {
+      await this.deleteSnapshot(userId, snap).catch(() => {});
+    }
+    await deleteDoc(metaRef(userId)).catch(() => {});
+    done++;
+    onProgress?.({ done, total: totalSteps, step: "backups" });
+
+    // آخر خطوة عمدًا: مستند users/{uid} الجذري نفسه — بعد ما كل حاجة
+    // تحته اتمسحت. لو الحذف اتوقف في نص الطريق (مثلاً أوف لاين)، السجل
+    // الجذري بيفضل موجود كدليل إن فيه بيانات لسه محتاجة تكميل الحذف،
+    // بدل ما يختفي الدليل قبل ما نتأكد إن الباقي اتمسح فعلاً.
+    await deleteDoc(doc(db, "users", userId)).catch(() => {});
+    done++;
+    onProgress?.({ done, total: totalSteps, step: "account" });
   },
 };

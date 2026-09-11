@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import { db, auth } from "../config/firebase";
 import { COLLECTIONS } from "../config/constants";
+import { alertService } from "./alertService";
 
 const col = () => collection(db, COLLECTIONS.ERROR_LOGS);
 
@@ -25,8 +26,23 @@ export const errorLogService = {
    * خطأ. تسجيل الأخطاء نفسه لازم يكون آخر حاجة ممكن تكسر التطبيق.
    */
   log: async ({ message, stack, page, source = "app" }) => {
+    const user = auth.currentUser;
+
+    // audit finding F-017: تنبيه حي خارجي — مستقل عمداً عن نجاح/فشل كتابة
+    // Firestore تحت، ومش محتاج المستخدم يكون مسجل دخول أصلاً (بيتبعت من
+    // المتصفح مباشرة لـ webhook خارجي، مش لـ Firestore). كده لو Firestore
+    // نفسه هو سبب العطل، التنبيه لسه بيوصل.
+    alertService.notifyAdmin({
+      title: "خطأ جديد في التطبيق",
+      message: String(message || "").slice(0, 300),
+      context: {
+        الصفحة: page || window.location.pathname,
+        المصدر: source,
+        المستخدم: user?.email || "غير مسجل دخول",
+      },
+    });
+
     try {
-      const user = auth.currentUser;
       if (!user) return; // الـ rule محتاج userId، ومفيش حساب هنا نسجله باسمه
       await addDoc(col(), {
         userId: user.uid,

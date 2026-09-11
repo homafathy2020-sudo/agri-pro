@@ -9,6 +9,7 @@ import Modal                from "../components/ui/Modal";
 import Button                from "../components/ui/Button";
 import { StatCard, EmptyState } from "../components/ui/Card";
 import LoadingScreen        from "../components/ui/LoadingScreen";
+import FeatureIntroBanner   from "../components/common/FeatureIntroBanner";
 import { TruckIcon, AlertIcon, PlusIcon, RevenueIcon } from "../components/ui/Icons";
 import { formatCurrency } from "../utils/formatters";
 
@@ -38,6 +39,12 @@ const SuppliersPage = () => {
 
   return (
     <div className="p-4 lg:p-6 max-w-5xl mx-auto" dir="rtl">
+
+      <FeatureIntroBanner
+        id="suppliers"
+        title="الموردين"
+        description="عكس صفحة العملاء بالظبط: هنا بتتابع فواتير الموردين اللي البرنامج مستحق عليك، ودفعاتك ليهم. سجّل فاتورة مورد جديدة وادفع منها على دفعات، والمتبقي بيتحدّث تلقائي."
+      />
 
       <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
         <div>

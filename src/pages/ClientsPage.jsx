@@ -8,6 +8,7 @@ import PaymentForm       from "../features/payments/PaymentForm";
 import Modal             from "../components/ui/Modal";
 import { StatCard, EmptyState } from "../components/ui/Card";
 import LoadingScreen     from "../components/ui/LoadingScreen";
+import FeatureIntroBanner from "../components/common/FeatureIntroBanner";
 import { DriverIcon, AlertIcon, RevenueIcon } from "../components/ui/Icons";
 import { formatCurrency } from "../utils/formatters";
 
@@ -50,6 +51,12 @@ const ClientsPage = () => {
 
   return (
     <div className="p-4 lg:p-6 max-w-5xl mx-auto" dir="rtl">
+
+      <FeatureIntroBanner
+        id="clients"
+        title="العملاء والديون"
+        description="الصفحة دي بتتولد أوتوماتيك من سجل الشغل — كل عميل سجّلت له عملية بيظهر هنا مع إجمالي المستحق عليه، من غير ما تدخل بياناته يدوي. تقدر تسجّل دفعة جديدة لأي عميل من هنا مباشرة."
+      />
 
       <div className="mb-6">
         <h1 className="text-xl font-extrabold text-gray-100 flex items-center gap-2">
