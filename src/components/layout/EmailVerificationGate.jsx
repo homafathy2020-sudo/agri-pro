@@ -24,15 +24,29 @@ import { LogoutIcon } from "../ui/Icons";
 
 const RESEND_COOLDOWN_MS = 60 * 1000;
 
+// تاريخ تفعيل ميزة التحقق من البريد. أي حساب اتسجل قبل التاريخ ده (كل
+// عملاء زراعي برو الحاليين) اتعمل من غير ما تكون الميزة دي موجودة أصلاً —
+// يعني Firebase عمره ما بعتله رابط تحقق، وemailVerified هيفضل false ليه
+// للأبد حتى لو حسابه شغال وحقيقي 100%. من غير الاستثناء ده، كل الحسابات
+// دي كانت هتتقفل فجأة بعد أول ديبلوي (نفس المشكلة اللي حصلت فعليًا).
+// الحسابات اللي بتتسجل من دلوقتي (بعد التاريخ ده) هي بس اللي بتاخد
+// رابط تحقق وقت التسجيل (AuthContext.jsx → register())، فالشرط هنا
+// بيتطبق عليها لوحدها.
+const EMAIL_VERIFICATION_CUTOFF = new Date("2026-09-11T00:00:00Z");
+
 const EmailVerificationGate = ({ children }) => {
   const { user, logout, resendVerificationEmail, refreshEmailVerified } = useAuth();
   const [sending, setSending] = useState(false);
   const [checking, setChecking] = useState(false);
   const [lastSentAt, setLastSentAt] = useState(0);
 
+  const createdAt = user?.metadata?.creationTime ? new Date(user.metadata.creationTime) : null;
+  const isGrandfathered = createdAt && createdAt < EMAIL_VERIFICATION_CUTOFF;
+
   // لو مفيش مستخدم أصلًا (هيتعالج في ProtectedRoute)، أو بريده متحقق منه
-  // بالفعل — منعرقلش، نسيب الصفحة المطلوبة تظهر عادي.
-  if (!user || user.emailVerified) return children;
+  // بالفعل، أو حساب قديم من قبل تفعيل الميزة دي (isGrandfathered) —
+  // منعرقلش، نسيب الصفحة المطلوبة تظهر عادي.
+  if (!user || user.emailVerified || isGrandfathered) return children;
 
   const onResend = async () => {
     if (Date.now() - lastSentAt < RESEND_COOLDOWN_MS) {
