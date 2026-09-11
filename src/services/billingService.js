@@ -12,7 +12,7 @@
 // ─────────────────────────────────────────────────────────
 import {
   doc, getDoc, getDocs, setDoc, addDoc, updateDoc,
-  collection, query, where, orderBy, onSnapshot, serverTimestamp,
+  collection, query, orderBy, onSnapshot, serverTimestamp,
   Timestamp,
 } from "firebase/firestore";
 import { db, auth } from "../config/firebase";
@@ -65,6 +65,20 @@ export const billingService = {
       }
     ),
 
+  /** Real-time — subscriptions/{uid} (دورة الفوترة الفعلية شهري/سنوي،
+   *  آخر دفعة...). سجل تجاري للعرض بس في صفحة /billing، مش مصدر
+   *  الصلاحيات (ده entitlements). null لو الشركة لسه ما اشتركتش في باقة
+   *  مدفوعة فعلية (تجربة مجانية مثلاً — مفيش subscriptions doc أصلاً). */
+  subscribeToSubscription: (uid, onChange, onError) =>
+    onSnapshot(
+      subscriptionRef(uid),
+      (snap) => onChange(snap.exists() ? snap.data() : null),
+      (error) => {
+        console.error("subscribeToSubscription failed:", error);
+        onError?.(error);
+      }
+    ),
+
   /** طلب دفع يدوي جديد — بيتسجل بحالة "قيد المراجعة" لحد ما الأدمن يتأكد
    *  من التحويل ويفعّل الباقة. بيرجّع الـ id عشان نقدر نتابع حالته live. */
   createBillingRequest: async ({ planId, billingCycle, amount, method }) => {
@@ -98,17 +112,6 @@ export const billingService = {
     return map; // { [uid]: entitlementData }
   },
 
-  /** طلبات الدفع اللي لسه محتاجة مراجعة الأدمن. */
-  getPendingBillingRequests: async () => {
-    const q = query(
-      billingRequestsCol(),
-      where("status", "==", BILLING_REQUEST_STATUS.PENDING_REVIEW),
-      orderBy("createdAt", "desc")
-    );
-    const snap = await getDocs(q);
-    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  },
-
   /** كل طلبات الدفع بكل حالاتها (قيد المراجعة/مؤكدة/مرفوضة) — لصفحة
    *  "طلبات الشراء" الكاملة في الأدمن (مراقبة شاملة زي أي متجر). ترتيب
    *  واحد فقط (createdAt) فمش محتاج composite index. */
@@ -116,6 +119,17 @@ export const billingService = {
     const q = query(billingRequestsCol(), orderBy("createdAt", "desc"));
     const snap = await getDocs(q);
     return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  },
+
+  /** طلبات الدفع اللي لسه محتاجة مراجعة الأدمن — لكارت الملخص في
+   *  AdminPage. عمدًا بتستخدم getAllBillingRequests وتفلتر بعدها بدل
+   *  where("status",...) + orderBy("createdAt") مع بعض: الاتنين مع بعض
+   *  كانوا محتاجين composite index في Firestore (وده كان سبب خطأ
+   *  "query requires an index" اللي كان بيظهر في الكونسول)، وعدد طلبات
+   *  الدفع أصلاً صغير فمفيش داعي لاستعلام تاني منفصل يحتاج فهرس زيادة. */
+  getPendingBillingRequests: async () => {
+    const all = await billingService.getAllBillingRequests();
+    return all.filter((r) => r.status === BILLING_REQUEST_STATUS.PENDING_REVIEW);
   },
 
   /**

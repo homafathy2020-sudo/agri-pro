@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useAuth } from "../contexts/AuthContext";
 import { useEntitlement } from "../hooks/useEntitlement";
+import { useSubscription } from "../hooks/useSubscription";
 import { billingService } from "../services/billingService";
 import { Card, Badge, EmptyState } from "../components/ui/Card";
 import Button from "../components/ui/Button";
@@ -14,7 +15,7 @@ import {
 } from "../components/ui/Icons";
 import { formatCurrency, formatDateTime } from "../utils/formatters";
 import {
-  PLANS, BILLING_CYCLE, getAnnualSavings,
+  PLANS, BILLING_CYCLE, TRIAL_DAYS, getAnnualSavings,
   MANUAL_PAYMENT_METHODS, MANUAL_PAYMENT_INFO, METHOD_LABELS_AR as METHOD_LABELS,
 } from "../config/constants/billing";
 import { LICENSE_STATE } from "../config/constants/billing";
@@ -219,8 +220,30 @@ const BillingPage = () => {
   const [cycle, setCycle] = useState(BILLING_CYCLE.MONTHLY);
   const [subscribingPlan, setSubscribingPlan] = useState(null);
   const { loading, error, state, plan, expirationDate, daysUntilExpiration, daysSinceExpiration } = useEntitlement();
+  const { subscription } = useSubscription();
 
   const statusInfo = STATE_LABELS[state] || STATE_LABELS[LICENSE_STATE.NONE];
+
+  // دورة الفوترة الفعلية (شهري/سنوي) بتتقرا من subscriptions/{uid} —
+  // مش من entitlement اللي معهوش الحقل ده أصلاً. متاحة بس لباقة مدفوعة
+  // فعلية (ACTIVE/GRACE/SUSPENDED)، مش لتجربة مجانية (مفيش subscription
+  // doc خالص لسه) ولا Lifetime/Complimentary (مفيش دورة فوترة أصلاً).
+  const cycleLabel = subscription?.billingCycle === BILLING_CYCLE.ANNUAL ? "سنوي" : "شهري";
+
+  // "نوع الاشتراك" — سطر واضح ومنفصل عن شارة الحالة، بيوضح تحديدًا لو
+  // ده تجربة مجانية ولا باقة مدفوعة وبأي دورة فوترة، زي ما طلب.
+  const subscriptionTypeText =
+    state === LICENSE_STATE.TRIAL
+      ? `تجربة مجانية — وصول كامل لباقة ${plan?.name || "احترافي"}`
+      : state === LICENSE_STATE.LIFETIME
+      ? "وصول دائم (Lifetime) — بدون تاريخ انتهاء"
+      : state === LICENSE_STATE.COMPLIMENTARY
+      ? `وصول مجاني${plan ? ` — باقة ${plan.name}` : ""}`
+      : state === LICENSE_STATE.NONE
+      ? "لسه ما اخترتش باقة اشتراك"
+      : plan
+      ? `باقة ${plan.name} مدفوعة — ${cycleLabel}${subscription ? "" : " (بيانات الدفع قيد التحديث)"}`
+      : "—";
 
   if (loading) return <LoadingScreen message="جاري تحميل بيانات الاشتراك..." />;
 
@@ -244,31 +267,59 @@ const BillingPage = () => {
         <p className="text-sm text-gray-500">اختر الباقة المناسبة لحجم شغلك — التحويل حاليًا يدوي لحد ما نفعّل بوابة دفع مباشرة.</p>
       </div>
 
-      <Card className="p-5 mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <p className="text-xs text-gray-500 mb-1">حالة الاشتراك</p>
-          <div className="flex items-center gap-2">
-            <Badge variant={statusInfo.variant}>{statusInfo.text}</Badge>
-            {plan && <span className="text-gray-100 font-bold text-sm">باقة {plan.name}</span>}
+      <Card className="p-5 mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-xs text-gray-500 mb-1">حالة الاشتراك</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge variant={statusInfo.variant}>{statusInfo.text}</Badge>
+              {plan && state !== LICENSE_STATE.LIFETIME && (
+                <span className="text-gray-100 font-bold text-sm">باقة {plan.name}</span>
+              )}
+            </div>
           </div>
+          {expirationDate && state !== LICENSE_STATE.TRIAL && (
+            <div className="text-sm">
+              {state === LICENSE_STATE.ACTIVE && (
+                <p className="text-gray-400">بتنتهي في {formatDateTime(expirationDate)} ({daysUntilExpiration} يوم)</p>
+              )}
+              {(state === LICENSE_STATE.GRACE || state === LICENSE_STATE.SUSPENDED) && (
+                <p className="text-amber-400 font-semibold">
+                  انتهت من {daysSinceExpiration} يوم — {state === LICENSE_STATE.SUSPENDED
+                    ? "مفيش إضافة معدة/فرد فريق جديد لحد ما تجدد"
+                    : "جدّد دلوقتي قبل ما تنتهي فترة السماح"}
+                </p>
+              )}
+            </div>
+          )}
         </div>
-        {expirationDate && (
-          <div className="text-sm">
-            {state === LICENSE_STATE.ACTIVE && (
-              <p className="text-gray-400">بتنتهي في {formatDateTime(expirationDate)} ({daysUntilExpiration} يوم)</p>
-            )}
-            {state === LICENSE_STATE.TRIAL && (
-              <p className={daysUntilExpiration <= 4 ? "text-amber-400 font-semibold" : "text-gray-400"}>
-                تنتهي فترتك التجريبية في {formatDateTime(expirationDate)} ({daysUntilExpiration} يوم) — اختار باقة قبل كده عشان تكمل من غير انقطاع
+
+        {/* نوع الاشتراك — سطر منفصل وواضح: تجربة مجانية / باقة مدفوعة
+            وبأي دورة فوترة / وصول دائم / مجاني — زي ما اتطلب بالظبط. */}
+        <div className="mt-4 pt-4 border-t border-white/10">
+          <p className="text-xs text-gray-500 mb-1">نوع الاشتراك</p>
+          <p className="text-sm text-gray-200 font-semibold">{subscriptionTypeText}</p>
+        </div>
+
+        {/* عداد الـ 14 يوم — بشكل مرئي واضح (progress bar + عدد الأيام)
+            مش مجرد سطر نص صغير، عشان يبان فورًا من غير ما تدور عليه. */}
+        {state === LICENSE_STATE.TRIAL && (
+          <div className="mt-4 pt-4 border-t border-white/10">
+            <div className="flex items-center justify-between mb-2 flex-wrap gap-1">
+              <p className="text-sm font-bold text-gray-100">
+                باقي <span className={daysUntilExpiration <= 4 ? "text-amber-400" : "text-brand-400"}>{daysUntilExpiration}</span> يوم من التجربة المجانية (من أصل {TRIAL_DAYS} يوم)
               </p>
-            )}
-            {(state === LICENSE_STATE.GRACE || state === LICENSE_STATE.SUSPENDED) && (
-              <p className="text-amber-400 font-semibold">
-                انتهت من {daysSinceExpiration} يوم — {state === LICENSE_STATE.SUSPENDED
-                  ? "مفيش إضافة معدة/فرد فريق جديد لحد ما تجدد"
-                  : "جدّد دلوقتي قبل ما تنتهي فترة السماح"}
-              </p>
-            )}
+              <span className="text-xs text-gray-500">تنتهي في {formatDateTime(expirationDate)}</span>
+            </div>
+            <div className="w-full h-2.5 rounded-full bg-surface-2 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${daysUntilExpiration <= 4 ? "bg-amber-500" : "bg-brand-500"}`}
+                style={{ width: `${Math.max(4, Math.min(100, (daysUntilExpiration / TRIAL_DAYS) * 100))}%` }}
+              />
+            </div>
+            <p className={`text-xs mt-2 ${daysUntilExpiration <= 4 ? "text-amber-400 font-semibold" : "text-gray-500"}`}>
+              اختار باقة قبل ما تنتهي التجربة عشان تكمل شغلك من غير أي انقطاع.
+            </p>
           </div>
         )}
       </Card>
