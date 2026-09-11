@@ -12,4 +12,8 @@ export const COLLECTIONS = {
   USERS:          "users",
   ERROR_LOGS:     "errorLogs",
   ADMIN_MESSAGES: "adminMessages",
+  // نظام الباقات والاشتراكات — راجع src/config/constants/billing.js
+  ENTITLEMENTS:      "entitlements",
+  SUBSCRIPTIONS:     "subscriptions",
+  BILLING_REQUESTS:  "billingRequests",
 };

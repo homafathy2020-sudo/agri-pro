@@ -1,10 +1,13 @@
 // src/pages/EquipmentPage.jsx
 import React, { useMemo } from "react";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import { useEquipment } from "../hooks/useEquipment";
 import { useDrivers }   from "../hooks/useDrivers";
 import { useJobs }      from "../hooks/useJobs";
 import { useConfirm }   from "../hooks/useConfirm";
+import { useEntitlement } from "../hooks/useEntitlement";
 import EquipmentCard    from "../features/equipment/EquipmentCard";
 import EquipmentForm    from "../features/equipment/EquipmentForm";
 import JobForm          from "../features/jobs/JobForm";
@@ -27,6 +30,8 @@ const EquipmentPage = () => {
   const assignableDrivers = driverReport.filter((d) => (d.role || TEAM_ROLE.DRIVER) === TEAM_ROLE.DRIVER);
   const { addJob, fuelPrice }    = useJobs();
   const { confirm, confirmState } = useConfirm();
+  const { canAddEquipment, plan: currentPlan } = useEntitlement();
+  const navigate = useNavigate();
   const [modal, setModal] = useState(null);
   // (audit finding B1) equipment with dependent history the user just tried
   // to delete — { eq, counts } | null. Blocks the delete outright instead
@@ -44,6 +49,17 @@ const EquipmentPage = () => {
 
   const getDriver = (driverId) => driverReport.find((d) => d.id === driverId);
   const getParent = (parentId) => report.find((eq) => eq.id === parentId);
+
+  // حد عدد المعدات مرتبط بالباقة (راجع src/config/constants/billing.js) —
+  // بيمنع إضافة معدة جديدة بس، مش بيلمس أي معدة موجودة أصلاً ولا بياناتها.
+  const handleAddClick = () => {
+    if (!canAddEquipment(baseList.length)) {
+      toast.error(`وصلت للحد الأقصى لباقتك الحالية (${currentPlan?.limits?.equipmentMax} معدة) — رقّي باقتك عشان تضيف أكتر`);
+      navigate("/billing");
+      return;
+    }
+    setModal({ mode: "add" });
+  };
 
   const handleSaveEquipment = async (formData) => {
     if (modal.mode === "add") await addEquipment(formData);
@@ -91,7 +107,7 @@ const EquipmentPage = () => {
             {baseList.length} معدة أساسية · {attachmentList.length} ملحق
           </p>
         </div>
-        <Button onClick={() => setModal({ mode:"add" })} icon={<PlusIcon size={16}/>}>إضافة معدة</Button>
+        <Button onClick={handleAddClick} icon={<PlusIcon size={16}/>}>إضافة معدة</Button>
       </div>
 
       {report.length === 0 ? (
@@ -99,7 +115,7 @@ const EquipmentPage = () => {
           icon={<TractorIcon size={48} className="text-gray-600 mx-auto mb-4"/>}
           title="لا توجد معدات بعد"
           description="أضف معداتك الزراعية لبدء تتبع الأداء"
-          action={<Button onClick={() => setModal({ mode:"add" })} icon={<PlusIcon size={16}/>}>إضافة أول معدة</Button>}
+          action={<Button onClick={handleAddClick} icon={<PlusIcon size={16}/>}>إضافة أول معدة</Button>}
         />
       ) : (
         <>

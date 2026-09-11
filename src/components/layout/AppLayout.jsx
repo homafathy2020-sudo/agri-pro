@@ -5,6 +5,7 @@ import Sidebar      from "./Sidebar";
 import TopBar       from "./TopBar";
 import BottomNav    from "./BottomNav";
 import OfflineBanner from "../ui/OfflineBanner";
+import SubscriptionStatusBanner from "./SubscriptionStatusBanner";
 
 const AppLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -42,6 +43,7 @@ const AppLayout = () => {
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <TopBar onMenuToggle={() => setSidebarOpen((s) => !s)} />
         <main className="flex-1 overflow-y-auto pb-24 lg:pb-6">
+          <SubscriptionStatusBanner />
           <Outlet />
         </main>
       </div>

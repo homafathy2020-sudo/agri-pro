@@ -12,6 +12,7 @@ import {
   HomeIcon, TractorIcon, ClipboardIcon,
   DriverIcon, WrenchIcon, ChartIcon,
   FuelIcon, LogoutIcon, AlertIcon, WalletIcon, ShieldIcon, BugIcon, MegaphoneIcon, DownloadIcon, ReceiptIcon, TruckIcon,
+  StarIcon,
 } from "../ui/Icons";
 
 const NAV_ITEMS = [
@@ -26,6 +27,7 @@ const NAV_ITEMS = [
   { to: "/tax-deductions", label: "الضرائب والخصومات", Icon: ReceiptIcon },
   { to: "/notifications", label: "التنبيهات",       Icon: AlertIcon, badge: true },
   { to: "/reports",       label: "التقارير",        Icon: ChartIcon     },
+  { to: "/billing",       label: "الاشتراك",        Icon: StarIcon      },
 ];
 
 const Sidebar = ({ onClose }) => {

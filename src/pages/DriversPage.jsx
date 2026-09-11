@@ -1,8 +1,11 @@
 // src/pages/DriversPage.jsx
 import React, { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import { useDrivers }     from "../hooks/useDrivers";
 import { useSalary }      from "../hooks/useSalary";
 import { useConfirm }     from "../hooks/useConfirm";
+import { useEntitlement } from "../hooks/useEntitlement";
 import DriverForm         from "../features/drivers/DriverForm";
 import DriverCard         from "../features/drivers/DriverCard";
 import Modal              from "../components/ui/Modal";
@@ -35,6 +38,8 @@ const DriversPage = () => {
   } = useDrivers();
   const { addSalaryEntry, deleteSalaryEntry, salaryEntries, currentMonth } = useSalary();
   const { confirm, confirmState } = useConfirm();
+  const { canAddTeamMember, plan: currentPlan } = useEntitlement();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(TEAM_ROLE.DRIVER);
   const [modal, setModal]         = useState(null);
   const [search, setSearch]       = useState("");
@@ -182,6 +187,17 @@ const DriversPage = () => {
   const isDriverTab = activeTab === TEAM_ROLE.DRIVER;
   const addLabel    = isDriverTab ? "إضافة سائق" : "إضافة إداري أو محاسب";
 
+  // حد عدد أفراد الفريق مرتبط بالباقة (src/config/constants/billing.js) —
+  // بيمنع إضافة عضو جديد بس، مش بيلمس أي عضو موجود أصلاً ولا بياناته.
+  const handleAddClick = () => {
+    if (!canAddTeamMember(report.length)) {
+      toast.error(`وصلت للحد الأقصى لباقتك الحالية (${currentPlan?.limits?.teamMax} فرد) — رقّي باقتك عشان تضيف أكتر`);
+      navigate("/billing");
+      return;
+    }
+    setModal({ mode: "add" });
+  };
+
   return (
     <div className="p-4 lg:p-6 max-w-4xl mx-auto" dir="rtl">
 
@@ -193,7 +209,7 @@ const DriversPage = () => {
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">{report.length} عضو مسجل</p>
         </div>
-        <Button onClick={() => setModal({ mode:"add" })} icon={<PlusIcon size={16}/>}>
+        <Button onClick={handleAddClick} icon={<PlusIcon size={16}/>}>
           {addLabel}
         </Button>
       </div>
@@ -264,7 +280,7 @@ const DriversPage = () => {
             icon={<DriverIcon size={48} className="text-gray-600 mx-auto mb-2"/>}
             title={isDriverTab ? "لا يوجد سائقون بعد" : "لا يوجد إداريون أو محاسبون بعد"}
             description={isDriverTab ? "أضف سائقيك لتتبع أدائهم وكشف مرتباتهم" : "أضف أعضاء الإدارة والمحاسبة لمتابعة رواتبهم وحضورهم"}
-            action={<Button onClick={() => setModal({ mode:"add" })} icon={<PlusIcon size={16}/>}>{addLabel}</Button>}
+            action={<Button onClick={handleAddClick} icon={<PlusIcon size={16}/>}>{addLabel}</Button>}
           />
         ) : (
           <EmptyState

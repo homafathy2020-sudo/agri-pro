@@ -358,5 +358,66 @@ service cloud.firestore {
          isAdmin());
       allow create, update, delete: if isAdmin();
     }
+
+    // ─── نظام الباقات والاشتراكات (Phase 1 — دفع يدوي مؤقت) ─────────────
+    // entitlements و subscriptions مقصودين يبقوا top-level (مش جوه
+    // users/{uid}) عشان الأدمن يقدر يقرا كل الشركات دفعة واحدة (allow
+    // list)، ونفس الوقت الكتابة عليهم مقفولة على الأدمن بس — التطبيق
+    // بيقرا صلاحياته من هنا بس، ما بيقدرش يغيّر باقته أو تاريخ انتهاءها
+    // بنفسه من الفرونت إند. ده هو اللي بيمنع التلاعب بالسعر/حالة
+    // الاشتراك من جهة العميل (راجع قسم "أمان Billing" في تقرير
+    // SAAS_PRICING_AND_BILLING_RESEARCH.html) — عمدًا مختلف عن قاعدة
+    // users/{uid} اللي بتسمح لصاحب الحساب بالكتابة على مستنده هو.
+    function isValidEntitlement(data) {
+      return
+        ('type' in data) && data.type in ['plan', 'lifetime', 'complimentary'] &&
+        (!('planId' in data) || data.planId == null || data.planId in ['starter', 'professional', 'business']) &&
+        (!('source' in data) || isShortStr(data.source)) &&
+        (!('notes' in data)  || isLongStr(data.notes));
+    }
+
+    match /entitlements/{uid} {
+      allow get:            if isSignedIn() && (isOwner(uid) || isAdmin());
+      allow list:            if isSignedIn() && isAdmin();
+      allow create, update: if isAdmin() && isValidEntitlement(request.resource.data);
+      allow delete:          if isAdmin();
+    }
+
+    function isValidSubscription(data) {
+      return
+        (!('planId' in data)          || data.planId in ['starter', 'professional', 'business']) &&
+        (!('billingCycle' in data)    || data.billingCycle in ['monthly', 'annual']) &&
+        (!('status' in data)          || data.status in ['trialing', 'active', 'canceled']) &&
+        (!('gatewayProvider' in data) || isShortStr(data.gatewayProvider));
+    }
+
+    match /subscriptions/{uid} {
+      allow get:            if isSignedIn() && (isOwner(uid) || isAdmin());
+      allow list:            if isSignedIn() && isAdmin();
+      allow create, update: if isAdmin() && isValidSubscription(request.resource.data);
+      allow delete:          if isAdmin();
+    }
+
+    // طلبات الدفع اليدوي (فودافون كاش/InstaPay) — العميل بيعمل create
+    // لطلبه بعد ما يحوّل ويبعت الإيصال عبر واتساب (نفس فكرة errorLogs
+    // بالظبط: write-only بالنسبة له وقت الإنشاء، وبعدين get بس على نفس
+    // الطلب اللي عمله عشان يتابع حالته). الأدمن بس اللي بيراجع كل
+    // الطلبات ويحدّث حالتها بعد التأكد من التحويل يدويًا.
+    function isValidBillingRequest(data) {
+      return
+        ('uid' in data)          && data.uid == request.auth.uid &&
+        ('planId' in data)       && data.planId in ['starter', 'professional', 'business'] &&
+        ('billingCycle' in data) && data.billingCycle in ['monthly', 'annual'] &&
+        ('amount' in data)       && isMoney(data.amount) &&
+        ('method' in data)       && data.method in ['vodafone_cash', 'instapay'] &&
+        ('status' in data)       && data.status == 'pending_review';
+    }
+
+    match /billingRequests/{id} {
+      allow create:          if isSignedIn() && isValidBillingRequest(request.resource.data);
+      allow get:              if isSignedIn() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow list:              if isSignedIn() && isAdmin();
+      allow update, delete:   if isAdmin();
+    }
   }
 }

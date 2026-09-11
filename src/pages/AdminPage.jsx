@@ -1,17 +1,23 @@
 // src/pages/AdminPage.jsx
 import React, { useMemo, useState } from "react";
+import toast from "react-hot-toast";
 import { useAdminUsers } from "../hooks/useAdminUsers";
 import { useAdminBackups } from "../hooks/useAdminBackups";
 import { useAdminBroadcast } from "../hooks/useAdminBroadcast";
+import { useAdminBilling } from "../hooks/useAdminBilling";
 import { useConfirm } from "../hooks/useConfirm";
 import { Card, EmptyState, Badge } from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import LoadingScreen from "../components/ui/LoadingScreen";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
-import { formatDateTime } from "../utils/formatters";
+import EntitlementEditorModal from "../features/admin/EntitlementEditorModal";
+import { computeLicenseState, LICENSE_STATE_LABELS } from "../utils/licenseState";
+import { METHOD_LABELS_AR } from "../config/constants/billing";
+import { formatDateTime, formatCurrency } from "../utils/formatters";
 import {
   ShieldIcon, UsersGroupIcon, RestoreIcon, ClearIcon, ExternalLinkIcon, AlertIcon, SendIcon,
+  WalletIcon, CheckCircleIcon, XCircleIcon, ClockIcon,
 } from "../components/ui/Icons";
 
 // نص تذكير الباك أب — ثابت لكل الشركات (زي ما اتفقنا)، بيظهر للشركة في
@@ -73,8 +79,11 @@ const AdminPage = () => {
   const { users, count, loading, error, reload } = useAdminUsers();
   const { backups, loading: backupsLoading } = useAdminBackups();
   const { send: sendReminder, sending } = useAdminBroadcast();
+  const billing = useAdminBilling();
   const { confirm, confirmState } = useConfirm();
+  const { confirm: confirmBilling, confirmState: billingConfirmState } = useConfirm();
   const [query, setQuery] = useState("");
+  const [managingCompany, setManagingCompany] = useState(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -84,6 +93,32 @@ const AdminPage = () => {
       (u.email || "").toLowerCase().includes(q)
     );
   }, [users, query]);
+
+  const usersByUid = useMemo(() => {
+    const map = {};
+    users.forEach((u) => { map[u.uid] = u; });
+    return map;
+  }, [users]);
+
+  const handleConfirmRequest = async (req) => {
+    const ok = await confirmBilling(req.id, `تفعيل باقة "${req.planId}" لهذه الشركة بعد التأكد من وصول التحويل؟`);
+    if (!ok) return;
+    try {
+      await billing.confirmRequest(req);
+      toast.success("تم تفعيل الاشتراك");
+    } catch {
+      toast.error("حصل خطأ، حاول تاني");
+    }
+  };
+
+  const handleRejectRequest = async (req) => {
+    try {
+      await billing.rejectRequest(req.id, "");
+      toast.success("تم رفض الطلب");
+    } catch {
+      toast.error("حصل خطأ، حاول تاني");
+    }
+  };
 
   const handleRemind = async (uid) => {
     const ok = await confirm(uid);
@@ -145,6 +180,38 @@ const AdminPage = () => {
         </div>
       </Card>
 
+      {/* طلبات الدفع اليدوي (فودافون كاش/InstaPay) اللي لسه محتاجة مراجعة
+          — العميل بيبعت الإيصال على واتساب، وهنا بيتفعّل الاشتراك فعليًا
+          بعد التأكد من وصول التحويل. */}
+      {billing.pendingRequests.length > 0 && (
+        <Card className="p-4 mb-5 border-amber-800/40">
+          <p className="text-xs font-bold text-amber-400 mb-3 flex items-center gap-1.5">
+            <ClockIcon size={14} /> طلبات دفع محتاجة مراجعة ({billing.pendingRequests.length})
+          </p>
+          <div className="flex flex-col gap-2">
+            {billing.pendingRequests.map((req) => {
+              const requester = usersByUid[req.uid];
+              return (
+                <div key={req.id} className="flex flex-wrap items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl bg-surface-2 border border-white/8">
+                  <div>
+                    <p className="text-sm text-gray-200 font-semibold">
+                      {requester?.displayName || requester?.email || req.uid}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      باقة {req.planId} ({req.billingCycle === "annual" ? "سنوي" : "شهري"}) — {formatCurrency(req.amount)} عبر {METHOD_LABELS_AR[req.method] || req.method}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="danger" size="xs" icon={<XCircleIcon size={13} />} onClick={() => handleRejectRequest(req)}>رفض</Button>
+                    <Button variant="primary" size="xs" icon={<CheckCircleIcon size={13} />} onClick={() => handleConfirmRequest(req)}>تأكيد وتفعيل</Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
       <div className="mb-5 flex items-center gap-4 flex-wrap">
         <div className="flex-1 min-w-[220px] relative">
           <span className="absolute inset-y-0 right-3.5 flex items-center text-gray-500 pointer-events-none">
@@ -186,11 +253,16 @@ const AdminPage = () => {
                 <th className="text-right font-semibold px-4 py-3">آخر دخول</th>
                 <th className="text-right font-semibold px-4 py-3">تاريخ التسجيل</th>
                 <th className="text-right font-semibold px-4 py-3">آخر نسخة احتياطية</th>
+                <th className="text-right font-semibold px-4 py-3">الباقة</th>
                 <th className="text-right font-semibold px-4 py-3"></th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((u) => (
+              {filtered.map((u) => {
+                const entitlement = billing.entitlements[u.uid] || null;
+                const license = computeLicenseState(entitlement);
+                const licenseLabel = LICENSE_STATE_LABELS[license.state];
+                return (
                 <tr key={u.uid} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03]">
                   <td className="px-4 py-3 text-gray-100 font-semibold whitespace-nowrap">
                     {u.displayName || "—"}
@@ -224,21 +296,47 @@ const AdminPage = () => {
                     )}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      icon={<AlertIcon size={14} />}
-                      disabled={sending}
-                      onClick={() => handleRemind(u.uid)}
-                    >
-                      تذكير
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={licenseLabel.variant}>{licenseLabel.text}</Badge>
+                      {license.plan && <span className="text-xs text-gray-500">{license.plan.name}</span>}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <div className="flex gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        icon={<AlertIcon size={14} />}
+                        disabled={sending}
+                        onClick={() => handleRemind(u.uid)}
+                      >
+                        تذكير
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        icon={<WalletIcon size={14} />}
+                        onClick={() => setManagingCompany(u)}
+                      >
+                        إدارة الاشتراك
+                      </Button>
+                    </div>
                   </td>
                 </tr>
-              ))}
+              );})}
             </tbody>
           </table>
         </Card>
+      )}
+
+      {managingCompany && (
+        <EntitlementEditorModal
+          company={managingCompany}
+          currentEntitlement={billing.entitlements[managingCompany.uid] || null}
+          onClose={() => setManagingCompany(null)}
+          onGrant={billing.grantEntitlement}
+          onExtend={billing.extendEntitlement}
+        />
       )}
 
       <ConfirmDialog
@@ -249,6 +347,17 @@ const AdminPage = () => {
         message="هيتبعت تنبيه للشركة دي جوه التطبيق يذكّرها إنها تعمل نسخة احتياطية. تحب تكمل؟"
         confirmLabel="تأكيد الإرسال"
         confirmIcon={<SendIcon size={14} />}
+        confirmVariant="primary"
+      />
+
+      <ConfirmDialog
+        open={billingConfirmState.open}
+        onClose={billingConfirmState.reject}
+        onConfirm={billingConfirmState.accept}
+        title="تأكيد تفعيل الاشتراك"
+        message={billingConfirmState.message}
+        confirmLabel="تأكيد التفعيل"
+        confirmIcon={<CheckCircleIcon size={14} />}
         confirmVariant="primary"
       />
     </div>
