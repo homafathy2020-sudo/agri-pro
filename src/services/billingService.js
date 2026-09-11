@@ -17,7 +17,9 @@ import {
 } from "firebase/firestore";
 import { db, auth } from "../config/firebase";
 import { COLLECTIONS } from "../config/constants";
-import { CYCLE_DAYS, BILLING_REQUEST_STATUS } from "../config/constants/billing";
+import {
+  CYCLE_DAYS, BILLING_REQUEST_STATUS, PLAN_IDS, ENTITLEMENT_SOURCE, TRIAL_DAYS,
+} from "../config/constants/billing";
 
 const entitlementRef  = (uid) => doc(db, COLLECTIONS.ENTITLEMENTS, uid);
 const subscriptionRef = (uid) => doc(db, COLLECTIONS.SUBSCRIPTIONS, uid);
@@ -27,6 +29,28 @@ const addDays = (date, days) => new Date(date.getTime() + days * 24 * 60 * 60 * 
 
 export const billingService = {
   // ─── الشركة نفسها ────────────────────────────────────────────────────
+
+  /**
+   * تجربة مجانية 14 يوم تلقائية — بتتنادى مرة واحدة بس من
+   * AuthContext.jsx → register() لحساب شركة جديد، وصول كامل لحدود
+   * ومزايا باقة "احترافي" بدون بطاقة ائتمان (قسم 15 في التقرير).
+   * الحماية الحقيقية في firestore.rules (isValidTrialSelfCreate): create
+   * بينجح مرة واحدة بس طول عمر الحساب — أي محاولة تانية (نفس الكود لو
+   * اتنادى غلط تاني، أو تلاعب مباشر بالـ SDK) هترفض تلقائيًا لأن
+   * الـ entitlement بقى موجود، وupdate/delete فاضلين أدمن بس. best-effort
+   * عمدًا (زي باقي كتابات التسجيل) — فشلها ميوقفش التسجيل نفسه.
+   */
+  startTrial: async (uid) => {
+    const now = new Date();
+    const expirationDate = addDays(now, TRIAL_DAYS);
+    await setDoc(entitlementRef(uid), {
+      type: "plan",
+      source: ENTITLEMENT_SOURCE.TRIAL,
+      planId: PLAN_IDS.PROFESSIONAL,
+      startDate: Timestamp.fromDate(now),
+      expirationDate: Timestamp.fromDate(expirationDate),
+    });
+  },
 
   /** Real-time — بيرجّع unsubscribe. entitlement = null لو مفيش واحد لسه.
    *  onError اختياري — بيتنادى لو الـ listener فشل (صلاحيات/شبكة) عشان

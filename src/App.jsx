@@ -7,6 +7,7 @@ import { AuthProvider }       from "./contexts/AuthContext";
 import { PrivacyProvider }    from "./contexts/PrivacyContext";
 import ProtectedRoute         from "./components/layout/ProtectedRoute";
 import AdminRoute             from "./components/layout/AdminRoute";
+import RequireModule          from "./components/layout/RequireModule";
 import AppLayout              from "./components/layout/AppLayout";
 import ErrorBoundary          from "./components/system/ErrorBoundary";
 
@@ -49,13 +50,13 @@ const App = () => (
           <Route path="drivers"                 element={<DriversPage />} />
           <Route path="drivers/:driverId"       element={<DriverDetailPage />} />
           <Route path="maintenance"             element={<MaintenancePage />} />
-          <Route path="custody"                 element={<CustodyPage />} />
+          <Route path="custody"                 element={<RequireModule module="custody"><CustodyPage /></RequireModule>} />
           <Route path="tax-deductions"          element={<TaxDeductionsPage />} />
           <Route path="reports"                 element={<ReportsPage />} />
-          <Route path="clients"                 element={<ClientsPage />} />
-          <Route path="clients/:clientName"     element={<ClientDetailPage />} />
-          <Route path="suppliers"               element={<SuppliersPage />} />
-          <Route path="suppliers/:supplierName" element={<SupplierDetailPage />} />
+          <Route path="clients"                 element={<RequireModule module="clients"><ClientsPage /></RequireModule>} />
+          <Route path="clients/:clientName"     element={<RequireModule module="clients"><ClientDetailPage /></RequireModule>} />
+          <Route path="suppliers"               element={<RequireModule module="suppliers"><SuppliersPage /></RequireModule>} />
+          <Route path="suppliers/:supplierName" element={<RequireModule module="suppliers"><SupplierDetailPage /></RequireModule>} />
           <Route path="notifications"           element={<NotificationsPage />} />
           <Route path="billing"                 element={<BillingPage />} />
           <Route path="admin" element={<AdminRoute><AdminPage /></AdminRoute>} />

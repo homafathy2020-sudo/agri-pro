@@ -4,6 +4,7 @@ import { NavLink } from "react-router-dom";
 import clsx from "clsx";
 import { useAuth } from "../../contexts/AuthContext";
 import { useData } from "../../contexts/DataContext";
+import { useEntitlement } from "../../hooks/useEntitlement";
 import { useNotifications } from "../../hooks/useNotifications";
 import { formatInputNumber, parseInputNumber } from "../../utils/formatters";
 import { ADMIN_UIDS, MAX_MONEY_VALUE } from "../../config/constants";
@@ -15,15 +16,19 @@ import {
   StarIcon,
 } from "../ui/Icons";
 
+// moduleKey يربط العنصر بمزية باقة (راجع src/config/constants/billing.js
+// → PLANS[].features وsrc/utils/licenseState.js) — العناصر اللي معاها
+// moduleKey بتتخفي تلقائيًا لو الباقة الحالية مش شاملة المزية دي، بنفس
+// المنطق اللي بيمنع الوصول المباشر بالرابط في RequireModule.jsx.
 const NAV_ITEMS = [
   { to: "/",              label: "الرئيسية",       Icon: HomeIcon      },
   { to: "/equipment",     label: "المعدات",         Icon: TractorIcon   },
   { to: "/jobs",          label: "سجل الشغل",       Icon: ClipboardIcon },
-  { to: "/clients",       label: "العملاء والديون", Icon: AlertIcon     },
-  { to: "/suppliers",     label: "الموردين",        Icon: TruckIcon     },
+  { to: "/clients",       label: "العملاء والديون", Icon: AlertIcon,    moduleKey: "clients" },
+  { to: "/suppliers",     label: "الموردين",        Icon: TruckIcon,    moduleKey: "suppliers" },
   { to: "/drivers",       label: "فريق العمل",      Icon: DriverIcon    },
   { to: "/maintenance",   label: "الصيانة",         Icon: WrenchIcon    },
-  { to: "/custody",       label: "العهدة",          Icon: WalletIcon    },
+  { to: "/custody",       label: "العهدة",          Icon: WalletIcon,   moduleKey: "custody" },
   { to: "/tax-deductions", label: "الضرائب والخصومات", Icon: ReceiptIcon },
   { to: "/notifications", label: "التنبيهات",       Icon: AlertIcon, badge: true },
   { to: "/reports",       label: "التقارير",        Icon: ChartIcon     },
@@ -34,6 +39,9 @@ const Sidebar = ({ onClose }) => {
   const { user, logout }           = useAuth();
   const { settings, saveSettings } = useData();
   const { totalCount, highCount }  = useNotifications();
+  const { modules } = useEntitlement();
+
+  const visibleNavItems = NAV_ITEMS.filter((item) => !item.moduleKey || modules?.[item.moduleKey]);
 
   const [profileOpen, setProfileOpen] = React.useState(false);
 
@@ -68,7 +76,7 @@ const Sidebar = ({ onClose }) => {
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
         <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest px-2 mb-2">القائمة</p>
-        {NAV_ITEMS.map(({ to, label, Icon, badge }) => (
+        {visibleNavItems.map(({ to, label, Icon, badge }) => (
           <NavLink
             key={to}
             to={to}

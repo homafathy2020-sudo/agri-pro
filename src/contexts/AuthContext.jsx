@@ -13,6 +13,7 @@ import {
 import { serverTimestamp } from "firebase/firestore";
 import { auth } from "../config/firebase";
 import { userProfileService } from "../services/userProfileService";
+import { billingService } from "../services/billingService";
 
 const AuthContext = createContext(null);
 
@@ -65,6 +66,11 @@ export const AuthProvider = ({ children }) => {
       createdAt: serverTimestamp(),
       lastActiveAt: serverTimestamp(),
     }).catch(() => {});
+    // تجربة مجانية 14 يوم تلقائية — بدون بطاقة، وصول كامل لباقة احترافي
+    // (راجع src/services/billingService.js → startTrial). best-effort
+    // برضو: لو فشلت (مثلاً أوف لاين وقت التسجيل)، الشركة تفضل في حالة
+    // "لسه ما اخترتش باقة" وتقدر تشترك يدويًا زي أي وقت تاني.
+    billingService.startTrial(cred.user.uid).catch(() => {});
     return cred;
   };
 

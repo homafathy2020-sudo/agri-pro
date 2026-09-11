@@ -3,10 +3,12 @@
 // بانر حالة الاشتراك — ظاهر أعلى محتوى كل صفحة (جوه AppLayout، قبل
 // Outlet مباشرة). بيتغيّر حسب useEntitlement():
 //  - none: تذكير هادي يوجّه لصفحة /billing (قابل للإخفاء)
+//  - trial قريبة من الانتهاء (≤4 أيام — يوم 10 من 14 بالظبط زي التقرير):
+//    تذكير يوجّه لاختيار باقة (قابل للإخفاء)
 //  - active قريبة من الانتهاء (≤3 أيام): تحذير كهرماني (قابل للإخفاء)
 //  - grace: تحذير كهرماني أقوى — البيانات كلها سليمة، بس محتاج تجديد
 //  - suspended: تحذير أحمر — مفيش إضافة معدة/فرد فريق جديد لحد التجديد
-// lifetime/complimentary/active بعيدة عن الانتهاء = مفيش بانر خالص.
+// trial/lifetime/complimentary/active بعيدة عن الانتهاء = مفيش بانر خالص.
 // ─────────────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -24,8 +26,13 @@ const SubscriptionStatusBanner = () => {
   const { state, daysUntilExpiration, loading } = entitlement;
   const uid = user?.uid || "anon";
 
+  const isTrialEndingSoon = state === LICENSE_STATE.TRIAL && typeof daysUntilExpiration === "number" && daysUntilExpiration <= 4;
   const isExpiringSoon = state === LICENSE_STATE.ACTIVE && typeof daysUntilExpiration === "number" && daysUntilExpiration <= 3;
-  const showKey = state === LICENSE_STATE.NONE ? "none" : isExpiringSoon ? "expiring" : state === LICENSE_STATE.GRACE ? "grace" : null;
+  const showKey = state === LICENSE_STATE.NONE ? "none"
+    : isTrialEndingSoon ? "trialEnding"
+    : isExpiringSoon ? "expiring"
+    : state === LICENSE_STATE.GRACE ? "grace"
+    : null;
 
   const [dismissed, setDismissed] = useState(false);
   useEffect(() => {
@@ -65,6 +72,10 @@ const SubscriptionStatusBanner = () => {
 
   const isNone = showKey === "none";
   const isGrace = showKey === "grace";
+  const isTrialEnding = showKey === "trialEnding";
+  // "اختيار باقة" (مش "تجديد") في أي حالة لسه معهاش اشتراك مدفوع فعلي —
+  // none والتجربة المجانية لسه ما اتدفعش، الشركة بتختار لأول مرة.
+  const chooseLabel = isNone || isTrialEnding;
 
   return (
     <div className={`flex items-center justify-between gap-3 rounded-xl px-4 py-3 mb-4 mx-4 lg:mx-6 mt-4 flex-wrap border ${
@@ -74,6 +85,7 @@ const SubscriptionStatusBanner = () => {
         {isGrace ? <AlertIcon size={18} className="text-amber-400 flex-shrink-0" /> : <StarIcon size={18} className="text-brand-400 flex-shrink-0" />}
         <p className={`text-sm ${isGrace ? "text-amber-200" : "text-gray-300"}`}>
           {isNone && "لسه ما اخترتش باقة اشتراك — اختار الباقة المناسبة لحجم شغلك."}
+          {isTrialEnding && `فترتك التجريبية هتنتهي خلال ${daysUntilExpiration} يوم — اختار الباقة المناسبة عشان تكمل من غير انقطاع.`}
           {isGrace && "انتهت باقتك من فترة قصيرة — جدّدها الآن قبل ما نضطر نوقف إضافة سجلات جديدة."}
           {showKey === "expiring" && `باقتك هتنتهي خلال ${daysUntilExpiration} يوم — جدّدها دلوقتي عشان ما ينقطعش الاشتراك.`}
         </p>
@@ -83,7 +95,7 @@ const SubscriptionStatusBanner = () => {
           onClick={() => navigate("/billing")}
           className="bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold rounded-lg px-3.5 py-2"
         >
-          {isNone ? "اختيار باقة" : "تجديد الباقة"}
+          {chooseLabel ? "اختيار باقة" : "تجديد الباقة"}
         </button>
         <button onClick={dismiss} aria-label="إخفاء" className="text-gray-500 hover:text-gray-300 p-1">
           <CloseIcon size={14} />

@@ -376,11 +376,38 @@ service cloud.firestore {
         (!('notes' in data)  || isLongStr(data.notes));
     }
 
+    // تجربة مجانية 14 يوم تلقائية عند التسجيل (src/contexts/AuthContext.jsx
+    // → register() → billingService.startTrial) — شكل صارم جدًا ومقفول
+    // بالكامل: باقة "احترافي" بس، تاريخ انتهاء بين 13 و15 يوم من وقت
+    // السيرفر (مش قيمة تعسفية من الجهاز)، ومفيش أي حقل أدمن. العميل
+    // يقدر ينشئ المستند ده مرة واحدة بس طول عمر حسابه — create مبدئيًا
+    // بينجح لو المستند مش موجود، ولو نجح مرة هيفضل موجود، وأي محاولة
+    // تانية (تعديل أو حذف وإعادة إنشاء) هترفض لأن update/delete فاضلين
+    // أدمن بس تحت. يعني مفيش أي طريقة العميل يمدّ تجربته أو يكررها بنفسه.
+    function isValidTrialSelfCreate(uid, data) {
+      return
+        isOwner(uid) &&
+        data.type == 'plan' &&
+        data.source == 'trial' &&
+        data.planId == 'professional' &&
+        data.startDate is timestamp &&
+        data.startDate > request.time - duration.value(1, 'h') &&
+        data.startDate < request.time + duration.value(1, 'h') &&
+        data.expirationDate is timestamp &&
+        data.expirationDate > request.time + duration.value(13, 'd') &&
+        data.expirationDate < request.time + duration.value(15, 'd') &&
+        (!('adminOverrideBy' in data)) &&
+        (!('adminOverrideAt' in data)) &&
+        (!('notes' in data) || data.notes == '');
+    }
+
     match /entitlements/{uid} {
-      allow get:            if isSignedIn() && (isOwner(uid) || isAdmin());
-      allow list:            if isSignedIn() && isAdmin();
-      allow create, update: if isAdmin() && isValidEntitlement(request.resource.data);
-      allow delete:          if isAdmin();
+      allow get:    if isSignedIn() && (isOwner(uid) || isAdmin());
+      allow list:   if isSignedIn() && isAdmin();
+      allow create: if (isAdmin() && isValidEntitlement(request.resource.data))
+                    || isValidTrialSelfCreate(uid, request.resource.data);
+      allow update: if isAdmin() && isValidEntitlement(request.resource.data);
+      allow delete: if isAdmin();
     }
 
     function isValidSubscription(data) {

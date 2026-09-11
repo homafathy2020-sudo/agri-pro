@@ -3,22 +3,32 @@ import React from "react";
 import { NavLink } from "react-router-dom";
 import clsx from "clsx";
 import { useNotifications } from "../../hooks/useNotifications";
+import { useEntitlement } from "../../hooks/useEntitlement";
 import { HomeIcon, TractorIcon, ClipboardIcon, AlertIcon, ChartIcon } from "../ui/Icons";
 
+// "العملاء" هنا هي التاب الوحيدة من الخمسة المرتبطة بمزية باقة (clients —
+// راجع src/config/constants/billing.js) — بتتخفي لو الباقة الحالية مش
+// شاملاها (زي الـ Sidebar بالظبط)، ونعدّل grid-cols حسب العدد الفعلي.
 const ITEMS = [
   { to: "/",          label: "الرئيسية", Icon: HomeIcon      },
   { to: "/equipment", label: "المعدات",  Icon: TractorIcon   },
   { to: "/jobs",      label: "الشغل",    Icon: ClipboardIcon },
-  { to: "/clients",   label: "العملاء",  Icon: AlertIcon     },
+  { to: "/clients",   label: "العملاء",  Icon: AlertIcon,    moduleKey: "clients" },
   { to: "/reports",   label: "تقارير",   Icon: ChartIcon     },
 ];
 
 const BottomNav = () => {
   const { totalCount, highCount } = useNotifications();
+  const { modules } = useEntitlement();
+
+  const visibleItems = ITEMS.filter((item) => !item.moduleKey || modules?.[item.moduleKey]);
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-40 bg-surface/95 backdrop-blur-md border-t border-white/10 grid grid-cols-5 pb-safe lg:hidden">
-      {ITEMS.map(({ to, label, Icon }) => (
+    <nav className={clsx(
+      "fixed bottom-0 inset-x-0 z-40 bg-surface/95 backdrop-blur-md border-t border-white/10 grid pb-safe lg:hidden",
+      visibleItems.length === 5 ? "grid-cols-5" : "grid-cols-4"
+    )}>
+      {visibleItems.map(({ to, label, Icon }) => (
         <NavLink
           key={to}
           to={to}

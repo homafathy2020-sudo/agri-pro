@@ -194,6 +194,9 @@ const PlanCard = ({ plan, cycle, currentPlanId, onSubscribe }) => {
         <li>حتى {plan.limits.teamMax ?? "غير محدود"} فرد فريق</li>
         <li>عمليات شغل غير محدودة</li>
         <li>نسخ احتياطي {plan.limits.backupFrequencyHours <= 24 ? "يومي" : "أسبوعي"} — {plan.limits.backupRetentionCount} نسخة</li>
+        {plan.features.clientsModule && <li>إدارة العملاء والديون</li>}
+        {plan.features.suppliersModule && <li>إدارة الموردين</li>}
+        {plan.features.custodyModule && <li>إدارة العهدة</li>}
         {plan.features.excelExport && <li>تصدير Excel + تنزيل PDF</li>}
         {plan.features.advancedReports && <li>تقارير متقدمة</li>}
         {plan.features.prioritySupport && <li>دعم أولوية</li>}
@@ -254,6 +257,11 @@ const BillingPage = () => {
             {state === LICENSE_STATE.ACTIVE && (
               <p className="text-gray-400">بتنتهي في {formatDateTime(expirationDate)} ({daysUntilExpiration} يوم)</p>
             )}
+            {state === LICENSE_STATE.TRIAL && (
+              <p className={daysUntilExpiration <= 4 ? "text-amber-400 font-semibold" : "text-gray-400"}>
+                تنتهي فترتك التجريبية في {formatDateTime(expirationDate)} ({daysUntilExpiration} يوم) — اختار باقة قبل كده عشان تكمل من غير انقطاع
+              </p>
+            )}
             {(state === LICENSE_STATE.GRACE || state === LICENSE_STATE.SUSPENDED) && (
               <p className="text-amber-400 font-semibold">
                 انتهت من {daysSinceExpiration} يوم — {state === LICENSE_STATE.SUSPENDED
@@ -287,7 +295,17 @@ const BillingPage = () => {
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {PLANS.map((p) => (
-          <PlanCard key={p.id} plan={p} cycle={cycle} currentPlanId={plan?.id} onSubscribe={setSubscribingPlan} />
+          <PlanCard
+            key={p.id}
+            plan={p}
+            cycle={cycle}
+            // "باقتك الحالية" (تعطيل زرار الاشتراك) بس لما تكون فعلاً
+            // مشترك ونشط. أثناء التجربة المجانية أو فترة السماح/التوقف
+            // المفروض تقدر تشترك (أو تجدد) في أي باقة عادي — لو عطّلناها
+            // زي حالة "نشط" كنا هنمنع أي تحويل من تجربة لباقة مدفوعة.
+            currentPlanId={state === LICENSE_STATE.ACTIVE ? plan?.id : null}
+            onSubscribe={setSubscribingPlan}
+          />
         ))}
       </div>
 
