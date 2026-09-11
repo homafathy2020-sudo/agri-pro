@@ -17,14 +17,17 @@ export const useEntitlement = () => {
   const { user } = useAuth();
   const [entitlement, setEntitlement] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!user?.uid) { setEntitlement(null); setLoading(false); return; }
+    if (!user?.uid) { setEntitlement(null); setError(null); setLoading(false); return; }
     setLoading(true);
-    const unsub = billingService.subscribeToEntitlement(user.uid, (data) => {
-      setEntitlement(data);
-      setLoading(false);
-    });
+    setError(null);
+    const unsub = billingService.subscribeToEntitlement(
+      user.uid,
+      (data) => { setEntitlement(data); setLoading(false); },
+      (err) => { setError(err); setLoading(false); }
+    );
     return unsub;
   }, [user?.uid]);
 
@@ -44,5 +47,5 @@ export const useEntitlement = () => {
     return max == null || teamCount < max;
   };
 
-  return { entitlement, loading, ...license, canAddEquipment, canAddTeamMember };
+  return { entitlement, loading, error, ...license, canAddEquipment, canAddTeamMember };
 };

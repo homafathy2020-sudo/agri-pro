@@ -207,11 +207,21 @@ const PlanCard = ({ plan, cycle, currentPlanId, onSubscribe }) => {
 const BillingPage = () => {
   const [cycle, setCycle] = useState(BILLING_CYCLE.MONTHLY);
   const [subscribingPlan, setSubscribingPlan] = useState(null);
-  const { loading, state, plan, expirationDate, daysUntilExpiration, daysSinceExpiration } = useEntitlement();
+  const { loading, error, state, plan, expirationDate, daysUntilExpiration, daysSinceExpiration } = useEntitlement();
 
   const statusInfo = STATE_LABELS[state] || STATE_LABELS[LICENSE_STATE.NONE];
 
   if (loading) return <LoadingScreen message="جاري تحميل بيانات الاشتراك..." />;
+
+  if (error) {
+    return (
+      <div className="p-4 lg:p-6 max-w-5xl mx-auto" dir="rtl">
+        <div className="bg-red-900/30 border border-red-800/50 rounded-xl px-4 py-3 text-sm text-red-200">
+          حصل خطأ في تحميل بيانات الاشتراك. جرّب تحدّث الصفحة، ولو المشكلة استمرت كلّم الدعم.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 lg:p-6 max-w-5xl mx-auto" dir="rtl">

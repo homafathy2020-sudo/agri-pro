@@ -28,9 +28,18 @@ const addDays = (date, days) => new Date(date.getTime() + days * 24 * 60 * 60 * 
 export const billingService = {
   // ─── الشركة نفسها ────────────────────────────────────────────────────
 
-  /** Real-time — بيرجّع unsubscribe. entitlement = null لو مفيش واحد لسه. */
-  subscribeToEntitlement: (uid, onChange) =>
-    onSnapshot(entitlementRef(uid), (snap) => onChange(snap.exists() ? snap.data() : null)),
+  /** Real-time — بيرجّع unsubscribe. entitlement = null لو مفيش واحد لسه.
+   *  onError اختياري — بيتنادى لو الـ listener فشل (صلاحيات/شبكة) عشان
+   *  اللي مستخدم الدالة يقدر يوقف حالة الـ loading بدل ما تفضل عالقة. */
+  subscribeToEntitlement: (uid, onChange, onError) =>
+    onSnapshot(
+      entitlementRef(uid),
+      (snap) => onChange(snap.exists() ? snap.data() : null),
+      (error) => {
+        console.error("subscribeToEntitlement failed:", error);
+        onError?.(error);
+      }
+    ),
 
   /** طلب دفع يدوي جديد — بيتسجل بحالة "قيد المراجعة" لحد ما الأدمن يتأكد
    *  من التحويل ويفعّل الباقة. بيرجّع الـ id عشان نقدر نتابع حالته live. */
