@@ -207,7 +207,7 @@ const PlanCard = ({ plan, cycle, currentPlanId, onSubscribe }) => {
 const BillingPage = () => {
   const [cycle, setCycle] = useState(BILLING_CYCLE.MONTHLY);
   const [subscribingPlan, setSubscribingPlan] = useState(null);
-  const { entitlement, loading, state, plan, expirationDate, daysUntilExpiration, daysSinceExpiration } = useEntitlement();
+  const { loading, state, plan, expirationDate, daysUntilExpiration, daysSinceExpiration } = useEntitlement();
 
   const statusInfo = STATE_LABELS[state] || STATE_LABELS[LICENSE_STATE.NONE];
 
