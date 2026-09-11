@@ -45,9 +45,13 @@ const PaymentModal = ({ plan, cycle, onClose }) => {
 
   // متابعة حالة الطلب live — لو الأدمن فعّل بسرعة، المستخدم يشوف النتيجة
   // من غير ما يقفل الشاشة أو يعمل refresh.
+  // requestId مستخرج كقيمة مستقرة (primitive) بدل الاعتماد على كائن
+  // request كله في dependency array — الكائن بيتغيّر مرجعه مع كل snapshot
+  // جديد، فلو اعتمدنا عليه هنا كان هيسبب إعادة اشتراك (resubscribe) لا نهائية.
+  const requestId = request?.id;
   useEffect(() => {
-    if (!request?.id) return;
-    const unsub = billingService.subscribeToBillingRequest(request.id, (data) => {
+    if (!requestId) return;
+    const unsub = billingService.subscribeToBillingRequest(requestId, (data) => {
       if (data?.status === "confirmed") {
         toast.success("تم تفعيل باقتك بنجاح! 🎉");
       } else if (data?.status === "rejected") {
@@ -56,7 +60,7 @@ const PaymentModal = ({ plan, cycle, onClose }) => {
       setRequest(data);
     });
     return unsub;
-  }, [request?.id]);
+  }, [requestId]);
 
   const handleSendReceipt = async () => {
     setSubmitting(true);
@@ -139,7 +143,11 @@ const PaymentModal = ({ plan, cycle, onClose }) => {
                 ? MANUAL_PAYMENT_INFO.instapayNumber
                 : MANUAL_PAYMENT_INFO.vodafoneCashNumber}
             </div>
-            <p className="text-xs text-gray-500">باسم: {MANUAL_PAYMENT_INFO.accountHolderName}</p>
+            <p className="text-xs text-gray-500">
+              باسم: {method === MANUAL_PAYMENT_METHODS.INSTAPAY
+                ? MANUAL_PAYMENT_INFO.instapayHolderName
+                : MANUAL_PAYMENT_INFO.vodafoneCashHolderName}
+            </p>
           </Card>
 
           <p className="text-xs text-gray-500 mb-5 leading-relaxed">

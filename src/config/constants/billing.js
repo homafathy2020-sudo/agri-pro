@@ -151,8 +151,9 @@ export const MANUAL_PAYMENT_METHODS = {
 
 export const MANUAL_PAYMENT_INFO = {
   vodafoneCashNumber: "01016212267",
+  vodafoneCashHolderName: "ادهم فتحي",
   instapayNumber:     "01009811200",
-  accountHolderName:  "fathy",
+  instapayHolderName: "fathyk",
   // بصيغة دولية بدون + أو صفر البداية، لازمة لرابط wa.me
   whatsappNumberIntl: "201015132639",
   whatsappNumberDisplay: "01015132639",

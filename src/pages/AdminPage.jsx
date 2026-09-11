@@ -1,6 +1,6 @@
 // src/pages/AdminPage.jsx
 import React, { useMemo, useState } from "react";
-import toast from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
 import { useAdminUsers } from "../hooks/useAdminUsers";
 import { useAdminBackups } from "../hooks/useAdminBackups";
 import { useAdminBroadcast } from "../hooks/useAdminBroadcast";
@@ -13,11 +13,10 @@ import LoadingScreen from "../components/ui/LoadingScreen";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
 import EntitlementEditorModal from "../features/admin/EntitlementEditorModal";
 import { computeLicenseState, LICENSE_STATE_LABELS } from "../utils/licenseState";
-import { METHOD_LABELS_AR } from "../config/constants/billing";
-import { formatDateTime, formatCurrency } from "../utils/formatters";
+import { formatDateTime } from "../utils/formatters";
 import {
   ShieldIcon, UsersGroupIcon, RestoreIcon, ClearIcon, ExternalLinkIcon, AlertIcon, SendIcon,
-  WalletIcon, CheckCircleIcon, XCircleIcon, ClockIcon,
+  WalletIcon, ClockIcon,
 } from "../components/ui/Icons";
 
 // نص تذكير الباك أب — ثابت لكل الشركات (زي ما اتفقنا)، بيظهر للشركة في
@@ -81,7 +80,7 @@ const AdminPage = () => {
   const { send: sendReminder, sending } = useAdminBroadcast();
   const billing = useAdminBilling();
   const { confirm, confirmState } = useConfirm();
-  const { confirm: confirmBilling, confirmState: billingConfirmState } = useConfirm();
+  const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [managingCompany, setManagingCompany] = useState(null);
 
@@ -93,32 +92,6 @@ const AdminPage = () => {
       (u.email || "").toLowerCase().includes(q)
     );
   }, [users, query]);
-
-  const usersByUid = useMemo(() => {
-    const map = {};
-    users.forEach((u) => { map[u.uid] = u; });
-    return map;
-  }, [users]);
-
-  const handleConfirmRequest = async (req) => {
-    const ok = await confirmBilling(req.id, `تفعيل باقة "${req.planId}" لهذه الشركة بعد التأكد من وصول التحويل؟`);
-    if (!ok) return;
-    try {
-      await billing.confirmRequest(req);
-      toast.success("تم تفعيل الاشتراك");
-    } catch {
-      toast.error("حصل خطأ، حاول تاني");
-    }
-  };
-
-  const handleRejectRequest = async (req) => {
-    try {
-      await billing.rejectRequest(req.id, "");
-      toast.success("تم رفض الطلب");
-    } catch {
-      toast.error("حصل خطأ، حاول تاني");
-    }
-  };
 
   const handleRemind = async (uid) => {
     const ok = await confirm(uid);
@@ -180,37 +153,23 @@ const AdminPage = () => {
         </div>
       </Card>
 
-      {/* طلبات الدفع اليدوي (فودافون كاش/InstaPay) اللي لسه محتاجة مراجعة
-          — العميل بيبعت الإيصال على واتساب، وهنا بيتفعّل الاشتراك فعليًا
-          بعد التأكد من وصول التحويل. */}
-      {billing.pendingRequests.length > 0 && (
-        <Card className="p-4 mb-5 border-amber-800/40">
-          <p className="text-xs font-bold text-amber-400 mb-3 flex items-center gap-1.5">
-            <ClockIcon size={14} /> طلبات دفع محتاجة مراجعة ({billing.pendingRequests.length})
+      {/* طلبات الدفع اليدوي (فودافون كاش/InstaPay) — مراجعة وتأكيد/رفض كامل
+          في صفحة "طلبات الشراء" المخصصة؛ هنا بس ملخص سريع وتنبيه لو فيه
+          طلبات لسه محتاجة مراجعة. */}
+      <Card className={`p-4 mb-5 ${billing.pendingRequests.length > 0 ? "border-amber-800/40" : ""}`}>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <p className="text-sm font-bold text-gray-300 flex items-center gap-2">
+            <ClockIcon size={16} className={billing.pendingRequests.length > 0 ? "text-amber-400" : "text-gray-500"} />
+            طلبات الشراء
+            {billing.pendingRequests.length > 0 && (
+              <Badge variant="amber">{billing.pendingRequests.length} محتاجة مراجعة</Badge>
+            )}
           </p>
-          <div className="flex flex-col gap-2">
-            {billing.pendingRequests.map((req) => {
-              const requester = usersByUid[req.uid];
-              return (
-                <div key={req.id} className="flex flex-wrap items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl bg-surface-2 border border-white/8">
-                  <div>
-                    <p className="text-sm text-gray-200 font-semibold">
-                      {requester?.displayName || requester?.email || req.uid}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      باقة {req.planId} ({req.billingCycle === "annual" ? "سنوي" : "شهري"}) — {formatCurrency(req.amount)} عبر {METHOD_LABELS_AR[req.method] || req.method}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="danger" size="xs" icon={<XCircleIcon size={13} />} onClick={() => handleRejectRequest(req)}>رفض</Button>
-                    <Button variant="primary" size="xs" icon={<CheckCircleIcon size={13} />} onClick={() => handleConfirmRequest(req)}>تأكيد وتفعيل</Button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-      )}
+          <Button variant="outline" size="sm" icon={<WalletIcon size={14} />} onClick={() => navigate("/admin/billing-requests")}>
+            عرض كل الطلبات
+          </Button>
+        </div>
+      </Card>
 
       <div className="mb-5 flex items-center gap-4 flex-wrap">
         <div className="flex-1 min-w-[220px] relative">
@@ -347,17 +306,6 @@ const AdminPage = () => {
         message="هيتبعت تنبيه للشركة دي جوه التطبيق يذكّرها إنها تعمل نسخة احتياطية. تحب تكمل؟"
         confirmLabel="تأكيد الإرسال"
         confirmIcon={<SendIcon size={14} />}
-        confirmVariant="primary"
-      />
-
-      <ConfirmDialog
-        open={billingConfirmState.open}
-        onClose={billingConfirmState.reject}
-        onConfirm={billingConfirmState.accept}
-        title="تأكيد تفعيل الاشتراك"
-        message={billingConfirmState.message}
-        confirmLabel="تأكيد التفعيل"
-        confirmIcon={<CheckCircleIcon size={14} />}
         confirmVariant="primary"
       />
     </div>

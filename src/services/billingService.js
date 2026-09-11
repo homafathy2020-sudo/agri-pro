@@ -85,6 +85,15 @@ export const billingService = {
     return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   },
 
+  /** كل طلبات الدفع بكل حالاتها (قيد المراجعة/مؤكدة/مرفوضة) — لصفحة
+   *  "طلبات الشراء" الكاملة في الأدمن (مراقبة شاملة زي أي متجر). ترتيب
+   *  واحد فقط (createdAt) فمش محتاج composite index. */
+  getAllBillingRequests: async () => {
+    const q = query(billingRequestsCol(), orderBy("createdAt", "desc"));
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  },
+
   /**
    * الأدمن بيتأكد إن التحويل وصل فعلاً (يدوياً، برا التطبيق) وبعدين
    * يضغط هنا — بيفعّل الاشتراك والصلاحية مع بعض، ويقفل الطلب كـ "متأكد
