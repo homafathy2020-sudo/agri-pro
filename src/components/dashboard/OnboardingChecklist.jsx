@@ -11,6 +11,7 @@ import toast from "react-hot-toast";
 import { useOnboardingChecklist } from "../../hooks/useOnboardingChecklist";
 import { useData } from "../../contexts/DataContext";
 import { seedDemoData } from "../../utils/demoDataSeed";
+import { FOCUS_FUEL_PRICE_EVENT } from "../../utils/uiEvents";
 import { Card } from "../ui/Card";
 import Button from "../ui/Button";
 import { CheckCircleIcon, CloseIcon, StarIcon } from "../ui/Icons";
@@ -26,6 +27,15 @@ const OnboardingChecklist = () => {
   // متاحة بس لسه محدش من الخطوات اتعمل — عشان متتلخبطش مع مستخدم دخل
   // بياناته الحقيقية فعلاً وباقيله خطوة واحدة بس (زي فريق العمل مثلاً).
   const canSeedDemo = doneCount === 0;
+
+  // خطوة "سعر الوقود" مالهاش path (صفحة خاصة بيها) — بدل التنقل، بنبعت
+  // نفس الحدث اللي كان زرار بانر "سعر الوقود" القديم بيبعته، عشان يوجّه
+  // المستخدم لحقل السعر في القائمة الجانبية (سكرول + focus + هايلايت).
+  const handleStepClick = (step) => {
+    if (step.done) return;
+    if (step.path) navigate(step.path);
+    else window.dispatchEvent(new CustomEvent(FOCUS_FUEL_PRICE_EVENT));
+  };
 
   const handleSeedDemo = async () => {
     setSeeding(true);
@@ -70,7 +80,7 @@ const OnboardingChecklist = () => {
           <button
             key={step.id}
             type="button"
-            onClick={() => !step.done && navigate(step.path)}
+            onClick={() => handleStepClick(step)}
             disabled={step.done}
             className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-right transition-colors ${
               step.done ? "bg-surface-2/50 cursor-default" : "bg-surface-2 hover:bg-surface-3 cursor-pointer"
