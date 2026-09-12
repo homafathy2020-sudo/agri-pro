@@ -1,26 +1,35 @@
 // src/pages/ClientDetailPage.jsx
-import React from "react";
+import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useClients }    from "../hooks/useClients";
 import { useData }       from "../contexts/DataContext";
 import PaymentBadge      from "../features/clients/PaymentBadge";
+import PaymentForm       from "../features/payments/PaymentForm";
+import Modal              from "../components/ui/Modal";
 import { Card, CardHeader, CardBody, SummaryRow, EmptyState, ProgressBar } from "../components/ui/Card";
 import LoadingScreen     from "../components/ui/LoadingScreen";
 import { formatCurrency, formatNumber, formatDateShort } from "../utils/formatters";
-import { AcreIcon, CalendarIcon, TractorIcon } from "../components/ui/Icons";
+import { AcreIcon, CalendarIcon, TractorIcon, PlusIcon } from "../components/ui/Icons";
 
 const ClientDetailPage = () => {
   const { clientName }  = useParams();
   const navigate        = useNavigate();
   const decodedName     = decodeURIComponent(clientName);
   const { getClientSummary, loading } = useClients();
-  const { equipment }       = useData();
+  const { equipment, addPayment } = useData();
+  const [payModal, setPayModal] = useState(null);
 
   if (loading) return <LoadingScreen />;
 
   const summary = getClientSummary(decodedName);
   const { totalRevenue, totalPaid, totalRemaining, totalAcres, ops, jobs } = summary;
   const paidPct = totalRevenue > 0 ? (totalPaid / totalRevenue) * 100 : 0;
+
+  // نفس addPayment المستخدمة بالفعل في JobsPage — بدون أي منطق حساب جديد.
+  const handleSavePayment = async (data) => {
+    await addPayment(data);
+    setPayModal(null);
+  };
 
   return (
     <div className="p-4 lg:p-6 max-w-3xl mx-auto" dir="rtl">
@@ -45,7 +54,19 @@ const ClientDetailPage = () => {
 
       {/* Financial summary card */}
       <Card className="mb-5">
-        <CardHeader title="الملخص المالي" />
+        <CardHeader
+          title="الملخص المالي"
+          actions={
+            totalRemaining > 0 && (
+              <button
+                onClick={() => setPayModal({})}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-amber-600 hover:bg-amber-500 text-white transition-colors"
+              >
+                <PlusIcon size={14}/> تسجيل دفعة
+              </button>
+            )
+          }
+        />
         <CardBody>
           <SummaryRow label="إجمالي الإيراد"  value={formatCurrency(totalRevenue)}   valueColor="text-amber-400" />
           <SummaryRow label="إجمالي المدفوع"  value={formatCurrency(totalPaid)}      valueColor="text-green-400" />
@@ -111,11 +132,40 @@ const ClientDetailPage = () => {
                       </div>
                     ))}
                   </div>
+
+                  {remaining > 0 && (
+                    <button
+                      onClick={() => setPayModal({ job })}
+                      className="w-full mt-3 flex items-center justify-center gap-2 py-2 rounded-xl bg-amber-900/20 border border-amber-800/40 text-amber-400 text-xs font-bold hover:bg-amber-900/40 transition-colors"
+                    >
+                      <PlusIcon size={14}/> تسجيل دفعة على العملية دي
+                    </button>
+                  )}
                 </div>
               );
             })}
         </div>
       )}
+
+      {/* Payment modal — targets a specific job if one was clicked,
+          otherwise the oldest unpaid job for this client. */}
+      <Modal open={!!payModal} onClose={() => setPayModal(null)} title={`تسجيل دفعة — ${decodedName}`}>
+        {payModal && (() => {
+          const target = payModal.job
+            || jobs.filter((j) => j.remainingAmount > 0)
+                 .sort((a, b) => (a.date || "").localeCompare(b.date || ""))[0];
+          if (!target) return null;
+          return (
+            <PaymentForm
+              jobId={target.id}
+              jobRevenue={target.revenue}
+              alreadyPaid={target.amountPaid || 0}
+              onSave={handleSavePayment}
+              onClose={() => setPayModal(null)}
+            />
+          );
+        })()}
+      </Modal>
     </div>
   );
 };
