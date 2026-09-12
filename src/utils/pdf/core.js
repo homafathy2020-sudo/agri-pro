@@ -94,7 +94,11 @@ export const INVOICE_CSS = `
   .inv-company-meta{font-size:11px; color:#6b7280; margin-top:3px; line-height:1.7;}
   .inv-meta{text-align:left; flex-shrink:0;}
   .inv-tag{
-    display:inline-block; font-size:10px; font-weight:800; letter-spacing:.5px;
+    /* لا letter-spacing هنا عمدًا: التباعد بين الحروف بيمنع حروف العربي من
+       الاتصال ببعضها (كل حرف بيتفصل عن اللي بعده) بغض النظر عن الفونت
+       المستخدم — وده بالظبط سبب تفكك الحروف في الشارة دي (نص عربي جوه
+       .inv-tag)، مش مشكلة فونت. */
+    display:inline-block; font-size:10px; font-weight:800;
     color:#0f4c2a; background:#dcfce7; padding:3px 10px; border-radius:999px; margin-bottom:6px;
   }
   .inv-no{font-size:20px; font-weight:800; color:#1a1a2e; font-variant-numeric:tabular-nums;}
