@@ -14,6 +14,7 @@ import FeatureIntroBanner from "../components/common/FeatureIntroBanner";
 import {
   WalletIcon, ArrowUpCircleIcon, ArrowDownCircleIcon,
   TrashIcon, EditIcon, CalendarIcon, AlertIcon, TractorIcon, DriverIcon,
+  DownloadIcon,
 } from "../components/ui/Icons";
 import { formatCurrency, formatDateShort, todayISO } from "../utils/formatters";
 import {
@@ -55,7 +56,9 @@ const CustodyPage = () => {
   const { drivers, equipment, settings } = useData();
   const { confirm, confirmState } = useConfirm();
   const [modal, setModal] = useState(null);
+  const [downloadModalOpen, setDownloadModalOpen] = useState(false);
   const [downloadMonth, setDownloadMonth] = useState("current");
+  const [downloadType, setDownloadType] = useState(CUSTODY_TYPES.EXPENSE);
 
   const handleSave = async (data) => {
     if (modal.mode === "add") await addCustody(data);
@@ -67,30 +70,35 @@ const CustodyPage = () => {
     if (ok) deleteCustody(id);
   };
 
-  // تحميل تقرير العهدة PDF — ثلاث حالات: "كل الشهور" بتستخدم إجماليات
-  // الصفحة الجاهزة (totalExpenses/expensesByCategory) زي ما هي، وشهر محدد
-  // (حالي/سابق) بيتفلتر بالـ month prefix وبيتحسب من جوه buildCustodyReportHtml
-  // نفسها من قايمة الحركات مباشرة، عشان الرقم يبقى مطابق 100% لهذا الشهر بس.
-  const handleDownload = () => {
-    if (downloadMonth === "all") {
-      return downloadCustodyReportPdf({
-        transactions: transactions,
-        totalDeposits,
-        totalExpenses,
-        balance,
-        expensesByCategory,
-        getLinkedName,
-        company: settings.company,
-      });
-    }
+  // تحميل تقرير العهدة PDF — نفس منطق الفلترة القديم بالظبط، بس مضاف له
+  // اختيار نوع الحركة (منصرف/واصل) اللي بيتحدد من نافذة التحميل: "كل الشهور"
+  // بتستخدم إجماليات الصفحة الجاهزة (totalExpenses/totalDeposits/expensesByCategory)
+  // زي ما هي، وشهر محدد (حالي/سابق) بيتفلتر بالـ month prefix وبيتحسب من جوه
+  // buildCustodyReportHtml نفسها من قايمة الحركات مباشرة، عشان الرقم يبقى
+  // مطابق 100% لهذا الشهر بس. بعد نجاح التحميل، النافذة بتقفل لوحدها.
+  const handleDownload = async () => {
+    const args = downloadMonth === "all"
+      ? {
+          transactions: transactions,
+          totalDeposits,
+          totalExpenses,
+          balance,
+          expensesByCategory,
+          getLinkedName,
+          company: settings.company,
+          reportType: downloadType,
+        }
+      : {
+          transactions: transactions,
+          getLinkedName,
+          company: settings.company,
+          month: resolveMonthPrefix(downloadMonth),
+          allTime: false,
+          reportType: downloadType,
+        };
 
-    return downloadCustodyReportPdf({
-      transactions: transactions,
-      getLinkedName,
-      company: settings.company,
-      month: resolveMonthPrefix(downloadMonth),
-      allTime: false,
-    });
+    await downloadCustodyReportPdf(args);
+    setDownloadModalOpen(false);
   };
 
   if (loading) return <LoadingScreen />;
@@ -113,24 +121,13 @@ const CustodyPage = () => {
           <p className="text-sm text-gray-500 mt-0.5">فلوس رجل الأعمال ومصروفاتها على الميكنة والسائقين</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {/* تحميل تقرير العهدة — نفس عنصر اختيار الفترة المستخدم في صفحة
-              التقارير، بنفس الشكل، عشان يبقى نفس هوية الاختيار في التطبيق. */}
-          <div className="flex items-center gap-2">
-            <select
-              value={downloadMonth}
-              onChange={(e) => setDownloadMonth(e.target.value)}
-              aria-label="اختر الفترة"
-              className="bg-surface-2 border border-white/10 rounded-xl px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-brand-600"
-            >
-              {MONTH_DOWNLOAD_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
-            <DownloadReportButton
-              onDownload={handleDownload}
-              title="تحميل تقرير العهدة PDF"
-            />
-          </div>
+          {/* تحميل تقرير العهدة — زرار واحد بيفتح نافذة فيها اختيار نوع
+              الحركة (منصرف/واصل) واختيار الفترة مع بعض، بدل ما يكون
+              اختيار الفترة select منفصل وبعيد عن الزرار. */}
+          <Button variant="secondary" size="sm" icon={<DownloadIcon size={16} />}
+            onClick={() => setDownloadModalOpen(true)}>
+            تحميل تقرير
+          </Button>
 
           <Button variant="info" onClick={() => setModal({ mode: "add", type: CUSTODY_TYPES.DEPOSIT })}
             icon={<ArrowUpCircleIcon size={16} />}>
@@ -194,12 +191,22 @@ const CustodyPage = () => {
           <EmptyState icon={<WalletIcon size={48} className="text-gray-600 mx-auto mb-2" />}
             title="لا توجد حركات بعد" description="سجّل أول إضافة أو مصروف للعهدة" />
         ) : (
-          <div className="divide-y divide-white/8 pb-2">
-            {transactions.map((t) => {
+          <div className="pb-2">
+            {transactions.map((t, idx) => {
               const isDeposit = t.type === CUSTODY_TYPES.DEPOSIT;
               const linkedName = getLinkedName(t);
+              // خط فاصل شكلي بس بين كل شهر وشهر — القايمة أصلاً مرتبة
+              // بالأحدث أولاً (useCustody)، فمقارنة أول 7 حروف من تاريخ
+              // الحركة الحالية بالحركة اللي قبلها كافية لمعرفة إننا دخلنا
+              // شهر جديد. مفيش أي تغيير في الترتيب أو الحسابات هنا.
+              const monthKey = (t.date || "").slice(0, 7);
+              const prevMonthKey = idx > 0 ? (transactions[idx - 1].date || "").slice(0, 7) : monthKey;
+              const isNewMonth = idx > 0 && monthKey !== prevMonthKey;
               return (
-                <div key={t.id} className="flex items-center gap-3 px-5 py-3">
+                <div key={t.id}
+                  className={`flex items-center gap-3 px-5 py-3 ${
+                    idx === 0 ? "" : isNewMonth ? "border-t-2 border-white/20" : "border-t border-white/8"
+                  }`}>
                   {isDeposit
                     ? <ArrowUpCircleIcon size={18} className="text-green-400 flex-shrink-0" />
                     : <ArrowDownCircleIcon size={18} className="text-red-400 flex-shrink-0" />}
@@ -249,6 +256,53 @@ const CustodyPage = () => {
 
       <ConfirmDialog open={confirmState.open} onClose={confirmState.reject}
         onConfirm={confirmState.accept} message="هل تريد حذف هذه الحركة؟" />
+
+      <Modal open={downloadModalOpen} onClose={() => setDownloadModalOpen(false)}
+        title="تحميل تقرير العهدة" size="sm">
+        <div className="space-y-4">
+          <div>
+            <p className="text-xs font-semibold text-gray-400 mb-1.5">نوع الحركة</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button"
+                onClick={() => setDownloadType(CUSTODY_TYPES.EXPENSE)}
+                className={`py-2.5 rounded-xl text-sm font-bold border transition-colors ${
+                  downloadType === CUSTODY_TYPES.EXPENSE
+                    ? "bg-red-900/30 border-red-700 text-red-300"
+                    : "bg-surface-2 border-white/10 text-gray-400"
+                }`}>
+                المنصرف
+              </button>
+              <button type="button"
+                onClick={() => setDownloadType(CUSTODY_TYPES.DEPOSIT)}
+                className={`py-2.5 rounded-xl text-sm font-bold border transition-colors ${
+                  downloadType === CUSTODY_TYPES.DEPOSIT
+                    ? "bg-green-900/30 border-green-700 text-green-300"
+                    : "bg-surface-2 border-white/10 text-gray-400"
+                }`}>
+                الواصل
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-400 mb-1.5">الفترة</label>
+            <select
+              value={downloadMonth}
+              onChange={(e) => setDownloadMonth(e.target.value)}
+              aria-label="اختر الفترة"
+              className="w-full bg-surface-2 border border-white/10 rounded-xl px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-brand-600"
+            >
+              {MONTH_DOWNLOAD_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex justify-end pt-3 mt-1 border-t border-white/8">
+            <DownloadReportButton onDownload={handleDownload} title="تحميل تقرير العهدة PDF" />
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

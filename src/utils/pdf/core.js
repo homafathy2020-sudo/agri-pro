@@ -174,6 +174,35 @@ const loadHtml2Pdf = () => {
   return html2pdfLoadPromise;
 };
 
+// ── Wait for the report font before rasterizing ──────────────────────────────
+// BASE_CSS/INVOICE_CSS load Cairo via @import, which fetches asynchronously.
+// html2canvas takes a "screenshot" of the container the moment it's called —
+// with no wait, that screenshot can be taken before Cairo finishes loading
+// (most likely the very first PDF generated after opening the app, or on a
+// slow/flaky connection), so the browser falls back to a default font for
+// that capture. A fallback font doesn't join Arabic letters into their
+// connected forms the way Cairo does, which is exactly the "disconnected
+// letters" / reordered-digits look reported on the custody report — the
+// report's *numbers* were never wrong, only how that one rasterized
+// snapshot drew them.
+// document.fonts.ready resolves once every requested font has settled
+// (loaded OR failed) — it can never hang waiting on a network that's down,
+// so this stays safe under the offline-first requirement; wrapped in
+// try/catch so an older browser without the Font Loading API still falls
+// through to the previous (unguarded) behavior instead of breaking the
+// download entirely.
+const waitForReportFonts = async () => {
+  try {
+    await document.fonts.ready;
+    await Promise.all(
+      ["400", "600", "700", "800"].map((weight) => document.fonts.load(`${weight} 13px Cairo`))
+    );
+  } catch {
+    // Font Loading API unsupported/failed — proceed with whatever font is
+    // currently available rather than blocking the download.
+  }
+};
+
 /**
  * Downloads the given report HTML (the exact same markup printXReport()
  * would print) as a .pdf file. Renders it off-screen first — not
@@ -215,6 +244,7 @@ export const downloadReportPdf = async (htmlContent, filename) => {
   document.body.appendChild(wrapper);
 
   try {
+    await waitForReportFonts();
     await html2pdf()
       .set({
         margin: 0,

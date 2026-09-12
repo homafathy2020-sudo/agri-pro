@@ -8,7 +8,8 @@
 
 import { formatCurrency, formatDate, formatDateTime } from "../formatters";
 import { escapeHtml, INVOICE_CSS, downloadReportPdf } from "./core";
-import { calcTotalExpenses, calcExpensesByCategory } from "../custodyCalculations";
+import { calcTotalExpenses, calcExpensesByCategory, calcTotalDeposits } from "../custodyCalculations";
+import { CUSTODY_TYPES } from "../../config/constants";
 
 const buildCustodyReportNumber = () => {
   const d = new Date();
@@ -16,40 +17,66 @@ const buildCustodyReportNumber = () => {
   return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
 };
 
-const buildCustodyReportHtml = ({ transactions, totalExpenses, expensesByCategory, getLinkedName, company = {}, month = null, allTime = true }) => {
+const buildCustodyReportHtml = ({
+  transactions, totalExpenses, totalDeposits, expensesByCategory, getLinkedName,
+  company = {}, month = null, allTime = true, reportType = CUSTODY_TYPES.EXPENSE,
+}) => {
   const today = new Date().toLocaleDateString("ar-EG");
   const printedAt = formatDateTime(new Date());
   const reportNo = buildCustodyReportNumber();
+  const isExpenseReport = reportType !== CUSTODY_TYPES.DEPOSIT;
 
   const categoryLabels = { equipment: "ميكنة", driver: "سائقين", other: "أخرى" };
 
-  // التقرير بيعرض المصروفات بس (من غير حركات الإضافة/الرصيد) — شاشة العهدة
-  // في التطبيق نفسها لسه بتعرض كل الحركات والرصيد زي ما هي، الفلترة دي
-  // خاصة بملف الـ PDF فقط.
-  const allExpenses = transactions.filter((t) => t.type !== "deposit");
+  // التقرير بيعرض نوع حركة واحد بس حسب الاختيار (مصروف أو إضافة) — شاشة
+  // العهدة في التطبيق نفسها لسه بتعرض كل الحركات والرصيد مع بعض زي ما هي،
+  // الفلترة دي خاصة بملف الـ PDF فقط. مسار المصروفات هو بالظبط زي ما كان
+  // قبل إضافة اختيار النوع (t.type !== "deposit")، من غير أي تغيير فيه.
+  const allForType = isExpenseReport
+    ? transactions.filter((t) => t.type !== CUSTODY_TYPES.DEPOSIT)
+    : transactions.filter((t) => t.type === CUSTODY_TYPES.DEPOSIT);
 
   // Month-scoped download (allTime=false + a "YYYY-MM" month): filter by
   // that prefix and recompute the total/category breakdown from the
   // filtered list itself — never from the page's all-time totals passed
   // in — so a monthly download can't accidentally show all-time numbers.
-  const expensesOnly = (!allTime && month) ? allExpenses.filter((t) => (t.date || "").startsWith(month)) : allExpenses;
-  const periodTotalExpenses = (!allTime && month)
-    ? calcTotalExpenses(expensesOnly)
-    : totalExpenses;
+  const forPeriod = (!allTime && month) ? allForType.filter((t) => (t.date || "").startsWith(month)) : allForType;
+  const periodTotal = (!allTime && month)
+    ? (isExpenseReport ? calcTotalExpenses(forPeriod) : calcTotalDeposits(forPeriod))
+    : (isExpenseReport ? totalExpenses : totalDeposits);
   const periodExpensesByCategory = (!allTime && month)
-    ? calcExpensesByCategory(expensesOnly)
+    ? calcExpensesByCategory(forPeriod)
     : expensesByCategory;
 
   const periodLabel = (!allTime && month)
     ? new Date(`${month}-01`).toLocaleDateString("ar-EG", { month: "long", year: "numeric" })
     : "كل الوقت";
-  const reportTitle = (!allTime && month) ? "تقرير العهدة الشهري" : "تقرير العهدة";
+  const reportTitle = (!allTime && month)
+    ? (isExpenseReport ? "تقرير العهدة الشهري" : "تقرير إضافات العهدة الشهري")
+    : (isExpenseReport ? "تقرير العهدة" : "تقرير إضافات العهدة");
+  const totalLabel = isExpenseReport ? "إجمالي المصروف" : "إجمالي الإضافات";
+  const totalColor = isExpenseReport ? "#991b1b" : "#15803d";
 
   // Sort oldest → newest for a chronological ledger read
-  const sorted = [...expensesOnly].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  const sorted = [...forPeriod].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
 
   const rows = sorted.map((t) => {
     const linkedName = getLinkedName ? getLinkedName(t) : null;
+    if (!isExpenseReport) {
+      const desc = escapeHtml(t.source) || "إضافة فلوس";
+      return `
+    <tr>
+      <td>${formatDate(t.date)}</td>
+      <td>
+        <span class="badge badge-green">إضافة</span>
+      </td>
+      <td>${desc}${linkedName ? ` · ${escapeHtml(linkedName)}` : ""}</td>
+      <td>${escapeHtml(t.notes) || "—"}</td>
+      <td style="color:#15803d;font-weight:700">
+        + ${formatCurrency(t.amount)}
+      </td>
+    </tr>`;
+    }
     const desc = t.category === "other" && t.otherLabel ? escapeHtml(t.otherLabel) : (categoryLabels[t.category] || "صرف");
     return `
     <tr>
@@ -65,7 +92,9 @@ const buildCustodyReportHtml = ({ transactions, totalExpenses, expensesByCategor
     </tr>`;
   }).join("");
 
-  const categoryRows = Object.entries(categoryLabels).map(([key, label]) => {
+  // تبويب "المصروفات حسب البند" خاص بتقرير المصروفات بس — الإضافات
+  // مالهاش تصنيف بند، بس مصدر المبلغ الحر اللي بيبان في عمود "البيان" فوق.
+  const categoryRows = !isExpenseReport ? "" : Object.entries(categoryLabels).map(([key, label]) => {
     const amount = periodExpensesByCategory?.[key] || 0;
     if (amount === 0) return "";
     return `<tr><td style="font-weight:600">${label}</td><td style="color:#991b1b">${formatCurrency(amount)}</td></tr>`;
@@ -109,8 +138,8 @@ const buildCustodyReportHtml = ({ transactions, totalExpenses, expensesByCategor
 
       <div class="grid-2">
         <div class="stat-box" style="grid-column:1 / -1;">
-          <div class="stat-val" style="color:#991b1b">${formatCurrency(periodTotalExpenses)}</div>
-          <div class="stat-lbl">إجمالي المصروف</div>
+          <div class="stat-val" style="color:${totalColor}">${formatCurrency(periodTotal)}</div>
+          <div class="stat-lbl">${totalLabel}</div>
         </div>
       </div>
 
@@ -129,8 +158,8 @@ const buildCustodyReportHtml = ({ transactions, totalExpenses, expensesByCategor
           <thead><tr><th>التاريخ</th><th>النوع</th><th>البيان</th><th>ملاحظات</th><th>المبلغ</th></tr></thead>
           <tbody>${rows}</tbody>
           <tr class="total-row">
-            <td colspan="4">إجمالي المصروف</td>
-            <td style="color:#991b1b">${formatCurrency(periodTotalExpenses)}</td>
+            <td colspan="4">${totalLabel}</td>
+            <td style="color:${totalColor}">${formatCurrency(periodTotal)}</td>
           </tr>
         </table>
       </div>` : `<div class="section"><p style="color:#666;text-align:center;padding:20px 0;">لا توجد حركات مسجلة${(!allTime && month) ? " في هذا الشهر" : " بعد"}</p></div>`}
@@ -154,7 +183,8 @@ const buildCustodyReportHtml = ({ transactions, totalExpenses, expensesByCategor
   `;
 
   const titleSuffix = (!allTime && month) ? periodLabel : today;
-  return { html, title: `${reportTitle} - ${titleSuffix}`, filename: `تقرير-العهدة-${titleSuffix}` };
+  const filenamePrefix = isExpenseReport ? "تقرير-العهدة-المنصرف" : "تقرير-العهدة-الواصل";
+  return { html, title: `${reportTitle} - ${titleSuffix}`, filename: `${filenamePrefix}-${titleSuffix}` };
 };
 
 export const downloadCustodyReportPdf = (args) => {
