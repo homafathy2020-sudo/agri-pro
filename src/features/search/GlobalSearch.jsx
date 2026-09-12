@@ -10,10 +10,15 @@ const SearchIcon = () => (
 );
 
 const RESULT_TYPES = {
-  equipment: { label: "معدة",  color: "text-brand-400", bg: "bg-brand-900/30" },
-  driver:    { label: "سائق",  color: "text-blue-400",  bg: "bg-blue-900/30"  },
-  client:    { label: "عميل",  color: "text-amber-400", bg: "bg-amber-900/30" },
-  job:       { label: "عملية", color: "text-green-400", bg: "bg-green-900/30" },
+  equipment:       { label: "معدة",        color: "text-brand-400",  bg: "bg-brand-900/30"  },
+  driver:          { label: "سائق",        color: "text-blue-400",   bg: "bg-blue-900/30"   },
+  client:          { label: "عميل",        color: "text-amber-400",  bg: "bg-amber-900/30"  },
+  job:             { label: "عملية",       color: "text-green-400",  bg: "bg-green-900/30"  },
+  supplier:        { label: "مورد",        color: "text-red-400",    bg: "bg-red-900/30"    },
+  supplierInvoice: { label: "فاتورة مورد", color: "text-red-400",    bg: "bg-red-900/30"    },
+  maintenance:     { label: "صيانة",       color: "text-orange-400", bg: "bg-orange-900/30" },
+  custody:         { label: "عهدة",        color: "text-purple-400", bg: "bg-purple-900/30" },
+  tax:             { label: "ضرائب",       color: "text-gray-400",   bg: "bg-gray-800/60"   },
 };
 
 const GlobalSearch = () => {
@@ -23,7 +28,7 @@ const GlobalSearch = () => {
   const ref      = useRef(null);
   const inputRef = useRef(null);
   const navigate = useNavigate();
-  const { equipment, drivers, jobs } = useData();
+  const { equipment, drivers, jobs, supplierInvoices, maintenance, custody, taxDeductions } = useData();
 
   useEffect(() => {
     const handler = (e) => {
@@ -74,8 +79,62 @@ const GlobalSearch = () => {
       list.push({ type:"job", id:job.id, label:`${job.client} — ${job.workType}`, sub:job.date, path:"/jobs" });
     });
 
-    return list.slice(0, 8);
-  }, [query, equipment, drivers, jobs]);
+    const uniqueSuppliers = [...new Set(supplierInvoices.map(s => s.supplierName).filter(Boolean))];
+    uniqueSuppliers.forEach((name) => {
+      if (name.toLowerCase().includes(q))
+        list.push({ type:"supplier", id:name, label:name, sub:"اضغط لعرض تفاصيل المورد", path:`/suppliers/${encodeURIComponent(name)}` });
+    });
+
+    supplierInvoices.filter(inv =>
+      inv.supplierName?.toLowerCase().includes(q) ||
+      inv.description?.toLowerCase().includes(q)
+    ).slice(0,3).forEach((inv) => {
+      list.push({
+        type: "supplierInvoice", id: inv.id,
+        label: inv.description ? `${inv.supplierName} — ${inv.description}` : inv.supplierName,
+        sub: inv.date, path: `/suppliers/${encodeURIComponent(inv.supplierName)}`,
+      });
+    });
+
+    maintenance.filter(m =>
+      (m.type || "").toLowerCase().includes(q) ||
+      (m.customType || "").toLowerCase().includes(q) ||
+      (m.notes || "").toLowerCase().includes(q)
+    ).slice(0,3).forEach((m) => {
+      const eq = equipment.find((e) => e.id === m.equipmentId);
+      list.push({
+        type: "maintenance", id: m.id,
+        label: `${m.customType || m.type || "صيانة"}${eq ? ` — ${eq.name}` : ""}`,
+        sub: m.date, path: "/maintenance",
+      });
+    });
+
+    custody.filter(c =>
+      (c.source || "").toLowerCase().includes(q) ||
+      (c.otherLabel || "").toLowerCase().includes(q) ||
+      (c.notes || "").toLowerCase().includes(q)
+    ).slice(0,3).forEach((c) => {
+      list.push({
+        type: "custody", id: c.id,
+        label: c.source || c.otherLabel || c.notes || (c.type === "deposit" ? "إضافة فلوس" : "صرف فلوس"),
+        sub: c.date, path: "/custody",
+      });
+    });
+
+    taxDeductions.filter(t =>
+      (t.type || "").toLowerCase().includes(q) ||
+      (t.otherLabel || "").toLowerCase().includes(q) ||
+      (t.notes || "").toLowerCase().includes(q)
+    ).slice(0,3).forEach((t) => {
+      list.push({
+        type: "tax", id: t.id,
+        label: t.otherLabel || t.type || "خصم ضريبي",
+        sub: t.date, path: "/tax-deductions",
+      });
+    });
+
+    return list.slice(0, 12);
+  }, [query, equipment, drivers, jobs, supplierInvoices, maintenance, custody, taxDeductions]);
 
   const handleSelect = (r) => { navigate(r.path); setQuery(""); setOpen(false); };
 
