@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useNotifications } from "../../hooks/useNotifications";
-import { AlertIcon, DriverIcon, OilCanIcon, CalendarIcon, CloudUploadIcon } from "../../components/ui/Icons";
+import { AlertIcon, DriverIcon, OilCanIcon, CalendarIcon } from "../../components/ui/Icons";
 
 const SEVERITY_COLORS = {
   high:   { bg: "bg-red-900/30 border-red-800/40",    icon: "text-red-400",   dot: "bg-red-500"   },
@@ -14,7 +14,6 @@ const TYPE_ICONS = {
   oil_change_due:    OilCanIcon,
   grease_due:        CalendarIcon,
   job_reminder_due:  CalendarIcon,
-  backup_failing:    CloudUploadIcon,
 };
 
 const NotificationBell = () => {
@@ -31,7 +30,7 @@ const NotificationBell = () => {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const handleAction = (n) => { setOpen(false); navigate(n.actionPath, n.actionState ? { state: n.actionState } : undefined); };
+  const handleAction = (path) => { setOpen(false); navigate(path); };
 
   return (
     <div className="relative" ref={ref}>
@@ -69,31 +68,23 @@ const NotificationBell = () => {
               notifications.map((n) => {
                 const colors   = SEVERITY_COLORS[n.severity];
                 const TypeIcon = TYPE_ICONS[n.type] ?? AlertIcon;
-                const clickable = !!n.actionPath;
                 return (
                   <div
                     key={n.id}
-                    className={`flex gap-3 p-4 border-b border-white/8 last:border-0 transition-colors ${
-                      clickable ? "cursor-pointer hover:bg-white/5 active:bg-white/8" : ""
-                    }`}
-                    onClick={() => clickable && handleAction(n)}
+                    className={`flex gap-3 p-4 border-b border-white/8 last:border-0 cursor-pointer hover:bg-white/3 transition-colors`}
+                    onClick={() => n.actionPath && handleAction(n.actionPath)}
                   >
-                    <div className={`w-9 h-9 rounded-xl border flex items-center justify-center flex-shrink-0 ${colors.bg}`}>
-                      <TypeIcon size={16} className={colors.icon} />
+                    <div className={`w-8 h-8 rounded-xl border flex items-center justify-center flex-shrink-0 ${colors.bg}`}>
+                      <TypeIcon size={15} className={colors.icon} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        {!n.read && <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${colors.dot}`} />}
-                        <p className="text-xs font-bold text-gray-100 leading-snug">{n.title}</p>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1 leading-relaxed">{n.body}</p>
-                      {n.actionLabel && clickable && (
-                        <p className="text-xs text-brand-400 mt-1.5 font-bold flex items-center gap-1">
-                          {n.actionLabel}
-                          <span className="text-sm leading-none">←</span>
-                        </p>
+                      <p className="text-xs font-bold text-gray-100 leading-snug">{n.title}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{n.body}</p>
+                      {n.actionLabel && (
+                        <p className="text-xs text-brand-400 mt-1 font-semibold">{n.actionLabel} ←</p>
                       )}
                     </div>
+                    <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-1 ${colors.dot}`} />
                   </div>
                 );
               })

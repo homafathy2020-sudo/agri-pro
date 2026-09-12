@@ -23,7 +23,6 @@ import {
   RevenueIcon, AcreIcon, FuelIcon, ProfitIcon,
   TractorIcon, DriverIcon, ClipboardIcon, ChartIcon,
   AlertIcon, StarIcon, WORK_TYPE_ICON_MAP,
-  OilCanIcon, CalendarIcon, CloudUploadIcon,
 } from "../components/ui/Icons";
 import { formatCurrency, formatNumber, formatDateShort } from "../utils/formatters";
 import { calcRevenue, calcFuelCost, getJobFuelPrice, calcRemainingAmount, derivePaymentStatus, getJobPaidAmount } from "../utils/calculations";
@@ -33,21 +32,6 @@ import { shortNum, createAngledNameTick } from "../components/charts/chartHelper
 const AREA_GREEN   = "#22c55e";
 const PIE_COLORS   = ["#22c55e","#f59e0b","#3b82f6","#8b5cf6","#f97316","#06b6d4"];
 const BAR_COLORS   = ["#f59e0b","#d97706","#b45309","#92400e","#78350f"];
-
-// ── "تنبيهات هامة" — same type→icon idea as NotificationBell.jsx's
-// TYPE_ICONS, kept in sync manually (small enough list that a shared file
-// isn't worth the indirection yet).
-const ALERT_TYPE_ICONS = {
-  debt_overdue:      DriverIcon,
-  oil_change_due:    OilCanIcon,
-  grease_due:        CalendarIcon,
-  job_reminder_due:  CalendarIcon,
-  backup_failing:    CloudUploadIcon,
-};
-const ALERT_SEVERITY_COLORS = {
-  high:   { bg: "bg-red-900/30 border-red-800/40",    icon: "text-red-400"   },
-  medium: { bg: "bg-amber-900/30 border-amber-800/40", icon: "text-amber-400" },
-};
 
 // ── Shared tooltip style ──────────────────────────────────────────────────
 const tooltipStyle = {
@@ -132,57 +116,6 @@ const DashboardPage = () => {
 
       {/* ── Privacy toggle ───────────────────────────────────── */}
       <PrivacyToggle />
-
-      {/* ── تنبيهات هامة — smart-alerts Phase 1 ──────────────
-          أول حاجة تتشاف في الصفحة، والباقي كله زي ما كان بالظبط تحتها.
-          مُشتقّة بالكامل من useNotifications.js (نفس مصدر جرس الإشعارات)
-          — مفيش أي قراءة بيانات إضافية، ومفيش Push/Backend. كل تنبيه بيوديك
-          مباشرة لمكانه (المعدة، العميل، النسخ الاحتياطي...) بدل ما يكون
-          مجرد نص. */}
-      <Card hover>
-        <CardHeader
-          title="تنبيهات هامة"
-          actions={
-            importantAlerts.length > 0 && (
-              <span className="text-xs text-gray-500">{importantAlerts.length} تنبيه</span>
-            )
-          }
-        />
-        <CardBody className="space-y-1.5">
-          {importantAlerts.length === 0 ? (
-            <p className="text-xs text-gray-500 text-center py-4">لا يوجد تنبيهات هامة حاليًا</p>
-          ) : (
-            importantAlerts.slice(0, 5).map((n) => {
-              const TypeIcon = ALERT_TYPE_ICONS[n.type] ?? AlertIcon;
-              const colors   = ALERT_SEVERITY_COLORS[n.severity] ?? ALERT_SEVERITY_COLORS.medium;
-              const clickable = !!n.actionPath;
-              return (
-                <div
-                  key={n.id}
-                  className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors ${
-                    clickable ? "cursor-pointer hover:bg-surface-2 active:bg-surface-3" : ""
-                  }`}
-                  onClick={() => clickable && navigate(n.actionPath, n.actionState ? { state: n.actionState } : undefined)}
-                >
-                  <div className={`w-9 h-9 rounded-xl border flex items-center justify-center flex-shrink-0 ${colors.bg}`}>
-                    <TypeIcon size={16} className={colors.icon} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-bold text-gray-200 truncate">{n.title}</p>
-                    <p className="text-[11px] text-gray-500 mt-0.5 truncate">{n.body}</p>
-                  </div>
-                  {n.actionLabel && clickable && (
-                    <span className="text-xs font-bold text-brand-400 flex-shrink-0 flex items-center gap-1">
-                      {n.actionLabel}
-                      <span className="text-sm leading-none">←</span>
-                    </span>
-                  )}
-                </div>
-              );
-            })
-          )}
-        </CardBody>
-      </Card>
 
       {/* ── أول خطوات (audit roadmap Phase 7) — بتختفي لوحدها أول ما
           المستخدم يكمّل خطواتها أو يقفلها بنفسه. "سعر الوقود" بقى خطوة
@@ -369,6 +302,46 @@ const DashboardPage = () => {
           </CardBody>
         </Card>
       </div>
+
+      {/* ── تنبيهات هامة — smart-alerts Phase 1 ──────────────
+          Purely derived from data already loaded (debts, custody, salary,
+          orphaned payments, admin messages, plus the new maintenance/
+          reminder-date alerts) via useNotifications.js — no new Firestore
+          reads, no push/backend. Shows the top few; the bell icon in the
+          header has the full list. */}
+      <Card hover className="mb-4">
+        <CardHeader
+          title="تنبيهات هامة"
+          actions={
+            importantAlerts.length > 0 && (
+              <span className="text-xs text-gray-500">{importantAlerts.length} تنبيه</span>
+            )
+          }
+        />
+        <CardBody className="space-y-2">
+          {importantAlerts.length === 0 ? (
+            <p className="text-xs text-gray-500 text-center py-4">لا يوجد تنبيهات هامة حاليًا</p>
+          ) : (
+            importantAlerts.slice(0, 5).map((n) => (
+              <div
+                key={n.id}
+                className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 transition-colors ${
+                  n.actionPath ? "cursor-pointer hover:bg-surface-2" : ""
+                }`}
+                onClick={() => n.actionPath && navigate(n.actionPath)}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${n.severity === "high" ? "bg-red-500" : "bg-amber-500"}`} />
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-gray-200 truncate">{n.title}</p>
+                    <p className="text-[11px] text-gray-500 truncate">{n.body}</p>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </CardBody>
+      </Card>
 
       {/* ── Top Debtors ───────────────────────────────────── */}
       {topDebtors.length > 0 && (
