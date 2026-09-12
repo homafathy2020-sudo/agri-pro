@@ -6,8 +6,9 @@ import { checkOverdueDebts } from "../utils/calculations";
 import { findDuplicateSalaryEntries } from "../utils/findDuplicateSalaryEntries";
 import { findOrphanedPayments, findOrphanedSupplierPayments } from "../utils/findOrphanedPayments";
 import { calcCustodyBalance } from "../utils/custodyCalculations";
-import { checkOilChangeDue, checkGreaseDue, checkJobReminders } from "../utils/maintenanceAlerts";
-import { formatCurrency, formatNumber, formatDateShort } from "../utils/formatters";
+import { checkEquipmentReminders, checkJobReminders } from "../utils/maintenanceAlerts";
+import { EQUIPMENT_CATEGORY } from "../config/constants";
+import { formatCurrency, formatDateShort } from "../utils/formatters";
 import { useAdminMessages } from "./useAdminMessages";
 
 // حالة "مقروء" و"محذوف" لكل تنبيه متخزنة محلياً على الجهاز (زي فكرة
@@ -97,9 +98,8 @@ export const useNotifications = () => {
   // utils/maintenanceAlerts.js for the full rationale). No Cloud Functions,
   // no push, nothing stored beyond the optional fields on equipment/jobs
   // already used to compute these.
-  const oilChangeAlerts = useMemo(() => checkOilChangeDue(equipment), [equipment]);
-  const greaseAlerts    = useMemo(() => checkGreaseDue(equipment), [equipment]);
-  const jobReminders    = useMemo(() => checkJobReminders(jobs), [jobs]);
+  const equipmentReminders = useMemo(() => checkEquipmentReminders(equipment), [equipment]);
+  const jobReminders       = useMemo(() => checkJobReminders(jobs), [jobs]);
 
   const notifications = useMemo(() => {
     const list = [];
@@ -182,33 +182,24 @@ export const useNotifications = () => {
       });
     });
 
-    // Oil-change-due alerts (usage-based, base equipment)
-    oilChangeAlerts.forEach(({ equipment: eq, dueAtMeter, currentMeter, over }) => {
-      list.push({
-        id:       `oil-due-${eq.id}`,
-        type:     "oil_change_due",
-        severity: "high",
-        title:    `${eq.name} — محتاجة غيار زيت`,
-        body:     `العداد وصل ${formatNumber(currentMeter)}، والغيار الجاي كان مفروض عند ${formatNumber(dueAtMeter)}${over > 0 ? ` (متجاوز بـ ${formatNumber(over)})` : ""}`,
-        date:     null,
-        actionLabel: "فتح المعدة",
-        actionPath:  `/equipment/${eq.id}`,
-      });
-    });
-
-    // Grease-due alerts (date-based, attachments) — staged by closeness.
-    greaseAlerts.forEach(({ equipment: eq, dueDate, daysUntil }) => {
+    // Equipment reminder-date alerts (date-based) — staged by closeness.
+    // Same field/logic for base equipment (oil change) and attachments
+    // (grease); only the wording differs by category.
+    equipmentReminders.forEach(({ equipment: eq, dueDate, daysUntil }) => {
       const overdue = daysUntil < 0;
+      const isAttachment = eq.category === EQUIPMENT_CATEGORY.ATTACHMENT;
+      const label = isAttachment ? "تشحيم" : "غيار زيت";
+      const verb  = isAttachment ? "يتشحم" : "يتغير زيته";
       list.push({
-        id:       `grease-due-${eq.id}`,
-        type:     "grease_due",
+        id:       `equip-reminder-${eq.id}`,
+        type:     "equipment_reminder_due",
         severity: overdue || daysUntil <= 1 ? "high" : "medium",
-        title:    `${eq.name} — موعد تشحيم ${overdue ? "متأخر" : "قريب"}`,
+        title:    `${eq.name} — موعد ${label} ${overdue ? "متأخر" : "قريب"}`,
         body:     overdue
-          ? `كان مفروض يتشحم في ${formatDateShort(dueDate)} (من ${Math.abs(daysUntil)} يوم)`
+          ? `كان مفروض ${verb} في ${formatDateShort(dueDate)} (من ${Math.abs(daysUntil)} يوم)`
           : daysUntil === 0
-            ? "موعد التشحيم النهاردة"
-            : `موعد التشحيم بعد ${daysUntil} يوم (${formatDateShort(dueDate)})`,
+            ? `موعد ${label} النهاردة`
+            : `موعد ${label} بعد ${daysUntil} يوم (${formatDateShort(dueDate)})`,
         date:     null,
         actionLabel: "فتح المعدة",
         actionPath:  `/equipment/${eq.id}`,
@@ -258,7 +249,7 @@ export const useNotifications = () => {
     return [...adminItems, ...sorted]
       .filter((n) => !hiddenSet.has(n.id))
       .map((n) => ({ ...n, read: readSet.has(n.id) }));
-  }, [debtAlerts, custody, custodyBalance, latestCustodyDate, salaryDuplicatesByDriver, drivers, orphanedPayments, orphanedSupplierPayments, oilChangeAlerts, greaseAlerts, jobReminders, adminMessages, dismiss, readSet, hiddenSet]);
+  }, [debtAlerts, custody, custodyBalance, latestCustodyDate, salaryDuplicatesByDriver, drivers, orphanedPayments, orphanedSupplierPayments, equipmentReminders, jobReminders, adminMessages, dismiss, readSet, hiddenSet]);
 
   const bump = () => setVersion((v) => v + 1);
 
