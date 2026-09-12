@@ -4,15 +4,15 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useSuppliers }  from "../hooks/useSuppliers";
 import { useData }       from "../contexts/DataContext";
 import SupplierPaymentForm from "../features/suppliers/SupplierPaymentForm";
-import EditInvoicePaidAmountDialog from "../features/suppliers/EditInvoicePaidAmountDialog";
+import DeleteSupplierInvoiceDialog from "../features/suppliers/DeleteSupplierInvoiceDialog";
 import Modal              from "../components/ui/Modal";
 import Button              from "../components/ui/Button";
 import DownloadReportButton from "../components/ui/DownloadReportButton";
 import { Input }           from "../components/ui/Input";
 import { Card, CardHeader, CardBody, SummaryRow, EmptyState, ProgressBar, Badge } from "../components/ui/Card";
 import LoadingScreen      from "../components/ui/LoadingScreen";
-import { formatCurrency, formatDateShort, todayISO } from "../utils/formatters";
-import { CalendarIcon, PlusIcon, EditIcon, PrintIcon } from "../components/ui/Icons";
+import { formatCurrency, formatDateShort } from "../utils/formatters";
+import { CalendarIcon, PlusIcon, EditIcon, PrintIcon, TrashIcon } from "../components/ui/Icons";
 import {
   printSupplierInvoice, downloadSupplierInvoicePdf,
   printSupplierStatement, downloadSupplierStatementPdf,
@@ -23,9 +23,9 @@ const SupplierDetailPage = () => {
   const navigate           = useNavigate();
   const decodedName        = decodeURIComponent(supplierName);
   const { getSupplierSummary, loading } = useSuppliers();
-  const { addSupplierPayment, renameSupplier, supplierPayments = [], settings } = useData();
+  const { addSupplierPayment, deleteSupplierInvoice, renameSupplier, supplierPayments = [], settings } = useData();
   const [payModal, setPayModal] = useState(null);
-  const [editModal, setEditModal] = useState(null); // { invoice, currentPaid }
+  const [deleteModal, setDeleteModal] = useState(null); // { invoice }
   const [renameModal, setRenameModal] = useState(false);
   const [renameValue, setRenameValue] = useState(decodedName);
   const [renaming, setRenaming] = useState(false);
@@ -41,19 +41,13 @@ const SupplierDetailPage = () => {
     setPayModal(null);
   };
 
-  // تعديل "إجمالي المدفوع" على فاتورة بعينها — مفيش رقم مخزّن نعدّله
-  // فعليًا (مفيش أصلاً، هو مجموع supplierPayments)، فالزيادة/الخصم اللي
-  // بيختاره المستخدم في الديالوج بتتسجل تحت السطح كدفعة بمبلغ الفرق
-  // (موجب أو سالب)، بنفس آلية أي دفعة عادية في البرنامج — بس من غير أي
-  // ملاحظة "تسوية" ظاهرة، عشان تفضل الواجهة بسيطة زي ما طلب.
-  const handleConfirmEditPaid = async (delta) => {
-    const inv = editModal?.invoice;
-    if (!inv || !delta) return;
-    await addSupplierPayment({
-      supplierInvoiceId: inv.id,
-      amount: delta,
-      date: todayISO(),
-    });
+  // حذف فاتورة مورد بالكامل — deleteSupplierInvoice بتمسح الفاتورة وكل
+  // الدفعات المرتبطة بيها في batch واحد ذرّي (راجع supplierMutations.js)،
+  // فمفيش أي حاجة يتيمة بتفضل بعد الحذف.
+  const handleConfirmDeleteInvoice = async () => {
+    const inv = deleteModal?.invoice;
+    if (!inv) return;
+    await deleteSupplierInvoice(inv.id);
   };
 
   // فاتورة عامة تجمع كل فواتير المورد في مستند واحد — نفس الإجماليات
@@ -195,11 +189,11 @@ const SupplierDetailPage = () => {
                         <PrintIcon size={13} />
                       </button>
                       <button
-                        onClick={() => setEditModal({ invoice: inv, currentPaid: inv.amountPaid })}
-                        title="تعديل إجمالي المدفوع"
-                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-transparent border border-white/10 text-gray-400 hover:text-gray-200 hover:bg-surface-2 transition-colors"
+                        onClick={() => setDeleteModal({ invoice: inv })}
+                        title="حذف الفاتورة"
+                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-transparent border border-white/10 text-gray-400 hover:text-red-400 hover:bg-surface-2 transition-colors"
                       >
-                        <EditIcon size={13} />
+                        <TrashIcon size={13} />
                       </button>
                       <DownloadReportButton onDownload={handleDownload} title="تحميل فاتورة PDF" size="xs" className="px-2" />
                     </div>
@@ -252,13 +246,15 @@ const SupplierDetailPage = () => {
         })()}
       </Modal>
 
-      {/* Edit "total paid" modal — password-gated, targets one invoice */}
-      <EditInvoicePaidAmountDialog
-        open={!!editModal}
-        onClose={() => setEditModal(null)}
-        invoice={editModal?.invoice}
-        currentPaid={editModal?.currentPaid || 0}
-        onConfirm={handleConfirmEditPaid}
+      {/* Delete invoice modal — password-gated, deletes the invoice + its
+          payments atomically (no orphaned records) */}
+      <DeleteSupplierInvoiceDialog
+        open={!!deleteModal}
+        onClose={() => setDeleteModal(null)}
+        invoiceDescription={deleteModal?.invoice?.description}
+        paymentsCount={deleteModal ? supplierPayments.filter((p) => p.supplierInvoiceId === deleteModal.invoice.id).length : 0}
+        paymentsTotal={deleteModal?.invoice?.amountPaid || 0}
+        onConfirm={handleConfirmDeleteInvoice}
       />
 
       {/* Rename modal — bulk-updates every invoice under this name, since
