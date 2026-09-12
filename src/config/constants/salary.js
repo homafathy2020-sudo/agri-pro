@@ -1,28 +1,29 @@
 // src/config/constants/salary.js
 
 // ─── Salary System ────────────────────────────────────────────────────────────
+// ملحوظة: نظام "السلف" (advance / advance_repay) اتشال بالكامل بطلب صريح —
+// كان بيتتبّع كمبلغ متبقي منفصل عن الراتب الشهري، وده اتلغى عشان يبسّط
+// حسابات الرواتب. أي مستند قديم في Firestore لسه فيه type="advance" أو
+// "advance_repay" (من حسابات مهاجَرة قبل كده عبر migrateDriverCosts.js)
+// مش بيتحذف ولا بيتلمس — بس دلوقتي بيتجاهله كل منطق الحساب (زي أي نوع قيد
+// غير معروف) وبيظهر في سجل القيود بالنص الخام بتاعه بدل تسمية جميلة، من
+// غير ما يأثر على أي رقم مالي.
 export const SALARY_ENTRY_TYPES = {
   BASE:      "base",       // الراتب الأساسي
   BONUS:     "bonus",      // حافز / زيادة
   DEDUCTION: "deduction",  // خصم
-  ADVANCE:   "advance",    // سلفة
-  ADVANCE_REPAY: "advance_repay", // سداد سلفة
 };
 
 export const SALARY_ENTRY_LABELS = {
   base:           "راتب أساسي",
   bonus:          "حافز / مكافأة",
   deduction:      "خصم",
-  advance:        "سلفة",
-  advance_repay:  "سداد سلفة",
 };
 
 export const SALARY_ENTRY_COLORS = {
   base:           "text-green-400",
   bonus:          "text-blue-400",
   deduction:      "text-red-400",
-  advance:        "text-amber-400",
-  advance_repay:  "text-purple-400",
 };
 
 export const DEDUCTION_REASONS = [

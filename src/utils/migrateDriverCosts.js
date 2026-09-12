@@ -13,7 +13,11 @@ import { SALARY_ENTRY_TYPES } from "../config/constants";
 const mapCostType = (type) => {
   switch (type) {
     case "راتب شهري": return { type: SALARY_ENTRY_TYPES.BASE,   reason: "" };
-    case "سلفة":       return { type: SALARY_ENTRY_TYPES.ADVANCE, reason: "" };
+    // "سلفة" (نظام السلف اتشال بالكامل — شوف constants/salary.js): أقرب
+    // معنى مالي باقٍ هو إنها مبلغ اتصرف فعلاً للسائق، فبتترحّل كـ"حافز"
+    // (BONUS) عشان تفضل بتزوّد صافي راتبه بنفس الاتجاه اللي كانت بيه قبل
+    // ما يتسجل أي سداد — قرار تقريبي واضح، مش استرجاع لمنطق السلف القديم.
+    case "سلفة":       return { type: SALARY_ENTRY_TYPES.BONUS, reason: "أخرى" };
     case "خصم":        return { type: SALARY_ENTRY_TYPES.DEDUCTION, reason: "أخرى" };
     case "بدل وقود":   return { type: SALARY_ENTRY_TYPES.BONUS, reason: "بدل وقود" };
     case "بدل سكن":    return { type: SALARY_ENTRY_TYPES.BONUS, reason: "بدل سكن" };

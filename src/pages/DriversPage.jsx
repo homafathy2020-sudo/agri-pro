@@ -80,7 +80,7 @@ const DriversPage = () => {
 
     const deductionsThisMonth = salaryEntries
       .filter((e) =>
-        (e.type === SALARY_ENTRY_TYPES.DEDUCTION || e.type === SALARY_ENTRY_TYPES.ADVANCE_REPAY) &&
+        e.type === SALARY_ENTRY_TYPES.DEDUCTION &&
         tabMemberIds.has(e.driverId) &&
         (e.date || "").startsWith(currentMonth)
       )
@@ -99,20 +99,7 @@ const DriversPage = () => {
 
     const remaining = Math.max(0, due - paid);
 
-    // إجمالي السلف والخصومات اللي اتسجلت لأعضاء التبويب الحالي الشهر ده —
-    // بيتحسب من قيود "سلفة" و"خصم" (وسداد السلف) مباشرة (مش محتاج "صرف
-    // راتب" رسمي عشان يظهر)، وبيرجع صفر أول كل شهر زي باقي المربعات.
-    const advancesThisMonth = salaryEntries
-      .filter((e) =>
-        e.type === SALARY_ENTRY_TYPES.ADVANCE &&
-        tabMemberIds.has(e.driverId) &&
-        (e.date || "").startsWith(currentMonth)
-      )
-      .reduce((s, e) => s + (Number(e.amount) || 0), 0);
-
-    const advancesAndDeductionsThisMonth = advancesThisMonth + deductionsThisMonth;
-
-    return { due, paid, remaining, advancesAndDeductionsThisMonth };
+    return { due, paid, remaining, deductionsThisMonth };
   }, [tabReport, tabMemberIds, salaryEntries, currentMonth]);
 
   const visibleDrivers = useMemo(() => {
@@ -241,7 +228,7 @@ const DriversPage = () => {
         <StatCard icon={<RevenueIcon size={24}/>} label="إجمالي رواتب الشهر المستحقة"  value={formatCurrency(salaryTotals.due)}       color="amber" sensitive/>
         <StatCard icon={<RevenueIcon size={24}/>} label="إجمالي الرواتب المصروفة"       value={formatCurrency(salaryTotals.paid)}      color="green" sensitive/>
         <StatCard icon={<RevenueIcon size={24}/>} label="إجمالي المتبقي"                value={formatCurrency(salaryTotals.remaining)} color={salaryTotals.remaining > 0 ? "amber" : "green"} sensitive/>
-        <StatCard icon={<WalletIcon size={24}/>}  label="إجمالي السلف والخصومات المنصرفة" value={formatCurrency(salaryTotals.advancesAndDeductionsThisMonth)} color="orange" sensitive/>
+        <StatCard icon={<WalletIcon size={24}/>}  label="إجمالي الخصومات هذا الشهر" value={formatCurrency(salaryTotals.deductionsThisMonth)} color="orange" sensitive/>
       </div>
 
       {/* Search + inactive toggle */}

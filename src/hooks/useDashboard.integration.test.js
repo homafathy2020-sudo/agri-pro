@@ -17,6 +17,16 @@
 //
 // If useDashboard.js's calculation is ever changed, this test must be
 // updated to match, and vice versa — keep the two in sync.
+//
+// One deliberate exception: useDashboard.js's top-level `totalSalaries` now
+// passes `{ assumeDueForMonth: <real current month> }` to calcTotalSalariesPaid
+// (see salaryCalculations.js) so a newly-added salaried driver counts
+// immediately, without waiting for a logged entry. This file's datasets are
+// all fixed historical dates unrelated to whatever "today" happens to be
+// when the suite runs, so mirroring that option here would make assertions
+// depend on the real system clock instead of the fixed mock data. The
+// assumeDueForMonth behavior itself is covered directly in
+// salaryCalculations.test.js and is intentionally NOT re-exercised here.
 
 import { aggregateJobs, aggregateSupplierInvoices } from "../utils/calculations";
 import { calcTotalSalariesPaid } from "../utils/salaryCalculations";
@@ -110,7 +120,7 @@ describe("dashboard pipeline: job creation -> payment -> debt/profit", () => {
     const maintenance = [{ cost: 400 }];
     const salaryEntries = [
       { type: SALARY_ENTRY_TYPES.BASE, amount: 1000 },
-      { type: SALARY_ENTRY_TYPES.ADVANCE, amount: 5000 }, // must NOT reduce profit (not a real expense yet)
+      { type: "advance", amount: 5000 }, // legacy/unmigrated doc type — must have zero financial effect
     ];
     const taxDeductions = [{ amount: 300 }];
     const supplierInvoices = [{ id: "inv1", amount: 1000 }];
@@ -122,7 +132,7 @@ describe("dashboard pipeline: job creation -> payment -> debt/profit", () => {
     });
 
     expect(result.totalMaintCost).toBe(400);
-    expect(result.totalSalaries).toBe(1000); // advance excluded
+    expect(result.totalSalaries).toBe(1000); // legacy "advance"-typed entry ignored
     expect(result.totalTaxDeductions).toBe(300);
     // Cash basis: only the 400 that actually left the bank counts as a
     // cost so far — the unpaid 600 is tracked separately as a debt, not
@@ -163,7 +173,7 @@ describe("dashboard pipeline: job creation -> payment -> debt/profit", () => {
       supplierInvoices: [], supplierPayments: [], fuelPrice: 15,
     });
 
-    // base(3000, from the driver fallback) + bonuses(0) - deductions(200) - advanceRepayments(0) = 2800
+    // base(3000, from the driver fallback) + bonuses(0) - deductions(200) = 2800
     expect(result.totalSalaries).toBe(2800);
     expect(result.netProfit).toBe(5000 - 2800);
 

@@ -2,33 +2,31 @@
 import {
   calcMonthlySalary,
   getMonthEntries,
-  calcOutstandingAdvances,
   calcTotalSalariesPaid,
   calcDailyRate,
   calcAttendanceSummary,
 } from "./salaryCalculations";
-import { SALARY_ENTRY_TYPES, MAX_MONEY_VALUE } from "../config/constants";
+import { SALARY_ENTRY_TYPES, MAX_MONEY_VALUE, DRIVER_STATUS } from "../config/constants";
 
 // ─── calcMonthlySalary ────────────────────────────────────────────────────────
 
 describe("calcMonthlySalary", () => {
-  test("sums base, bonus, deduction and advance-repayment entries", () => {
+  test("sums base, bonus and deduction entries", () => {
     const entries = [
       { type: SALARY_ENTRY_TYPES.BASE, amount: 3000 },
       { type: SALARY_ENTRY_TYPES.BONUS, amount: 500 },
       { type: SALARY_ENTRY_TYPES.DEDUCTION, amount: 200 },
-      { type: SALARY_ENTRY_TYPES.ADVANCE, amount: 1000 },
-      { type: SALARY_ENTRY_TYPES.ADVANCE_REPAY, amount: 300 },
     ];
     const result = calcMonthlySalary(entries, 3000);
 
     expect(result.base).toBe(3000);
     expect(result.bonuses).toBe(500);
     expect(result.deductions).toBe(200);
-    expect(result.advances).toBe(1000);
-    expect(result.advanceRepayments).toBe(300);
     expect(result.gross).toBe(3500);       // base + bonuses
-    expect(result.net).toBe(3000);         // gross - deductions - advanceRepayments
+    expect(result.net).toBe(3300);         // gross - deductions
+    // The removed "advance" concept must leave no trace on the result shape.
+    expect(result.advances).toBeUndefined();
+    expect(result.advanceRepayments).toBeUndefined();
   });
 
   test("falls back to the driver's default base salary when no BASE entry exists this month", () => {
@@ -52,13 +50,18 @@ describe("calcMonthlySalary", () => {
     expect(result.net).toBe(0);
   });
 
-  test("unrecognised entry types are ignored rather than throwing", () => {
-    const entries = [{ type: "unknown_type", amount: 999 }];
+  test("unrecognised entry types are ignored rather than throwing (covers legacy advance/advance_repay docs)", () => {
+    const entries = [
+      { type: "unknown_type", amount: 999 },
+      { type: "advance", amount: 1000 },        // legacy, unmigrated doc
+      { type: "advance_repay", amount: 300 },   // legacy, unmigrated doc
+    ];
     const result = calcMonthlySalary(entries, 1000);
-    // base falls back to default since no BASE entry was found; the unknown
-    // entry contributes to nothing
+    // base falls back to default since no BASE entry was found; none of the
+    // unrecognised entries contribute to anything.
     expect(result.base).toBe(1000);
     expect(result.gross).toBe(1000);
+    expect(result.net).toBe(1000);
   });
 });
 
@@ -74,27 +77,10 @@ describe("calcMonthlySalary — boundary values", () => {
     expect(result.gross).toBe(MAX_MONEY_VALUE);
   });
 
-  // Deduction + advance + advance-repayment together in the same month —
-  // the exact combined scenario the SC-2026-9114 review asked to confirm.
-  test("net salary is correct when deduction, advance and advance-repayment all land in the same month", () => {
-    const entries = [
-      { type: SALARY_ENTRY_TYPES.BASE, amount: 3000 },
-      { type: SALARY_ENTRY_TYPES.DEDUCTION, amount: 200 },   // e.g. absence
-      { type: SALARY_ENTRY_TYPES.ADVANCE, amount: 1000 },    // new advance taken
-      { type: SALARY_ENTRY_TYPES.ADVANCE_REPAY, amount: 500 }, // repaying an older advance
-    ];
-    const result = calcMonthlySalary(entries);
-    // net = gross(3000) - deductions(200) - advanceRepayments(500)
-    // the new advance itself does NOT reduce this month's net pay — it's
-    // money already handed out, tracked separately via calcOutstandingAdvances
-    expect(result.net).toBe(2300);
-    expect(result.advances).toBe(1000);
-  });
-
-  test("net salary can go negative when deductions/repayments exceed gross pay", () => {
+  test("net salary can go negative when deductions exceed gross pay", () => {
     const entries = [
       { type: SALARY_ENTRY_TYPES.BASE, amount: 500 },
-      { type: SALARY_ENTRY_TYPES.ADVANCE_REPAY, amount: 800 },
+      { type: SALARY_ENTRY_TYPES.DEDUCTION, amount: 800 },
     ];
     const result = calcMonthlySalary(entries);
     expect(result.net).toBe(-300);
@@ -121,39 +107,25 @@ describe("getMonthEntries", () => {
   });
 });
 
-// ─── calcOutstandingAdvances ──────────────────────────────────────────────────
-
-describe("calcOutstandingAdvances", () => {
-  test("advances minus repayments for that driver only", () => {
-    const entries = [
-      { driverId: "d1", type: SALARY_ENTRY_TYPES.ADVANCE, amount: 1000 },
-      { driverId: "d1", type: SALARY_ENTRY_TYPES.ADVANCE_REPAY, amount: 400 },
-      { driverId: "d2", type: SALARY_ENTRY_TYPES.ADVANCE, amount: 5000 }, // other driver
-    ];
-    expect(calcOutstandingAdvances(entries, "d1")).toBe(600);
-  });
-
-  test("never returns a negative balance when repayments exceed advances", () => {
-    const entries = [
-      { driverId: "d1", type: SALARY_ENTRY_TYPES.ADVANCE, amount: 200 },
-      { driverId: "d1", type: SALARY_ENTRY_TYPES.ADVANCE_REPAY, amount: 500 },
-    ];
-    expect(calcOutstandingAdvances(entries, "d1")).toBe(0);
-  });
-});
-
 // ─── calcTotalSalariesPaid ────────────────────────────────────────────────────
 
 describe("calcTotalSalariesPaid", () => {
-  test("nets BASE/BONUS against DEDUCTION/ADVANCE_REPAY; excludes ADVANCE", () => {
+  test("nets BASE/BONUS against DEDUCTION", () => {
     const entries = [
       { driverId: "d1", type: SALARY_ENTRY_TYPES.BASE, amount: 3000 },
       { driverId: "d2", type: SALARY_ENTRY_TYPES.BONUS, amount: 500 },
-      { driverId: "d1", type: SALARY_ENTRY_TYPES.ADVANCE, amount: 1000 }, // excluded (debt, not expense)
-      { driverId: "d1", type: SALARY_ENTRY_TYPES.DEDUCTION, amount: 200 }, // now subtracted
-      { driverId: "d2", type: SALARY_ENTRY_TYPES.ADVANCE_REPAY, amount: 300 }, // now subtracted
+      { driverId: "d1", type: SALARY_ENTRY_TYPES.DEDUCTION, amount: 200 },
     ];
-    // 3000 + 500 - 200 - 300 = 3000
+    // 3000 + 500 - 200 = 3300
+    expect(calcTotalSalariesPaid(entries)).toBe(3300);
+  });
+
+  test("ignores legacy advance/advance_repay-typed entries entirely (no financial effect)", () => {
+    const entries = [
+      { driverId: "d1", type: SALARY_ENTRY_TYPES.BASE, amount: 3000 },
+      { driverId: "d1", type: "advance", amount: 1000 },
+      { driverId: "d1", type: "advance_repay", amount: 300 },
+    ];
     expect(calcTotalSalariesPaid(entries)).toBe(3000);
   });
 
@@ -185,6 +157,50 @@ describe("calcTotalSalariesPaid", () => {
     const drivers = [{ id: "d1", salary: 3000 }];
     // May: 3000 (explicit BASE). June: 3000 (default) - 300 = 2700.
     expect(calcTotalSalariesPaid(entries, drivers)).toBe(3000 + 2700);
+  });
+
+  // ── options.assumeDueForMonth ────────────────────────────────────────────
+  // New behavior: a driver added with a salary but zero logged entries yet
+  // should still count for the CURRENT month when the caller opts in, so
+  // the live financial summary reflects them immediately.
+
+  test("assumeDueForMonth: an active salaried driver with zero entries counts their default base for that month", () => {
+    const drivers = [{ id: "d1", salary: 3000, status: DRIVER_STATUS.ACTIVE }];
+    expect(calcTotalSalariesPaid([], drivers, { assumeDueForMonth: "2026-09" })).toBe(3000);
+  });
+
+  test("assumeDueForMonth: without the option, the same zero-entry driver contributes nothing (old behavior preserved)", () => {
+    const drivers = [{ id: "d1", salary: 3000, status: DRIVER_STATUS.ACTIVE }];
+    expect(calcTotalSalariesPaid([], drivers)).toBe(0);
+  });
+
+  test("assumeDueForMonth: inactive drivers are excluded even with a salary set", () => {
+    const drivers = [{ id: "d1", salary: 3000, status: DRIVER_STATUS.INACTIVE }];
+    expect(calcTotalSalariesPaid([], drivers, { assumeDueForMonth: "2026-09" })).toBe(0);
+  });
+
+  test("assumeDueForMonth: drivers with no salary (0/unset) are excluded", () => {
+    const drivers = [
+      { id: "d1", salary: 0, status: DRIVER_STATUS.ACTIVE },
+      { id: "d2", status: DRIVER_STATUS.ACTIVE }, // salary unset
+    ];
+    expect(calcTotalSalariesPaid([], drivers, { assumeDueForMonth: "2026-09" })).toBe(0);
+  });
+
+  test("assumeDueForMonth: does not double-count a driver who already has real entries that month", () => {
+    const entries = [
+      { driverId: "d1", type: SALARY_ENTRY_TYPES.BASE, amount: 3500, date: "2026-09-01" },
+    ];
+    const drivers = [{ id: "d1", salary: 3000, status: DRIVER_STATUS.ACTIVE }];
+    // Real BASE entry (3500) wins — the assumption never overrides recorded data.
+    expect(calcTotalSalariesPaid(entries, drivers, { assumeDueForMonth: "2026-09" })).toBe(3500);
+  });
+
+  test("assumeDueForMonth: never assumed for a month other than the one passed in", () => {
+    const drivers = [{ id: "d1", salary: 3000, status: DRIVER_STATUS.ACTIVE }];
+    // Driver has zero entries in ANY month; only "2026-09" should be assumed.
+    const total = calcTotalSalariesPaid([], drivers, { assumeDueForMonth: "2026-09" });
+    expect(total).toBe(3000); // one assumed month only, not one per calendar month
   });
 });
 

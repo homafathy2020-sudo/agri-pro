@@ -189,7 +189,6 @@ const DriverDetailPage = () => {
               { label:"الحوافز والزيادات", value:formatCurrency(monthlySummary.bonuses),          color:"text-green-400" },
               { label:"الإجمالي",         value:formatCurrency(monthlySummary.gross),            color:"text-amber-400" },
               { label:"الخصومات",         value:formatCurrency(monthlySummary.deductions),       color:"text-red-400"   },
-              { label:"سداد السلف",       value:formatCurrency(monthlySummary.advanceRepayments),color:"text-red-400"   },
               { label:"صافي الراتب",      value:formatCurrency(monthlySummary.net),              color: monthlySummary.net >= 0 ? "text-green-400" : "text-red-400" },
             ].map((s) => (
               <div key={s.label} className="bg-surface-2 rounded-xl p-3">
@@ -227,11 +226,9 @@ const DriverDetailPage = () => {
                     </div>
                   </div>
                   <span className={`text-sm font-bold tabular-nums flex-shrink-0 ${
-                    e.type === SALARY_ENTRY_TYPES.DEDUCTION || e.type === SALARY_ENTRY_TYPES.ADVANCE_REPAY
-                      ? "text-red-400" : e.type === SALARY_ENTRY_TYPES.ADVANCE
-                      ? "text-amber-400" : "text-green-400"
+                    e.type === SALARY_ENTRY_TYPES.DEDUCTION ? "text-red-400" : "text-green-400"
                   }`}>
-                    {e.type === SALARY_ENTRY_TYPES.DEDUCTION || e.type === SALARY_ENTRY_TYPES.ADVANCE_REPAY
+                    {e.type === SALARY_ENTRY_TYPES.DEDUCTION
                       ? `- ${formatCurrency(e.amount)}`
                       : `+ ${formatCurrency(e.amount)}`
                     }

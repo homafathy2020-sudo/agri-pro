@@ -1,5 +1,5 @@
 // src/services/salaryService.js
-// Handles salary entries: base pay, bonuses, deductions, advances
+// Handles salary entries: base pay, bonuses, deductions
 import {
   collection, doc,
   setDoc, updateDoc, deleteDoc,

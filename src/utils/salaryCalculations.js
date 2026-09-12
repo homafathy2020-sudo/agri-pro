@@ -1,5 +1,5 @@
 // src/utils/salaryCalculations.js
-import { SALARY_ENTRY_TYPES } from "../config/constants";
+import { SALARY_ENTRY_TYPES, DRIVER_STATUS } from "../config/constants";
 
 /**
  * Calculate net salary for a driver in a specific month.
@@ -9,8 +9,6 @@ export const calcMonthlySalary = (entries, defaultBase = 0) => {
   let base      = 0;
   let bonuses   = 0;
   let deductions = 0;
-  let advances  = 0;
-  let advanceRepayments = 0;
   let hasBaseEntry = false;
 
   entries.forEach((e) => {
@@ -19,9 +17,7 @@ export const calcMonthlySalary = (entries, defaultBase = 0) => {
       case SALARY_ENTRY_TYPES.BASE:          base += amount; hasBaseEntry = true; break;
       case SALARY_ENTRY_TYPES.BONUS:         bonuses          += amount; break;
       case SALARY_ENTRY_TYPES.DEDUCTION:     deductions       += amount; break;
-      case SALARY_ENTRY_TYPES.ADVANCE:       advances         += amount; break;
-      case SALARY_ENTRY_TYPES.ADVANCE_REPAY: advanceRepayments += amount; break;
-      default: break;
+      default: break; // e.g. legacy "advance"/"advance_repay" entries — ignored, not deleted
     }
   });
 
@@ -31,9 +27,9 @@ export const calcMonthlySalary = (entries, defaultBase = 0) => {
   if (!hasBaseEntry) base = Number(defaultBase) || 0;
 
   const gross = base + bonuses;
-  const net   = gross - deductions - advanceRepayments;
+  const net   = gross - deductions;
 
-  return { base, bonuses, deductions, advances, advanceRepayments, gross, net };
+  return { base, bonuses, deductions, gross, net };
 };
 
 /**
@@ -45,35 +41,37 @@ export const getMonthEntries = (allEntries, driverId, yearMonth) =>
   );
 
 /**
- * Total outstanding advances for a driver (advances - repayments).
- */
-export const calcOutstandingAdvances = (allEntries, driverId) => {
-  const driverEntries = allEntries.filter((e) => e.driverId === driverId);
-  const totalAdvances = driverEntries
-    .filter((e) => e.type === SALARY_ENTRY_TYPES.ADVANCE)
-    .reduce((s, e) => s + (Number(e.amount) || 0), 0);
-  const totalRepaid = driverEntries
-    .filter((e) => e.type === SALARY_ENTRY_TYPES.ADVANCE_REPAY)
-    .reduce((s, e) => s + (Number(e.amount) || 0), 0);
-  return Math.max(0, totalAdvances - totalRepaid);
-};
-
-/**
  * Total salary paid to ALL drivers (for profit deduction).
- * Net cost = base + bonus - deductions - advanceRepayments, computed the
- * SAME way as calcMonthlySalary (grouped per driver per month, applying
- * each driver's default base salary when a month has no explicit BASE
- * entry). Without this grouping, a driver whose base is never logged
- * explicitly but who has a deduction/advance-repayment entry that month
- * would contribute a bare negative number with nothing to net it against,
- * which flips the sign of "مرتبات الفريق" and — because it's subtracted
- * from profit — makes net profit look artificially higher.
+ * Net cost = base + bonus - deductions, computed the SAME way as
+ * calcMonthlySalary (grouped per driver per month, applying each driver's
+ * default base salary when a month has no explicit BASE entry). Without
+ * this grouping, a driver whose base is never logged explicitly but who
+ * has a deduction entry that month would contribute a bare negative number
+ * with nothing to net it against, which flips the sign of "مرتبات الفريق"
+ * and — because it's subtracted from profit — makes net profit look
+ * artificially higher.
  *
  * `drivers` is optional (defaults to []) for backward-compat with existing
  * callers; without it, default-base fallback simply won't apply (same as
  * calcMonthlySalary with defaultBase = 0).
+ *
+ * `options.assumeDueForMonth` (a "YYYY-MM" string, optional): by default
+ * this function only counts a driver+month if at least one salaryEntries
+ * row exists for it — a driver added mid-month with a salary but zero
+ * entries yet contributes nothing at all for that month, anywhere,
+ * including a month that hasn't been touched yet. Pass the CURRENT
+ * calendar month here to also count every active, salaried driver's
+ * default base for THAT specific month even with zero entries, so a
+ * newly-added team member's cost shows up in the live financial summary
+ * immediately instead of waiting for a first salary/bonus/deduction entry.
+ * Never pass a past month here — a period you've already lived through
+ * should reflect what was actually recorded, not an assumption. That's why
+ * every other caller of this function (reports for a chosen period, the
+ * previous-month side of the dashboard comparison, PDF exports) omits it
+ * and keeps the exact old entries-only behavior.
  */
-export const calcTotalSalariesPaid = (allEntries, drivers = []) => {
+export const calcTotalSalariesPaid = (allEntries, drivers = [], options = {}) => {
+  const { assumeDueForMonth = null } = options;
   const driverById = new Map(drivers.map((d) => [d.id, d]));
 
   // Group entries by driver + month, same unit calcMonthlySalary works on.
@@ -84,6 +82,21 @@ export const calcTotalSalariesPaid = (allEntries, drivers = []) => {
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(e);
   });
+
+  // Make sure every active, salaried driver has at least an (empty) group
+  // for `assumeDueForMonth` — calcMonthlySalary already falls back to the
+  // driver's default base when a group has no BASE entry, so an empty
+  // group is enough to make their salary count for that one month.
+  // `d.status !== DRIVER_STATUS.INACTIVE` mirrors useDrivers.js's own
+  // active/inactive rule exactly (missing/undefined status = active).
+  if (assumeDueForMonth) {
+    drivers.forEach((d) => {
+      if (d.status === DRIVER_STATUS.INACTIVE) return;
+      if (!(Number(d.salary) > 0)) return;
+      const key = `${d.id}|${assumeDueForMonth}`;
+      if (!groups.has(key)) groups.set(key, []);
+    });
+  }
 
   let total = 0;
   groups.forEach((entries, key) => {

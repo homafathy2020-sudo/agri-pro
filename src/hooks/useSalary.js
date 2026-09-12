@@ -3,7 +3,6 @@ import { useMemo, useCallback } from "react";
 import { useData } from "../contexts/DataContext";
 import {
   calcMonthlySalary,
-  calcOutstandingAdvances,
   calcTotalSalariesPaid,
   getMonthEntries,
   calcAttendanceSummary,
@@ -35,11 +34,6 @@ export const useSalary = () => {
     [salaryEntries, drivers]
   );
 
-  const getOutstandingAdvances = useCallback(
-    (driverId) => calcOutstandingAdvances(salaryEntries, driverId),
-    [salaryEntries]
-  );
-
   const getAttendanceSummary = useCallback(
     (driverId, yearMonth) => calcAttendanceSummary(attendance, driverId, yearMonth),
     [attendance]
@@ -67,11 +61,10 @@ export const useSalary = () => {
   const currentMonthPayroll = useMemo(() =>
     drivers.map((drv) => {
       const summary   = getMonthSummary(drv.id, currentMonth);
-      const advances  = getOutstandingAdvances(drv.id);
       const attend    = getAttendanceSummary(drv.id, currentMonth);
-      return { driver: drv, ...summary, outstandingAdvances: advances, attendance: attend };
+      return { driver: drv, ...summary, attendance: attend };
     }),
-    [drivers, currentMonth, getMonthSummary, getOutstandingAdvances, getAttendanceSummary]
+    [drivers, currentMonth, getMonthSummary, getAttendanceSummary]
   );
 
   return {
@@ -83,7 +76,6 @@ export const useSalary = () => {
     loading,
     getDriverEntries,
     getMonthSummary,
-    getOutstandingAdvances,
     getAttendanceSummary,
     getDriverAttendance,
     addSalaryEntry,    updateSalaryEntry,    deleteSalaryEntry,

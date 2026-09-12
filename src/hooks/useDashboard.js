@@ -32,14 +32,21 @@ const monthPrefixOf = (date) =>
 const buildMonthFinancials = (monthPrefix, {
   jobs, maintenance, salaryEntries, taxDeductions,
   supplierInvoices, supplierPayments, drivers, fuelPrice, payments,
-}) => {
+}, { assumeSalaryDue = false } = {}) => {
   const inMonth = (d) => (d?.date || "").startsWith(monthPrefix);
 
   const { totalRevenue, totalFuelCost, totalAcres, totalFuel } = aggregateJobs(jobs.filter(inMonth), fuelPrice, payments);
   const totalMaintCost = maintenance
     .filter(inMonth)
     .reduce((s, m) => s + (Number(m.cost) || 0), 0);
-  const totalSalariesPaid = calcTotalSalariesPaid(salaryEntries.filter(inMonth), drivers);
+  // assumeSalaryDue بيتفعّل بس لما monthPrefix ده هو الشهر الحالي فعلاً
+  // (شوف مكان الاستدعاء تحت) — عشان سائق جديد اتضاف براتب يتحسب فورًا
+  // في ملخص الشهر الحالي، من غير ما يأثر على أي شهر سابق.
+  const totalSalariesPaid = calcTotalSalariesPaid(
+    salaryEntries.filter(inMonth),
+    drivers,
+    assumeSalaryDue ? { assumeDueForMonth: monthPrefix } : undefined
+  );
   const totalTaxDeductions = calcTotalTaxDeductions(taxDeductions.filter(inMonth));
   // Cash basis, scoped by payment date (not invoice date) — same idea as
   // ReportsPage's supplierPaidOutForPeriod.
@@ -75,9 +82,14 @@ export const useDashboard = () => {
     [maintenance]
   );
 
+  // الشهر الحالي بيتحسب بافتراض إن كل سائق نشط وله راتب مستحق عن الشهر
+  // ده حتى لو مفيش قيود اتسجّلت له لسه — عشان سائق جديد يظهر في الملخص
+  // المالي فورًا لحظة إضافته، مش لما تتسجل عليه أول عملية صرف. الشهور
+  // اللي فاتت مش بتتأثر لأن التاريخ الحالي بيتغيّر كل يوم.
+  const currentMonthPrefix = monthPrefixOf(new Date());
   const totalSalaries = useMemo(
-    () => calcTotalSalariesPaid(salaryEntries, drivers),
-    [salaryEntries, drivers]
+    () => calcTotalSalariesPaid(salaryEntries, drivers, { assumeDueForMonth: currentMonthPrefix }),
+    [salaryEntries, drivers, currentMonthPrefix]
   );
 
   const totalTaxDeductions = useMemo(
@@ -134,7 +146,7 @@ export const useDashboard = () => {
     const now = new Date();
     const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const ctx = { jobs, maintenance, salaryEntries, taxDeductions, supplierInvoices, supplierPayments, drivers, fuelPrice, payments };
-    const current  = buildMonthFinancials(monthPrefixOf(now), ctx);
+    const current  = buildMonthFinancials(monthPrefixOf(now), ctx, { assumeSalaryDue: true });
     const previous = buildMonthFinancials(monthPrefixOf(prevMonthDate), ctx);
     const pair = (curr, prev) => ({ current: curr, change: calcPercentChange(curr, prev) });
     return {
