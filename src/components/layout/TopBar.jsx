@@ -1,7 +1,6 @@
 // src/components/layout/TopBar.jsx
 import React from "react";
 import { useLocation } from "react-router-dom";
-import NotificationBell from "../../features/notifications/NotificationBell";
 import GlobalSearch     from "../../features/search/GlobalSearch";
 
 const TITLES = {
@@ -45,9 +44,6 @@ const TopBar = ({ onMenuToggle }) => {
 
       {/* Search — takes remaining space */}
       <GlobalSearch />
-
-      {/* Notification bell */}
-      <NotificationBell />
     </header>
   );
 };

@@ -22,7 +22,7 @@ import OnboardingChecklist from "../components/dashboard/OnboardingChecklist";
 import {
   RevenueIcon, AcreIcon, FuelIcon, ProfitIcon,
   TractorIcon, DriverIcon, ClipboardIcon, ChartIcon,
-  AlertIcon, StarIcon, WORK_TYPE_ICON_MAP,
+  AlertIcon, StarIcon, WORK_TYPE_ICON_MAP, ChevronLeftIcon,
 } from "../components/ui/Icons";
 import { formatCurrency, formatNumber, formatDateShort } from "../utils/formatters";
 import { calcRevenue, calcFuelCost, getJobFuelPrice, calcRemainingAmount, derivePaymentStatus, getJobPaidAmount } from "../utils/calculations";
@@ -91,10 +91,13 @@ const DashboardPage = () => {
 
   const { clients, totalDebt } = useClients();
   const { totalPayable } = useSuppliers();
-  // "تنبيهات هامة" — reuses the exact same derived alerts as the
-  // notification bell (useNotifications.js), so the two are always
-  // consistent; nothing new is fetched or computed here.
-  const { notifications: importantAlerts } = useNotifications();
+  // "تنبيهات هامة" — reuses the exact same derived alerts as the main
+  // /notifications page (useNotifications.js), so the two are always
+  // consistent; nothing new is fetched or computed here. Shows unread only
+  // — marking as read or deleting (from /notifications) removes it from
+  // here immediately since it's the same underlying list/localStorage.
+  const { notifications: allNotifications } = useNotifications();
+  const importantAlerts = allNotifications.filter((n) => !n.read);
   const totalCollected = clients.reduce((s, c) => s + c.totalPaid, 0);
   // صافي وضعك المالي = اللي ليك عند العملاء − اللي عليك للموردين.
   const netPosition = totalDebt - totalPayable;
@@ -205,25 +208,37 @@ const DashboardPage = () => {
 
         {/* ── تنبيهات هامة — smart-alerts Phase 1 ────────────────
             Purely derived from data already loaded (debts, custody, salary,
-            orphaned payments, admin messages, plus the new maintenance/
+            orphaned payments, admin messages, plus the maintenance/
             reminder-date alerts) via useNotifications.js — no new Firestore
-            reads, no push/backend. Shows the top few; the bell icon in the
-            header has the full list. Moved here (next to the alert strips)
-            so it fills the 1/3 column instead of sitting full-width below. */}
+            reads, no push/backend. Moved here (next to the alert strips) so
+            it fills the 1/3 column instead of sitting full-width below.
+            The list itself scrolls (capped height ≈ 3 rows) instead of
+            being sliced, and the arrow next to the count opens the full
+            /notifications page. */}
         <Card hover>
           <CardHeader
             title="تنبيهات هامة"
             actions={
-              importantAlerts.length > 0 && (
-                <span className="text-xs text-gray-500">{importantAlerts.length} تنبيه</span>
-              )
+              <div className="flex items-center gap-2">
+                {importantAlerts.length > 0 && (
+                  <span className="text-xs text-gray-500">{importantAlerts.length} تنبيه</span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => navigate("/notifications")}
+                  className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-500 hover:text-brand-400 hover:bg-surface-2 transition-colors"
+                  aria-label="عرض كل التنبيهات"
+                >
+                  <ChevronLeftIcon size={14} />
+                </button>
+              </div>
             }
           />
-          <CardBody className="space-y-2">
+          <CardBody className="space-y-2 max-h-44 overflow-y-auto">
             {importantAlerts.length === 0 ? (
               <p className="text-xs text-gray-500 text-center py-4">لا يوجد تنبيهات هامة حاليًا</p>
             ) : (
-              importantAlerts.slice(0, 5).map((n) => (
+              importantAlerts.map((n) => (
                 <div
                   key={n.id}
                   className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 transition-colors ${
