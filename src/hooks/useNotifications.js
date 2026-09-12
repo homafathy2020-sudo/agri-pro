@@ -31,6 +31,7 @@ export const useNotifications = () => {
   const {
     jobs, payments, settings, custody, salaryEntries = [], drivers = [],
     supplierInvoices = [], supplierPayments = [], equipment = [], loading,
+    backupFailCount = 0,
   } = useData();
   const { user } = useAuth();
   const { messages: adminMessages, loading: adminLoading, dismiss } = useAdminMessages();
@@ -182,6 +183,26 @@ export const useNotifications = () => {
       });
     });
 
+    // Automatic daily backup failing repeatedly — same signal and same
+    // threshold (>=2 consecutive failures) OfflineBanner.jsx already shows
+    // as a persistent red banner; surfacing it here too means "تذكير بعمل
+    // نسخة" shows up in the same actionable feed as every other alert,
+    // taking the owner straight to where a backup can be made/retried
+    // instead of just sitting in a banner he might dismiss/scroll past.
+    if (backupFailCount >= 2) {
+      list.push({
+        id:       "backup-failing",
+        type:     "backup_failing",
+        severity: "high",
+        title:    "النسخ الاحتياطي التلقائي متوقف",
+        body:     `فشل ${backupFailCount} مرات على التوالي — بياناتك محفوظة عادي، بس محتاج تعمل نسخة يدوية لحد ما يترجع يشتغل`,
+        date:     null,
+        actionLabel: "فتح النسخ الاحتياطي",
+        actionPath:  "/profile",
+        actionState: { tab: "backup" },
+      });
+    }
+
     // Oil-change-due alerts (usage-based, base equipment)
     oilChangeAlerts.forEach(({ equipment: eq, dueAtMeter, currentMeter, over }) => {
       list.push({
@@ -258,7 +279,7 @@ export const useNotifications = () => {
     return [...adminItems, ...sorted]
       .filter((n) => !hiddenSet.has(n.id))
       .map((n) => ({ ...n, read: readSet.has(n.id) }));
-  }, [debtAlerts, custody, custodyBalance, latestCustodyDate, salaryDuplicatesByDriver, drivers, orphanedPayments, orphanedSupplierPayments, oilChangeAlerts, greaseAlerts, jobReminders, adminMessages, dismiss, readSet, hiddenSet]);
+  }, [debtAlerts, custody, custodyBalance, latestCustodyDate, salaryDuplicatesByDriver, drivers, orphanedPayments, orphanedSupplierPayments, backupFailCount, oilChangeAlerts, greaseAlerts, jobReminders, adminMessages, dismiss, readSet, hiddenSet]);
 
   const bump = () => setVersion((v) => v + 1);
 

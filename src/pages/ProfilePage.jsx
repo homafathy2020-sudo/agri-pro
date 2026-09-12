@@ -12,6 +12,7 @@
 // واحدة ← صفحة بتبويبات)، مش أي حاجة جوه الأقسام نفسها. ده اللي بيخلي
 // المعمارية مبسطة: تعديل واجهة بحت، بدون تكرار أي كود أو حساب.
 import React, { useState } from "react";
+import { useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useData } from "../contexts/DataContext";
 import IdentityHeader from "../features/profile/IdentityHeader";
@@ -36,7 +37,11 @@ const TABS = [
 const ProfilePage = () => {
   const { user } = useAuth();
   const { settings, saveSettings } = useData();
-  const [tab, setTab] = useState("billing");
+  // بيدعم فتح تاب معين مباشرة (زي تنبيه "النسخ الاحتياطي متوقف" اللي بيودّي
+  // هنا على تاب "النسخ الاحتياطي" تحديدًا) عبر navigate("/profile", { state:
+  // { tab: "..." } }) — لو مفيش state، بيفتح على "الاشتراك" زي ما كان.
+  const location = useLocation();
+  const [tab, setTab] = useState(location.state?.tab || "billing");
 
   // نفس فكرة RestoreModal/ImportModal في ProfileModal.jsx القديمة —
   // البيبقوا sibling للتاب المفتوح، مش جوه BackupSection/LocalExportSection
