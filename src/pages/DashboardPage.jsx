@@ -136,65 +136,114 @@ const DashboardPage = () => {
           change={monthlyComparison.netProfit.change}/>
       </div>
 
-      {/* ── Debt alert ─────────────────────────────────────── */}
-      {totalDebt > 0 && (
-        <div
-          className="flex items-center justify-between gap-4 bg-amber-900/20 border border-amber-800/40 rounded-2xl px-5 py-3.5 cursor-pointer hover:bg-amber-900/30 transition-colors"
-          onClick={() => navigate("/clients")}
-        >
-          <div className="flex items-center gap-3">
-            <AlertIcon size={18} className="text-amber-400 flex-shrink-0"/>
-            <div>
-              <p className="text-sm font-bold text-amber-300">مستحقات غير محصّلة</p>
-              <p className="text-xs text-amber-500/80 mt-0.5">
-                {clients.filter(c=>c.totalRemaining>0).length} عميل لديهم ديون
-              </p>
-            </div>
-          </div>
-          <span
-            className="text-base font-extrabold text-amber-400 tabular-nums flex-shrink-0 transition-[filter] duration-300"
-            style={{ filter: isPrivate ? "blur(6px)" : "none", userSelect: isPrivate ? "none" : "auto" }}
-          >
-            {formatCurrency(totalDebt)}
-          </span>
-        </div>
-      )}
+      {/* ── Alert strips + Important alerts — same 2/3 · 1/3 split as the
+          chart/summary row below, so the strips no longer stretch full
+          page width. ─────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
-      {/* ── Supplier payable alert ─────────────────────────── */}
-      {totalPayable > 0 && (
-        <div
-          className="flex items-center justify-between gap-4 bg-red-900/20 border border-red-800/40 rounded-2xl px-5 py-3.5 cursor-pointer hover:bg-red-900/30 transition-colors"
-          onClick={() => navigate("/suppliers")}
-        >
-          <div className="flex items-center gap-3">
-            <AlertIcon size={18} className="text-red-400 flex-shrink-0"/>
-            <div>
-              <p className="text-sm font-bold text-red-300">مستحقات عليك للموردين</p>
-              <p className="text-xs text-red-500/80 mt-0.5">اضغط لعرض التفاصيل</p>
+        <div className="lg:col-span-2 space-y-3">
+          {/* ── Debt alert ─────────────────────────────────── */}
+          {totalDebt > 0 && (
+            <div
+              className="flex items-center justify-between gap-4 bg-amber-900/20 border border-amber-800/40 rounded-2xl px-5 py-3.5 cursor-pointer hover:bg-amber-900/30 transition-colors"
+              onClick={() => navigate("/clients")}
+            >
+              <div className="flex items-center gap-3">
+                <AlertIcon size={18} className="text-amber-400 flex-shrink-0"/>
+                <div>
+                  <p className="text-sm font-bold text-amber-300">مستحقات غير محصّلة</p>
+                  <p className="text-xs text-amber-500/80 mt-0.5">
+                    {clients.filter(c=>c.totalRemaining>0).length} عميل لديهم ديون
+                  </p>
+                </div>
+              </div>
+              <span
+                className="text-base font-extrabold text-amber-400 tabular-nums flex-shrink-0 transition-[filter] duration-300"
+                style={{ filter: isPrivate ? "blur(6px)" : "none", userSelect: isPrivate ? "none" : "auto" }}
+              >
+                {formatCurrency(totalDebt)}
+              </span>
             </div>
-          </div>
-          <span
-            className="text-base font-extrabold text-red-400 tabular-nums flex-shrink-0 transition-[filter] duration-300"
-            style={{ filter: isPrivate ? "blur(6px)" : "none", userSelect: isPrivate ? "none" : "auto" }}
-          >
-            {formatCurrency(totalPayable)}
-          </span>
-        </div>
-      )}
+          )}
 
-      {/* ── Net financial position: what clients owe you minus what you
-          owe suppliers — the number neither side alone can show. ────── */}
-      {(totalDebt > 0 || totalPayable > 0) && (
-        <div className="flex items-center justify-between gap-4 bg-surface border border-white/8 rounded-2xl px-5 py-3.5">
-          <p className="text-sm font-bold text-gray-300">صافي وضعك المالي (ليك − عليك)</p>
-          <span
-            className={`text-base font-extrabold tabular-nums flex-shrink-0 transition-[filter] duration-300 ${netPosition >= 0 ? "text-green-400" : "text-red-400"}`}
-            style={{ filter: isPrivate ? "blur(6px)" : "none", userSelect: isPrivate ? "none" : "auto" }}
-          >
-            {formatCurrency(netPosition)}
-          </span>
+          {/* ── Supplier payable alert ─────────────────────── */}
+          {totalPayable > 0 && (
+            <div
+              className="flex items-center justify-between gap-4 bg-red-900/20 border border-red-800/40 rounded-2xl px-5 py-3.5 cursor-pointer hover:bg-red-900/30 transition-colors"
+              onClick={() => navigate("/suppliers")}
+            >
+              <div className="flex items-center gap-3">
+                <AlertIcon size={18} className="text-red-400 flex-shrink-0"/>
+                <div>
+                  <p className="text-sm font-bold text-red-300">مستحقات عليك للموردين</p>
+                  <p className="text-xs text-red-500/80 mt-0.5">اضغط لعرض التفاصيل</p>
+                </div>
+              </div>
+              <span
+                className="text-base font-extrabold text-red-400 tabular-nums flex-shrink-0 transition-[filter] duration-300"
+                style={{ filter: isPrivate ? "blur(6px)" : "none", userSelect: isPrivate ? "none" : "auto" }}
+              >
+                {formatCurrency(totalPayable)}
+              </span>
+            </div>
+          )}
+
+          {/* ── Net financial position: what clients owe you minus what you
+              owe suppliers — the number neither side alone can show. ── */}
+          {(totalDebt > 0 || totalPayable > 0) && (
+            <div className="flex items-center justify-between gap-4 bg-surface border border-white/8 rounded-2xl px-5 py-3.5">
+              <p className="text-sm font-bold text-gray-300">صافي وضعك المالي (ليك − عليك)</p>
+              <span
+                className={`text-base font-extrabold tabular-nums flex-shrink-0 transition-[filter] duration-300 ${netPosition >= 0 ? "text-green-400" : "text-red-400"}`}
+                style={{ filter: isPrivate ? "blur(6px)" : "none", userSelect: isPrivate ? "none" : "auto" }}
+              >
+                {formatCurrency(netPosition)}
+              </span>
+            </div>
+          )}
         </div>
-      )}
+
+        {/* ── تنبيهات هامة — smart-alerts Phase 1 ────────────────
+            Purely derived from data already loaded (debts, custody, salary,
+            orphaned payments, admin messages, plus the new maintenance/
+            reminder-date alerts) via useNotifications.js — no new Firestore
+            reads, no push/backend. Shows the top few; the bell icon in the
+            header has the full list. Moved here (next to the alert strips)
+            so it fills the 1/3 column instead of sitting full-width below. */}
+        <Card hover>
+          <CardHeader
+            title="تنبيهات هامة"
+            actions={
+              importantAlerts.length > 0 && (
+                <span className="text-xs text-gray-500">{importantAlerts.length} تنبيه</span>
+              )
+            }
+          />
+          <CardBody className="space-y-2">
+            {importantAlerts.length === 0 ? (
+              <p className="text-xs text-gray-500 text-center py-4">لا يوجد تنبيهات هامة حاليًا</p>
+            ) : (
+              importantAlerts.slice(0, 5).map((n) => (
+                <div
+                  key={n.id}
+                  className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 transition-colors ${
+                    n.actionPath ? "cursor-pointer hover:bg-surface-2" : ""
+                  }`}
+                  onClick={() => n.actionPath && navigate(n.actionPath)}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${n.severity === "high" ? "bg-red-500" : "bg-amber-500"}`} />
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-gray-200 truncate">{n.title}</p>
+                      <p className="text-[11px] text-gray-500 truncate">{n.body}</p>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </CardBody>
+        </Card>
+      </div>
 
       {/* ── Area chart + Financial summary ─────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -302,46 +351,6 @@ const DashboardPage = () => {
           </CardBody>
         </Card>
       </div>
-
-      {/* ── تنبيهات هامة — smart-alerts Phase 1 ──────────────
-          Purely derived from data already loaded (debts, custody, salary,
-          orphaned payments, admin messages, plus the new maintenance/
-          reminder-date alerts) via useNotifications.js — no new Firestore
-          reads, no push/backend. Shows the top few; the bell icon in the
-          header has the full list. */}
-      <Card hover className="mb-4">
-        <CardHeader
-          title="تنبيهات هامة"
-          actions={
-            importantAlerts.length > 0 && (
-              <span className="text-xs text-gray-500">{importantAlerts.length} تنبيه</span>
-            )
-          }
-        />
-        <CardBody className="space-y-2">
-          {importantAlerts.length === 0 ? (
-            <p className="text-xs text-gray-500 text-center py-4">لا يوجد تنبيهات هامة حاليًا</p>
-          ) : (
-            importantAlerts.slice(0, 5).map((n) => (
-              <div
-                key={n.id}
-                className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 transition-colors ${
-                  n.actionPath ? "cursor-pointer hover:bg-surface-2" : ""
-                }`}
-                onClick={() => n.actionPath && navigate(n.actionPath)}
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${n.severity === "high" ? "bg-red-500" : "bg-amber-500"}`} />
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-gray-200 truncate">{n.title}</p>
-                    <p className="text-[11px] text-gray-500 truncate">{n.body}</p>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </CardBody>
-      </Card>
 
       {/* ── Top Debtors ───────────────────────────────────── */}
       {topDebtors.length > 0 && (
