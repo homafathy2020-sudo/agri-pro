@@ -10,6 +10,7 @@ import {
 import { useDashboard }  from "../hooks/useDashboard";
 import { useClients }    from "../hooks/useClients";
 import { useSuppliers }  from "../hooks/useSuppliers";
+import { useNotifications } from "../hooks/useNotifications";
 import { usePrivacy }    from "../contexts/PrivacyContext";
 import { StatCard, Card, CardHeader, CardBody, SummaryRow, EmptyState } from "../components/ui/Card";
 import { ChartCard } from "../components/ui/ChartCard";
@@ -90,6 +91,10 @@ const DashboardPage = () => {
 
   const { clients, totalDebt } = useClients();
   const { totalPayable } = useSuppliers();
+  // "تنبيهات هامة" — reuses the exact same derived alerts as the
+  // notification bell (useNotifications.js), so the two are always
+  // consistent; nothing new is fetched or computed here.
+  const { notifications: importantAlerts } = useNotifications();
   const totalCollected = clients.reduce((s, c) => s + c.totalPaid, 0);
   // صافي وضعك المالي = اللي ليك عند العملاء − اللي عليك للموردين.
   const netPosition = totalDebt - totalPayable;
@@ -297,6 +302,46 @@ const DashboardPage = () => {
           </CardBody>
         </Card>
       </div>
+
+      {/* ── تنبيهات هامة — smart-alerts Phase 1 ──────────────
+          Purely derived from data already loaded (debts, custody, salary,
+          orphaned payments, admin messages, plus the new maintenance/
+          reminder-date alerts) via useNotifications.js — no new Firestore
+          reads, no push/backend. Shows the top few; the bell icon in the
+          header has the full list. */}
+      <Card hover className="mb-4">
+        <CardHeader
+          title="تنبيهات هامة"
+          actions={
+            importantAlerts.length > 0 && (
+              <span className="text-xs text-gray-500">{importantAlerts.length} تنبيه</span>
+            )
+          }
+        />
+        <CardBody className="space-y-2">
+          {importantAlerts.length === 0 ? (
+            <p className="text-xs text-gray-500 text-center py-4">لا يوجد تنبيهات هامة حاليًا</p>
+          ) : (
+            importantAlerts.slice(0, 5).map((n) => (
+              <div
+                key={n.id}
+                className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 transition-colors ${
+                  n.actionPath ? "cursor-pointer hover:bg-surface-2" : ""
+                }`}
+                onClick={() => n.actionPath && navigate(n.actionPath)}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${n.severity === "high" ? "bg-red-500" : "bg-amber-500"}`} />
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-gray-200 truncate">{n.title}</p>
+                    <p className="text-[11px] text-gray-500 truncate">{n.body}</p>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </CardBody>
+      </Card>
 
       {/* ── Top Debtors ───────────────────────────────────── */}
       {topDebtors.length > 0 && (

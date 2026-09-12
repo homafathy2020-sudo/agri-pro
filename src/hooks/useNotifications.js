@@ -6,7 +6,8 @@ import { checkOverdueDebts } from "../utils/calculations";
 import { findDuplicateSalaryEntries } from "../utils/findDuplicateSalaryEntries";
 import { findOrphanedPayments, findOrphanedSupplierPayments } from "../utils/findOrphanedPayments";
 import { calcCustodyBalance } from "../utils/custodyCalculations";
-import { formatCurrency } from "../utils/formatters";
+import { checkOilChangeDue, checkGreaseDue, checkJobReminders } from "../utils/maintenanceAlerts";
+import { formatCurrency, formatNumber, formatDateShort } from "../utils/formatters";
 import { useAdminMessages } from "./useAdminMessages";
 
 // حالة "مقروء" و"محذوف" لكل تنبيه متخزنة محلياً على الجهاز (زي فكرة
@@ -29,7 +30,7 @@ const saveSet = (key, set) => localStorage.setItem(key, JSON.stringify([...set])
 export const useNotifications = () => {
   const {
     jobs, payments, settings, custody, salaryEntries = [], drivers = [],
-    supplierInvoices = [], supplierPayments = [], loading,
+    supplierInvoices = [], supplierPayments = [], equipment = [], loading,
   } = useData();
   const { user } = useAuth();
   const { messages: adminMessages, loading: adminLoading, dismiss } = useAdminMessages();
@@ -90,6 +91,15 @@ export const useNotifications = () => {
     () => findOrphanedSupplierPayments(supplierInvoices, supplierPayments),
     [supplierInvoices, supplierPayments]
   );
+
+  // "تنبيهات هامة" — Phase 1 of the smart-alerts feature: purely derived
+  // from equipment/job fields the user fills in themselves (see
+  // utils/maintenanceAlerts.js for the full rationale). No Cloud Functions,
+  // no push, nothing stored beyond the optional fields on equipment/jobs
+  // already used to compute these.
+  const oilChangeAlerts = useMemo(() => checkOilChangeDue(equipment), [equipment]);
+  const greaseAlerts    = useMemo(() => checkGreaseDue(equipment), [equipment]);
+  const jobReminders    = useMemo(() => checkJobReminders(jobs), [jobs]);
 
   const notifications = useMemo(() => {
     const list = [];
@@ -172,6 +182,58 @@ export const useNotifications = () => {
       });
     });
 
+    // Oil-change-due alerts (usage-based, base equipment)
+    oilChangeAlerts.forEach(({ equipment: eq, dueAtMeter, currentMeter, over }) => {
+      list.push({
+        id:       `oil-due-${eq.id}`,
+        type:     "oil_change_due",
+        severity: "high",
+        title:    `${eq.name} — محتاجة غيار زيت`,
+        body:     `العداد وصل ${formatNumber(currentMeter)}، والغيار الجاي كان مفروض عند ${formatNumber(dueAtMeter)}${over > 0 ? ` (متجاوز بـ ${formatNumber(over)})` : ""}`,
+        date:     null,
+        actionLabel: "فتح المعدة",
+        actionPath:  `/equipment/${eq.id}`,
+      });
+    });
+
+    // Grease-due alerts (date-based, attachments) — staged by closeness.
+    greaseAlerts.forEach(({ equipment: eq, dueDate, daysUntil }) => {
+      const overdue = daysUntil < 0;
+      list.push({
+        id:       `grease-due-${eq.id}`,
+        type:     "grease_due",
+        severity: overdue || daysUntil <= 1 ? "high" : "medium",
+        title:    `${eq.name} — موعد تشحيم ${overdue ? "متأخر" : "قريب"}`,
+        body:     overdue
+          ? `كان مفروض يتشحم في ${formatDateShort(dueDate)} (من ${Math.abs(daysUntil)} يوم)`
+          : daysUntil === 0
+            ? "موعد التشحيم النهاردة"
+            : `موعد التشحيم بعد ${daysUntil} يوم (${formatDateShort(dueDate)})`,
+        date:     null,
+        actionLabel: "فتح المعدة",
+        actionPath:  `/equipment/${eq.id}`,
+      });
+    });
+
+    // Job/debt reminder-date alerts — staged the same way as grease alerts.
+    jobReminders.forEach(({ job, dueDate, daysUntil }) => {
+      const overdue = daysUntil < 0;
+      list.push({
+        id:       `job-reminder-${job.id}`,
+        type:     "job_reminder_due",
+        severity: overdue || daysUntil <= 1 ? "high" : "medium",
+        title:    `${job.client} — تذكير ${overdue ? "متأخر" : "قريب"}`,
+        body:     overdue
+          ? `كان مفروض تتابع مع العميل في ${formatDateShort(dueDate)} (من ${Math.abs(daysUntil)} يوم)`
+          : daysUntil === 0
+            ? "التذكير النهاردة"
+            : `التذكير بعد ${daysUntil} يوم (${formatDateShort(dueDate)})`,
+        date:     null,
+        actionLabel: "عرض العميل",
+        actionPath:  `/clients/${encodeURIComponent(job.client)}`,
+      });
+    });
+
     // Admin broadcast/targeted messages — دايماً فوق كل حاجة تانية،
     // بترتيبها هي بالتاريخ (الأحدث الأول)، مش متدمجة مع ترتيب severity
     // بتاع باقي التنبيهات عشان تفضل واضحة إنها من الإدارة.
@@ -196,7 +258,7 @@ export const useNotifications = () => {
     return [...adminItems, ...sorted]
       .filter((n) => !hiddenSet.has(n.id))
       .map((n) => ({ ...n, read: readSet.has(n.id) }));
-  }, [debtAlerts, custody, custodyBalance, latestCustodyDate, salaryDuplicatesByDriver, drivers, orphanedPayments, orphanedSupplierPayments, adminMessages, dismiss, readSet, hiddenSet]);
+  }, [debtAlerts, custody, custodyBalance, latestCustodyDate, salaryDuplicatesByDriver, drivers, orphanedPayments, orphanedSupplierPayments, oilChangeAlerts, greaseAlerts, jobReminders, adminMessages, dismiss, readSet, hiddenSet]);
 
   const bump = () => setVersion((v) => v + 1);
 

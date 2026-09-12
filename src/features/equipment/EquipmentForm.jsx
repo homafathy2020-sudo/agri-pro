@@ -24,6 +24,8 @@ const buildDefaultValues = (initial) => {
       parentEquipmentId:   "",
       customParentName:    "",
       status:              "active",
+      oilChangeIntervalMeter: "",
+      greaseIntervalDays:     "",
     };
   }
   const driverIsOther = !initial.driverId && !!initial.customDriverName;
@@ -118,6 +120,12 @@ const EquipmentForm = ({ initial, drivers, baseEquipment = [], onSave, onClose }
       // unchanged so a basic-info edit here never wipes it out.
       payload.lastGreaseDate = initial?.lastGreaseDate || "";
       payload.greaseHistory  = initial?.greaseHistory || [];
+      // Smart-alerts (Phase 1): optional grease interval — how many days
+      // between one greasing and the next. Oil-change fields don't apply
+      // to attachments, so they're cleared like the rest of that branch.
+      payload.greaseIntervalDays     = data.greaseIntervalDays === "" ? "" : Number(data.greaseIntervalDays) || "";
+      payload.oilChangeIntervalMeter = "";
+      payload.currentMeter            = "";
     } else {
       payload.fuelRate           = Number(data.fuelRate) || 0;
       payload.parentEquipmentId  = "";
@@ -128,6 +136,13 @@ const EquipmentForm = ({ initial, drivers, baseEquipment = [], onSave, onClose }
       // the existing log through unchanged.
       payload.lastOilChangeMeter = initial?.lastOilChangeMeter ?? "";
       payload.oilChangeHistory   = initial?.oilChangeHistory || [];
+      // Smart-alerts (Phase 1): optional interval (كل قد إيه بالعداد) —
+      // `currentMeter` itself is updated from the equipment detail page
+      // (frequent, quick action), not this form, so it's just carried
+      // through unchanged here like the history log above.
+      payload.oilChangeIntervalMeter = data.oilChangeIntervalMeter === "" ? "" : Number(data.oilChangeIntervalMeter) || "";
+      payload.currentMeter            = initial?.currentMeter ?? "";
+      payload.greaseIntervalDays      = "";
     }
 
     await onSave(payload);
@@ -278,6 +293,43 @@ const EquipmentForm = ({ initial, drivers, baseEquipment = [], onSave, onClose }
                 label="معدل استهلاك الوقود (لتر/ساعة)"
                 placeholder="0"
                 error={errors.fuelRate?.message}
+                {...field}
+              />
+            )}
+          />
+        )}
+
+        {/* Smart-alerts (Phase 1) — optional oil-change interval. Purely
+            client-side, no push/backend: see utils/maintenanceAlerts.js.
+            `currentMeter` (the live reading) is updated from the equipment
+            detail page, not here — this is a one-time setup value. */}
+        {!isAttachment && (
+          <Controller
+            name="oilChangeIntervalMeter"
+            control={control}
+            rules={{ validate: (v) => !v || Number(v) > 0 || "لازم يكون رقم أكبر من صفر" }}
+            render={({ field }) => (
+              <NumberInput
+                label="كل قد إيه (بالعداد) يتغير الزيت"
+                placeholder="مثال: 250"
+                error={errors.oilChangeIntervalMeter?.message}
+                {...field}
+              />
+            )}
+          />
+        )}
+
+        {/* Smart-alerts (Phase 1) — optional grease interval, in days. */}
+        {isAttachment && (
+          <Controller
+            name="greaseIntervalDays"
+            control={control}
+            rules={{ validate: (v) => !v || Number(v) > 0 || "لازم يكون رقم أكبر من صفر" }}
+            render={({ field }) => (
+              <NumberInput
+                label="كل قد إيه (بالأيام) تتشحم"
+                placeholder="مثال: 30"
+                error={errors.greaseIntervalDays?.message}
                 {...field}
               />
             )}

@@ -6,9 +6,11 @@ import { useData }       from "../contexts/DataContext";
 import PaymentBadge      from "../features/clients/PaymentBadge";
 import PaymentForm       from "../features/payments/PaymentForm";
 import Modal              from "../components/ui/Modal";
+import { Input }          from "../components/ui/Input";
+import Button              from "../components/ui/Button";
 import { Card, CardHeader, CardBody, SummaryRow, EmptyState, ProgressBar } from "../components/ui/Card";
 import LoadingScreen     from "../components/ui/LoadingScreen";
-import { formatCurrency, formatNumber, formatDateShort } from "../utils/formatters";
+import { formatCurrency, formatNumber, formatDateShort, todayISO } from "../utils/formatters";
 import { AcreIcon, CalendarIcon, TractorIcon, PlusIcon } from "../components/ui/Icons";
 
 const ClientDetailPage = () => {
@@ -16,8 +18,14 @@ const ClientDetailPage = () => {
   const navigate        = useNavigate();
   const decodedName     = decodeURIComponent(clientName);
   const { getClientSummary, loading } = useClients();
-  const { equipment, addPayment } = useData();
+  const { equipment, addPayment, updateJob, jobs: rawJobs } = useData();
   const [payModal, setPayModal] = useState(null);
+  // Smart-alerts (Phase 1) — optional reminder date per job (e.g. a debt
+  // follow-up). Purely an additive field on the job doc; the actual "is it
+  // due soon" logic lives in utils/maintenanceAlerts.js and feeds the
+  // existing notification bell + dashboard "تنبيهات هامة" card.
+  const [reminderModal, setReminderModal] = useState(null); // job | null
+  const [reminderDraft, setReminderDraft] = useState("");
 
   if (loading) return <LoadingScreen />;
 
@@ -29,6 +37,24 @@ const ClientDetailPage = () => {
   const handleSavePayment = async (data) => {
     await addPayment(data);
     setPayModal(null);
+  };
+
+  // `jobs` in this page comes from useClients()'s getClientSummary, which
+  // ENRICHES each job with computed-only fields (amountPaid, remainingAmount,
+  // paymentStatus) that must never be written back to Firestore as if they
+  // were real job fields. updateJob's local cache replaces the whole record
+  // (see jobsMutations.js), so we always spread the RAW job doc from
+  // useData() — same pattern already used for updateEquipment elsewhere.
+  const handleSaveReminder = async () => {
+    const raw = rawJobs.find((j) => j.id === reminderModal.id);
+    if (!raw) return;
+    await updateJob(raw.id, { ...raw, reminderDate: reminderDraft || "" });
+    setReminderModal(null);
+  };
+  const handleClearReminder = async (job) => {
+    const raw = rawJobs.find((j) => j.id === job.id);
+    if (!raw) return;
+    await updateJob(raw.id, { ...raw, reminderDate: "" });
   };
 
   return (
@@ -141,6 +167,39 @@ const ClientDetailPage = () => {
                       <PlusIcon size={14}/> تسجيل دفعة على العملية دي
                     </button>
                   )}
+
+                  {/* Smart-alerts (Phase 1) — optional reminder date on this
+                      job (e.g. "تابع مع العميل يوم كذا"). Shows up in the
+                      notification bell + dashboard "تنبيهات هامة" card once
+                      within 7 days of the date (utils/maintenanceAlerts.js). */}
+                  {job.reminderDate ? (
+                    <div className="w-full mt-2 flex items-center justify-between gap-2 py-2 px-3 rounded-xl bg-surface-2 border border-white/8 text-xs">
+                      <span className="text-gray-400">
+                        🔔 تذكير: <span className="font-bold text-gray-200">{formatDateShort(job.reminderDate)}</span>
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          className="text-brand-400 hover:text-brand-300 font-semibold"
+                          onClick={() => { setReminderModal(job); setReminderDraft(job.reminderDate); }}
+                        >
+                          تعديل
+                        </button>
+                        <button
+                          className="text-gray-500 hover:text-red-400"
+                          onClick={() => handleClearReminder(job)}
+                        >
+                          إلغاء
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => { setReminderModal(job); setReminderDraft(todayISO()); }}
+                      className="w-full mt-2 flex items-center justify-center gap-2 py-2 rounded-xl bg-surface-2 border border-white/8 text-gray-400 text-xs font-bold hover:bg-surface-3 hover:text-gray-200 transition-colors"
+                    >
+                      🔔 تحديد تذكير على العملية دي
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -165,6 +224,24 @@ const ClientDetailPage = () => {
             />
           );
         })()}
+      </Modal>
+
+      {/* Reminder-date modal — smart-alerts Phase 1 */}
+      <Modal open={!!reminderModal} onClose={() => setReminderModal(null)} title="تحديد تذكير">
+        {reminderModal && (
+          <div className="space-y-4">
+            <Input
+              label="التاريخ"
+              type="date"
+              value={reminderDraft}
+              onChange={(e) => setReminderDraft(e.target.value)}
+            />
+            <div className="flex gap-3 justify-end pt-2">
+              <Button type="button" variant="ghost" onClick={() => setReminderModal(null)}>إلغاء</Button>
+              <Button type="button" onClick={handleSaveReminder} disabled={!reminderDraft}>حفظ</Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

@@ -1,5 +1,5 @@
 // src/pages/EquipmentDetailPage.jsx
-import React from "react";
+import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useEquipmentDetail } from "../hooks/useEquipmentDetail";
 import { useData }            from "../contexts/DataContext";
@@ -8,6 +8,7 @@ import ServiceHistoryCard     from "../features/equipment/ServiceHistoryCard";
 import DownloadReportButton   from "../components/ui/DownloadReportButton";
 import { Card, CardHeader, CardBody, StatCard, SummaryRow, EmptyState, ProgressBar, Badge } from "../components/ui/Card";
 import Button                 from "../components/ui/Button";
+import { NumberInput }        from "../components/ui/Input";
 import LoadingScreen          from "../components/ui/LoadingScreen";
 import { formatCurrency, formatNumber, formatDateShort, formatPercent } from "../utils/formatters";
 import { getLastOilChange, getLastGreaseDate } from "../utils/serviceHistory";
@@ -37,6 +38,8 @@ const EquipmentDetailPage = () => {
     stats, maintCost, netProfit, margin,
     loading, fuelPrice,
   } = useEquipmentDetail(equipmentId);
+  const [editingMeter, setEditingMeter] = useState(false);
+  const [meterDraft, setMeterDraft]     = useState("");
 
   if (loading) return <LoadingScreen />;
   if (!equipment) return (
@@ -50,6 +53,20 @@ const EquipmentDetailPage = () => {
   const parentLabel = parent?.name || equipment.customParentName || null;
   const lastOilChange = !isAttachment ? getLastOilChange(equipment) : null;
   const lastGreaseDate = isAttachment ? getLastGreaseDate(equipment) : null;
+
+  // Smart-alerts (Phase 1) — derived "due" status, same numbers
+  // useNotifications.js computes for the alert feed, shown here too so the
+  // owner can see it right where he'd act on it (no separate lookup).
+  const oilInterval = !isAttachment ? Number(equipment.oilChangeIntervalMeter) || 0 : 0;
+  const dueAtMeter = oilInterval && lastOilChange ? Number(lastOilChange.meter) + oilInterval : null;
+  const greaseInterval = isAttachment ? Number(equipment.greaseIntervalDays) || 0 : 0;
+  const greaseDueDate = (() => {
+    if (!greaseInterval || !lastGreaseDate) return null;
+    const d = new Date(lastGreaseDate);
+    if (Number.isNaN(d.getTime())) return null;
+    d.setDate(d.getDate() + greaseInterval);
+    return d.toISOString().slice(0, 10);
+  })();
 
   // Append/remove an entry to the equipment's oil-change or grease log.
   // Always spread the full raw equipment doc — the local reducer replaces
@@ -68,6 +85,14 @@ const EquipmentDetailPage = () => {
     await updateEquipment(equipment.id, {
       ...equipment, oilChangeHistory, lastOilChangeMeter: last?.meter ?? "",
     });
+  };
+  // Smart-alerts (Phase 1) — manual "current meter" update. Deliberately
+  // manual: the app has no way to read a tractor's real odometer/hour-meter
+  // on its own, so this is the one input that keeps the oil-change alert
+  // honest (see utils/maintenanceAlerts.js). Always spread the full
+  // equipment doc — see the pattern note on handleAddOilChange above.
+  const handleUpdateCurrentMeter = async (newValue) => {
+    await updateEquipment(equipment.id, { ...equipment, currentMeter: newValue });
   };
   const handleAddGrease = async (entry) => {
     const greaseHistory = [...(equipment.greaseHistory || []), entry];
@@ -155,15 +180,81 @@ const EquipmentDetailPage = () => {
               <span className="text-gray-400">آخر تشحيم:</span>
               <span className="font-bold text-gray-200">{lastGreaseDate ? formatDateShort(lastGreaseDate) : "—"}</span>
             </div>
+            {greaseDueDate && (
+              <div className="flex items-center gap-2 bg-amber-900/20 border border-amber-800/40 rounded-xl px-4 py-2.5 text-sm">
+                <CalendarIcon size={15} className="text-amber-400"/>
+                <span className="text-gray-400">موعد التشحيم الجاي:</span>
+                <span className="font-bold text-amber-300">{formatDateShort(greaseDueDate)}</span>
+              </div>
+            )}
           </>
         ) : (
-          <div className="flex items-center gap-2 bg-surface border border-white/8 rounded-xl px-4 py-2.5 text-sm">
-            <OilCanIcon size={15} className="text-gray-400"/>
-            <span className="text-gray-400">عداد آخر غيار زيت:</span>
-            <span className="font-bold text-gray-200">
-              {lastOilChange ? formatNumber(lastOilChange.meter) : "—"}
-            </span>
-          </div>
+          <>
+            <div className="flex items-center gap-2 bg-surface border border-white/8 rounded-xl px-4 py-2.5 text-sm">
+              <OilCanIcon size={15} className="text-gray-400"/>
+              <span className="text-gray-400">عداد آخر غيار زيت:</span>
+              <span className="font-bold text-gray-200">
+                {lastOilChange ? formatNumber(lastOilChange.meter) : "—"}
+              </span>
+            </div>
+
+            {/* Smart-alerts (Phase 1) — manual current-meter reading, the
+                one input the app can't infer on its own. */}
+            <div className="flex items-center gap-2 bg-surface border border-white/8 rounded-xl px-4 py-2.5 text-sm">
+              <OilCanIcon size={15} className="text-gray-400"/>
+              <span className="text-gray-400">العداد الحالي:</span>
+              {editingMeter ? (
+                <div className="flex items-center gap-1.5">
+                  <div className="w-28">
+                    <NumberInput
+                      value={meterDraft}
+                      onChange={(e) => setMeterDraft(e.target.value)}
+                      placeholder="مثال: 123500"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    className="text-xs font-bold text-brand-400 hover:text-brand-300 px-1"
+                    onClick={async () => {
+                      await handleUpdateCurrentMeter(meterDraft === "" ? "" : Number(meterDraft) || 0);
+                      setEditingMeter(false);
+                    }}
+                  >
+                    حفظ
+                  </button>
+                  <button
+                    type="button"
+                    className="text-xs text-gray-500 hover:text-gray-300 px-1"
+                    onClick={() => setEditingMeter(false)}
+                  >
+                    إلغاء
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="font-bold text-gray-200 hover:text-brand-400 transition-colors underline decoration-dotted underline-offset-4"
+                  onClick={() => { setMeterDraft(equipment.currentMeter ?? ""); setEditingMeter(true); }}
+                >
+                  {equipment.currentMeter || equipment.currentMeter === 0 ? formatNumber(equipment.currentMeter) : "— (اضغط للتحديث)"}
+                </button>
+              )}
+            </div>
+
+            {dueAtMeter != null && (
+              <div className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm border ${
+                Number(equipment.currentMeter) >= dueAtMeter
+                  ? "bg-red-900/20 border-red-800/40"
+                  : "bg-surface border-white/8"
+              }`}>
+                <OilCanIcon size={15} className={Number(equipment.currentMeter) >= dueAtMeter ? "text-red-400" : "text-gray-400"}/>
+                <span className="text-gray-400">الغيار الجاي عند:</span>
+                <span className={`font-bold ${Number(equipment.currentMeter) >= dueAtMeter ? "text-red-300" : "text-gray-200"}`}>
+                  {formatNumber(dueAtMeter)}
+                </span>
+              </div>
+            )}
+          </>
         )}
       </div>
 

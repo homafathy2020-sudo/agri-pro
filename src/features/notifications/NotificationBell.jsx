@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useNotifications } from "../../hooks/useNotifications";
-import { AlertIcon, DriverIcon } from "../../components/ui/Icons";
+import { AlertIcon, DriverIcon, OilCanIcon, CalendarIcon } from "../../components/ui/Icons";
 
 const SEVERITY_COLORS = {
   high:   { bg: "bg-red-900/30 border-red-800/40",    icon: "text-red-400",   dot: "bg-red-500"   },
@@ -10,7 +10,10 @@ const SEVERITY_COLORS = {
 };
 
 const TYPE_ICONS = {
-  debt_overdue:    DriverIcon,
+  debt_overdue:      DriverIcon,
+  oil_change_due:    OilCanIcon,
+  grease_due:        CalendarIcon,
+  job_reminder_due:  CalendarIcon,
 };
 
 const NotificationBell = () => {
