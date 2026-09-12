@@ -6,18 +6,20 @@ import { useData }       from "../contexts/DataContext";
 import SupplierPaymentForm from "../features/suppliers/SupplierPaymentForm";
 import Modal              from "../components/ui/Modal";
 import Button              from "../components/ui/Button";
+import DownloadReportButton from "../components/ui/DownloadReportButton";
 import { Input }           from "../components/ui/Input";
 import { Card, CardHeader, CardBody, SummaryRow, EmptyState, ProgressBar, Badge } from "../components/ui/Card";
 import LoadingScreen      from "../components/ui/LoadingScreen";
 import { formatCurrency, formatDateShort } from "../utils/formatters";
-import { CalendarIcon, PlusIcon, EditIcon } from "../components/ui/Icons";
+import { CalendarIcon, PlusIcon, EditIcon, PrintIcon } from "../components/ui/Icons";
+import { printSupplierInvoice, downloadSupplierInvoicePdf } from "../utils/pdfGenerator";
 
 const SupplierDetailPage = () => {
   const { supplierName }  = useParams();
   const navigate           = useNavigate();
   const decodedName        = decodeURIComponent(supplierName);
   const { getSupplierSummary, loading } = useSuppliers();
-  const { addSupplierPayment, renameSupplier } = useData();
+  const { addSupplierPayment, renameSupplier, supplierPayments = [], settings } = useData();
   const [payModal, setPayModal] = useState(null);
   const [renameModal, setRenameModal] = useState(false);
   const [renameValue, setRenameValue] = useState(decodedName);
@@ -122,6 +124,12 @@ const SupplierDetailPage = () => {
             .map((inv) => {
               const remaining = inv.remainingAmount;
               const isPaid    = remaining <= 0;
+              // نفس فكرة الفاتورة اللي بتتطبع/تتحمل لكل عملية في JobCard.jsx
+              // بالظبط — فاتورة المورد هنا عملية واحدة بمبلغ وتاريخ محددين،
+              // فطبيعي يكون ليها فاتورة زي أي عملية تانية في التطبيق، مش
+              // مجرد سجل بيانات من غير مستند.
+              const handlePrint    = () => printSupplierInvoice({ invoice: inv, supplierPayments, company: settings.company });
+              const handleDownload = () => downloadSupplierInvoicePdf({ invoice: inv, supplierPayments, company: settings.company });
               return (
                 <div key={inv.id} className={`bg-surface border rounded-2xl p-4 ${
                   !isPaid ? "border-red-800/40" : "border-white/8"
@@ -133,7 +141,17 @@ const SupplierDetailPage = () => {
                         <CalendarIcon size={11} /> {formatDateShort(inv.date)}
                       </div>
                     </div>
-                    <Badge variant={isPaid ? "green" : "red"}>{isPaid ? "مدفوع" : "لسه عليك"}</Badge>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <Badge variant={isPaid ? "green" : "red"}>{isPaid ? "مدفوع" : "لسه عليك"}</Badge>
+                      <button
+                        onClick={handlePrint}
+                        title="طباعة فاتورة"
+                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-transparent border border-white/10 text-gray-400 hover:text-gray-200 hover:bg-surface-2 transition-colors"
+                      >
+                        <PrintIcon size={13} />
+                      </button>
+                      <DownloadReportButton onDownload={handleDownload} title="تحميل فاتورة PDF" size="xs" className="px-2" />
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-3 gap-2">
