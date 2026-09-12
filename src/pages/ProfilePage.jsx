@@ -22,9 +22,11 @@ import LocalExportSection from "../features/profile/LocalExportSection";
 import DeleteAccountSection from "../features/profile/DeleteAccountSection";
 import RestoreModal from "../features/profile/RestoreModal";
 import ImportModal from "../features/profile/ImportModal";
-import { PrintIcon, LockIcon, CloudUploadIcon, TrashIcon } from "../components/ui/Icons";
+import BillingPage from "./BillingPage";
+import { PrintIcon, LockIcon, CloudUploadIcon, TrashIcon, WalletIcon } from "../components/ui/Icons";
 
 const TABS = [
+  { id: "billing",  label: "الاشتراك",          Icon: WalletIcon      },
   { id: "invoice",  label: "بيانات الفاتورة",   Icon: PrintIcon       },
   { id: "security", label: "الأمان",            Icon: LockIcon        },
   { id: "backup",   label: "النسخ الاحتياطي",   Icon: CloudUploadIcon },
@@ -34,7 +36,7 @@ const TABS = [
 const ProfilePage = () => {
   const { user } = useAuth();
   const { settings, saveSettings } = useData();
-  const [tab, setTab] = useState("invoice");
+  const [tab, setTab] = useState("billing");
 
   // نفس فكرة RestoreModal/ImportModal في ProfileModal.jsx القديمة —
   // البيبقوا sibling للتاب المفتوح، مش جوه BackupSection/LocalExportSection
@@ -42,8 +44,10 @@ const ProfilePage = () => {
   const [restoreOpen, setRestoreOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
 
+  // تاب "الاشتراك" محتاج عرض أوسع (زي صفحة /billing المستقلة بالظبط)
+  // عشان بطاقات الباقات التلاتة تتعرض جنب بعض من غير ما تتزنق.
   return (
-    <div className="p-4 lg:p-6 max-w-3xl mx-auto" dir="rtl">
+    <div className={`p-4 lg:p-6 mx-auto ${tab === "billing" ? "max-w-5xl" : "max-w-3xl"}`} dir="rtl">
       {/* Header — زي هيدر أي صفحة تانية في التطبيق */}
       <div className="mb-6">
         <h1 className="text-xl font-extrabold text-gray-100 mb-4">الملف الشخصي</h1>
@@ -70,6 +74,8 @@ const ProfilePage = () => {
           </button>
         ))}
       </div>
+
+      {tab === "billing" && <BillingPage embedded />}
 
       {tab === "invoice" && (
         <CompanyInvoiceSection user={user} settings={settings} saveSettings={saveSettings} />

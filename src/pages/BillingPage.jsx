@@ -216,7 +216,13 @@ const PlanCard = ({ plan, cycle, currentPlanId, onSubscribe }) => {
   );
 };
 
-const BillingPage = () => {
+// `embedded`: بيستخدمها تاب "الاشتراك" جوه ProfilePage.jsx — نفس الصفحة
+// بالحرف الواحد (صفر تكرار منطق)، بس من غير الغلاف الخارجي (padding +
+// max-width + dir) لأن ProfilePage بيوفر غلافه هو. الراوت المستقل
+// /billing (لسه مستخدم من أماكن تانية كتير: حدود المعدات/الفريق، بانر
+// الاشتراك، RequireModule) بيفضل شغال زي ما هو بالظبط لأن `embedded`
+// افتراضيًا false.
+const BillingPage = ({ embedded = false }) => {
   const [cycle, setCycle] = useState(BILLING_CYCLE.MONTHLY);
   const [subscribingPlan, setSubscribingPlan] = useState(null);
   const { loading, error, state, plan, expirationDate, daysUntilExpiration, daysSinceExpiration } = useEntitlement();
@@ -248,17 +254,21 @@ const BillingPage = () => {
   if (loading) return <LoadingScreen message="جاري تحميل بيانات الاشتراك..." />;
 
   if (error) {
+    const errorBox = (
+      <div className="bg-red-900/30 border border-red-800/50 rounded-xl px-4 py-3 text-sm text-red-200">
+        حصل خطأ في تحميل بيانات الاشتراك. جرّب تحدّث الصفحة، ولو المشكلة استمرت كلّم الدعم.
+      </div>
+    );
+    if (embedded) return errorBox;
     return (
       <div className="p-4 lg:p-6 max-w-5xl mx-auto" dir="rtl">
-        <div className="bg-red-900/30 border border-red-800/50 rounded-xl px-4 py-3 text-sm text-red-200">
-          حصل خطأ في تحميل بيانات الاشتراك. جرّب تحدّث الصفحة، ولو المشكلة استمرت كلّم الدعم.
-        </div>
+        {errorBox}
       </div>
     );
   }
 
-  return (
-    <div className="p-4 lg:p-6 max-w-5xl mx-auto" dir="rtl">
+  const content = (
+    <>
       <div className="mb-6">
         <h1 className="text-xl font-extrabold text-gray-100 flex items-center gap-2 mb-1">
           <WalletIcon size={22} className="text-brand-400" />
@@ -373,6 +383,14 @@ const BillingPage = () => {
       {subscribingPlan && (
         <PaymentModal plan={subscribingPlan} cycle={cycle} onClose={() => setSubscribingPlan(null)} />
       )}
+    </>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <div className="p-4 lg:p-6 max-w-5xl mx-auto" dir="rtl">
+      {content}
     </div>
   );
 };

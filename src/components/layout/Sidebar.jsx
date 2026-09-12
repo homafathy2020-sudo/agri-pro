@@ -13,7 +13,7 @@ import {
   HomeIcon, TractorIcon, ClipboardIcon,
   DriverIcon, WrenchIcon, ChartIcon,
   FuelIcon, LogoutIcon, AlertIcon, WalletIcon, ShieldIcon, BugIcon, MegaphoneIcon, DownloadIcon, ReceiptIcon, TruckIcon, SearchIcon,
-  StarIcon,
+  SettingsIcon,
 } from "../ui/Icons";
 
 // moduleKey يربط العنصر بمزية باقة (راجع src/config/constants/billing.js
@@ -32,7 +32,10 @@ const NAV_ITEMS = [
   { to: "/tax-deductions", label: "الضرائب والخصومات", Icon: ReceiptIcon },
   { to: "/notifications", label: "التنبيهات",       Icon: AlertIcon, badge: true },
   { to: "/reports",       label: "التقارير",        Icon: ChartIcon     },
-  { to: "/billing",       label: "الاشتراك",        Icon: StarIcon      },
+  // "الاشتراك" اتنقل جوه صفحة الملف الشخصي (تاب) بدل ما يكون عنصر منفصل
+  // هنا — الرابط ده بقى بياخد لصفحة الملف الشخصي نفسها، واسمه هنا
+  // "الإعدادات" بدل الاعتماد على زرار اسم المستخدم تحت بس.
+  { to: "/profile",       label: "الإعدادات",       Icon: SettingsIcon  },
 ];
 
 const Sidebar = ({ onClose }) => {
