@@ -12,7 +12,10 @@ import { Card, CardHeader, CardBody, SummaryRow, EmptyState, ProgressBar, Badge 
 import LoadingScreen      from "../components/ui/LoadingScreen";
 import { formatCurrency, formatDateShort } from "../utils/formatters";
 import { CalendarIcon, PlusIcon, EditIcon, PrintIcon } from "../components/ui/Icons";
-import { printSupplierInvoice, downloadSupplierInvoicePdf } from "../utils/pdfGenerator";
+import {
+  printSupplierInvoice, downloadSupplierInvoicePdf,
+  printSupplierStatement, downloadSupplierStatementPdf,
+} from "../utils/pdfGenerator";
 
 const SupplierDetailPage = () => {
   const { supplierName }  = useParams();
@@ -35,6 +38,16 @@ const SupplierDetailPage = () => {
     await addSupplierPayment(data);
     setPayModal(null);
   };
+
+  // فاتورة عامة تجمع كل فواتير المورد في مستند واحد — نفس الإجماليات
+  // المعروضة فوق بالظبط (totalInvoiced/totalPaidOut/totalPayable)، من غير
+  // أي حساب موازي جديد.
+  const handlePrintStatement = () => printSupplierStatement({
+    supplierName: decodedName, invoices, totalInvoiced, totalPaidOut, totalPayable, company: settings.company,
+  });
+  const handleDownloadStatement = () => downloadSupplierStatementPdf({
+    supplierName: decodedName, invoices, totalInvoiced, totalPaidOut, totalPayable, company: settings.company,
+  });
 
   // بعد التصحيح بيتنقل تلقائيًا لصفحة المورد بالاسم الجديد، لأن الرابط
   // (وده المورد نفسه فعليًا) مبني على الاسم — مفيش id تاني نرجعله.
@@ -86,11 +99,25 @@ const SupplierDetailPage = () => {
         <CardHeader
           title="الملخص المالي"
           actions={
-            totalPayable > 0 && (
-              <Button size="xs" variant="danger" onClick={() => setPayModal({})}>
-                <PlusIcon size={14}/> تسجيل دفعة
-              </Button>
-            )
+            <div className="flex items-center gap-1.5">
+              {ops > 0 && (
+                <>
+                  <button
+                    onClick={handlePrintStatement}
+                    title="طباعة فاتورة عامة للمورد"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-transparent border border-white/10 text-gray-400 hover:text-gray-200 hover:bg-surface-2 transition-colors"
+                  >
+                    <PrintIcon size={13} />
+                  </button>
+                  <DownloadReportButton onDownload={handleDownloadStatement} title="تحميل فاتورة عامة PDF" size="xs" className="px-2" />
+                </>
+              )}
+              {totalPayable > 0 && (
+                <Button size="xs" variant="danger" onClick={() => setPayModal({})}>
+                  <PlusIcon size={14}/> تسجيل دفعة
+                </Button>
+              )}
+            </div>
           }
         />
         <CardBody>

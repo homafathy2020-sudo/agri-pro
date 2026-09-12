@@ -11,4 +11,4 @@ export { printEquipmentReport, downloadEquipmentReportPdf } from "./pdf/equipmen
 export { downloadMonthlySummaryPdf } from "./pdf/monthlySummary";
 export { printDriverPayslip, downloadDriverPayslipPdf } from "./pdf/driverPayslip";
 export { downloadCustodyReportPdf } from "./pdf/custodyReport";
-export { printSupplierInvoice, downloadSupplierInvoicePdf } from "./pdf/supplierInvoice";
+export { printSupplierInvoice, downloadSupplierInvoicePdf, printSupplierStatement, downloadSupplierStatementPdf } from "./pdf/supplierInvoice";

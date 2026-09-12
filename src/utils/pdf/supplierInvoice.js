@@ -158,3 +158,153 @@ export const downloadSupplierInvoicePdf = (args) => {
   const { html, filename } = buildSupplierInvoiceHtml(args);
   return downloadReportPdf(html, filename);
 };
+
+// ── فاتورة عامة (شاملة) للمورد ────────────────────────────────────────────
+// نفس شكل الفاتورة المفردة (letterhead) بالظبط، بس بتجمع كل فواتير المورد
+// في مستند واحد — كل شغلانة بسطر: تاريخها، وصفها، حالتها (مدفوعة/جزئي/
+// لسه)، والمبالغ. الإجماليات هنا مش بتتحسب من جديد — بتيجي زي ما هي من
+// getSupplierSummary (نفس الأرقام المعروضة في صفحة المورد بالظبط)، وكل
+// سطر بيستخدم amountPaid/remainingAmount اللي محسوبة أصلاً على كل فاتورة
+// من نفس الهوك — عشان الورقة تطابق الشاشة 100%.
+const buildSupplierStatementHtml = ({ supplierName, invoices = [], totalInvoiced = 0, totalPaidOut = 0, totalPayable = 0, company = {} }) => {
+  const printedAt = formatDateTime(new Date());
+
+  const companyName = (company.name || "").trim() || "اسم الشركة / المزرعة";
+  const logoInitials = companyName.replace(/\s+/g, "").slice(0, 2) || "شر";
+  const metaLine2 = [
+    company.commercialRegister ? `سجل تجاري: ${escapeHtml(company.commercialRegister)}` : "",
+    company.taxNumber ? `الرقم الضريبي: ${escapeHtml(company.taxNumber)}` : "",
+  ].filter(Boolean).join(" · ");
+
+  const statusBadge = (remaining, amountPaid) => remaining <= 0
+    ? `<span class="badge badge-green">مدفوعة</span>`
+    : amountPaid > 0
+    ? `<span class="badge badge-amber">جزئياً</span>`
+    : `<span class="badge badge-red">لسه</span>`;
+
+  // Sort oldest → newest for a chronological ledger read (نفس أسلوب custodyReport.js)
+  const sorted = [...invoices].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+
+  const rows = sorted.map((inv) => `
+    <tr>
+      <td>${formatDate(inv.date)}</td>
+      <td>${escapeHtml(inv.description) || "—"}</td>
+      <td>${statusBadge(inv.remainingAmount, inv.amountPaid)}</td>
+      <td>${formatCurrency(inv.amount)}</td>
+      <td style="color:#15803d">${formatCurrency(inv.amountPaid)}</td>
+      <td style="color:${inv.remainingAmount > 0 ? "#991b1b" : "#15803d"}">${formatCurrency(inv.remainingAmount)}</td>
+    </tr>`
+  ).join("");
+
+  const overallBadge = totalPayable <= 0
+    ? `<span class="badge badge-green">مسدد بالكامل</span>`
+    : totalPaidOut > 0
+    ? `<span class="badge badge-amber">مسدد جزئياً</span>`
+    : `<span class="badge badge-red">غير مسدد</span>`;
+
+  const html = `
+    <style>${INVOICE_CSS}</style>
+    <div class="page inv-page">
+      <div class="inv-watermark">${totalPayable <= 0 ? "مسدد" : "فاتورة"}</div>
+
+      <div class="inv-header">
+        <div class="inv-company">
+          ${company.logo
+            ? `<img class="inv-logo-img" src="${escapeHtml(company.logo)}" alt="شعار الشركة" />`
+            : `<div class="inv-logo-box">${escapeHtml(logoInitials)}</div>`}
+          <div>
+            <div class="inv-company-name">${escapeHtml(companyName)}</div>
+            <div class="inv-company-meta">
+              ${company.address ? escapeHtml(company.address) : "أضف عنوان الشركة من الملف الشخصي"}
+              ${metaLine2 ? `<br>${metaLine2}` : ""}
+            </div>
+          </div>
+        </div>
+        <div class="inv-meta">
+          <span class="inv-tag">فاتورة عامة · مورّد</span>
+          <div class="inv-date">صدرت: ${printedAt}</div>
+          <div style="margin-top:8px">${overallBadge}</div>
+          <div class="inv-badge-note">
+            هذه الفاتورة صادرة إلكترونياً وتُعتمد بتوقيع الطرفين<br>
+            تجميع كل فواتير المورد حتى تاريخ الإصدار
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="stat-box">
+          <div class="stat-lbl">اسم المورد / الشخص</div>
+          <div class="stat-val">${escapeHtml(supplierName) || "—"}</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-lbl">عدد الفواتير</div>
+          <div class="stat-val">${sorted.length}</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="stat-box">
+          <div class="stat-lbl">إجمالي المستحق عليك</div>
+          <div class="stat-val" style="color:#d97706">${formatCurrency(totalInvoiced)}</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-lbl">إجمالي اللي دفعته</div>
+          <div class="stat-val" style="color:#15803d">${formatCurrency(totalPaidOut)}</div>
+        </div>
+        <div class="stat-box" style="grid-column:1 / -1;">
+          <div class="stat-lbl">المبلغ الباقي عليك</div>
+          <div class="stat-val" style="color:${totalPayable>0?"#991b1b":"#15803d"}">${formatCurrency(totalPayable)}</div>
+        </div>
+      </div>
+
+      ${rows ? `
+      <div class="section">
+        <h2>تفاصيل الفواتير (${sorted.length})</h2>
+        <table>
+          <thead><tr><th>التاريخ</th><th>الشغل</th><th>الحالة</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th></tr></thead>
+          <tbody>${rows}</tbody>
+          <tr class="total-row">
+            <td colspan="3">الإجمالي</td>
+            <td>${formatCurrency(totalInvoiced)}</td>
+            <td style="color:#15803d">${formatCurrency(totalPaidOut)}</td>
+            <td style="color:${totalPayable>0?"#991b1b":"#15803d"}">${formatCurrency(totalPayable)}</td>
+          </tr>
+        </table>
+      </div>` : `<div class="section"><p style="color:#666;text-align:center;padding:20px 0;">لا توجد فواتير مسجلة لهذا المورد بعد</p></div>`}
+
+      <div class="inv-closing">
+        <div class="inv-sign-section">
+          <div class="inv-sign-box">
+            <div class="inv-sign-line"></div>
+            <div class="inv-sign-label">توقيع المورد</div>
+            <div class="inv-sign-sub">${escapeHtml(supplierName) || ""}</div>
+          </div>
+          <div class="inv-sign-box">
+            <div class="inv-sign-line">
+              <div class="inv-stamp-hint">مكان<br>الختم</div>
+            </div>
+            <div class="inv-sign-label">توقيع واعتماد الشركة</div>
+            <div class="inv-sign-sub">${escapeHtml(companyName)}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const today = new Date().toLocaleDateString("ar-EG");
+  return {
+    html,
+    title: `فاتورة عامة - ${supplierName} - ${today}`,
+    filename: `فاتورة-عامة-مورد-${(supplierName || "").replace(/[<>:"/\\|?*]/g, "")}`,
+  };
+};
+
+export const printSupplierStatement = (args) => {
+  const { html, title } = buildSupplierStatementHtml(args);
+  printWindow(html, title);
+};
+
+export const downloadSupplierStatementPdf = (args) => {
+  const { html, filename } = buildSupplierStatementHtml(args);
+  return downloadReportPdf(html, filename);
+};
