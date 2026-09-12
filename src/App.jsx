@@ -28,6 +28,7 @@ import SuppliersPage          from "./pages/SuppliersPage";
 import SupplierDetailPage     from "./pages/SupplierDetailPage";
 import NotificationsPage      from "./pages/NotificationsPage";
 import BillingPage            from "./pages/BillingPage";
+import ProfilePage            from "./pages/ProfilePage";
 import AdminPage              from "./pages/AdminPage";
 import AdminBillingRequestsPage from "./pages/AdminBillingRequestsPage";
 import AdminErrorsPage        from "./pages/AdminErrorsPage";
@@ -60,6 +61,7 @@ const App = () => (
           <Route path="suppliers/:supplierName" element={<RequireModule module="suppliers"><SupplierDetailPage /></RequireModule>} />
           <Route path="notifications"           element={<NotificationsPage />} />
           <Route path="billing"                 element={<BillingPage />} />
+          <Route path="profile"                 element={<ProfilePage />} />
           <Route path="admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
           <Route path="admin/billing-requests" element={<AdminRoute><AdminBillingRequestsPage /></AdminRoute>} />
           <Route path="admin/errors" element={<AdminRoute><AdminErrorsPage /></AdminRoute>} />

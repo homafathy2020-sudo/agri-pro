@@ -1,6 +1,6 @@
 // src/components/layout/Sidebar.jsx
 import React from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import clsx from "clsx";
 import { useAuth } from "../../contexts/AuthContext";
 import { useData } from "../../contexts/DataContext";
@@ -9,7 +9,6 @@ import { useNotifications } from "../../hooks/useNotifications";
 import { formatInputNumber, parseInputNumber } from "../../utils/formatters";
 import { ADMIN_UIDS, MAX_MONEY_VALUE } from "../../config/constants";
 import { FOCUS_FUEL_PRICE_EVENT, FUEL_PRICE_SAVED_EVENT } from "../../utils/uiEvents";
-import ProfileModal from "../../features/profile/ProfileModal";
 import {
   HomeIcon, TractorIcon, ClipboardIcon,
   DriverIcon, WrenchIcon, ChartIcon,
@@ -43,8 +42,7 @@ const Sidebar = ({ onClose }) => {
   const { modules } = useEntitlement();
 
   const visibleNavItems = NAV_ITEMS.filter((item) => !item.moduleKey || modules?.[item.moduleKey]);
-
-  const [profileOpen, setProfileOpen] = React.useState(false);
+  const navigate = useNavigate();
 
   const [fuelDisplay, setFuelDisplay] = React.useState(
     () => formatInputNumber(settings.fuelPrice)
@@ -277,7 +275,7 @@ const Sidebar = ({ onClose }) => {
       {/* User */}
       <div className="px-4 pb-5 pt-2 border-t border-white/8">
         <button
-          onClick={() => setProfileOpen(true)}
+          onClick={() => { navigate("/profile"); onClose?.(); }}
           className="w-full flex items-center gap-3 text-right rounded-xl p-1.5 -m-1.5 transition-colors hover:bg-white/5"
         >
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-700 to-blue-700 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">
@@ -296,8 +294,6 @@ const Sidebar = ({ onClose }) => {
           </span>
         </button>
       </div>
-
-      <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
     </aside>
   );
 };
